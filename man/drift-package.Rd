@@ -6,6 +6,8 @@
 \alias{drift-package}
 \title{drift: Detecting Riparian and Inland Floodplain Transitions}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 Fetch STAC-hosted land cover rasters, classify and summarize change over time within user-provided AOI polygons, and produce standardized maps, plots, and tables for reporting. Generic STAC pipeline works with any classified raster (Esri IO LULC, ESA WorldCover, custom COGs).
 }
 \seealso{

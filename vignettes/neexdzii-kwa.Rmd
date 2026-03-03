@@ -118,3 +118,11 @@ trees_range |>
        title = "Tree cover loss in Neexdzii Kwa floodplain") +
   theme_minimal()
 ```
+
+## Interactive Map
+
+Toggle between time periods to see how land cover changed across the floodplain.
+
+```{r map-interactive, fig.height = 5}
+dft_map_interactive(classified, aoi = aoi)
+```
