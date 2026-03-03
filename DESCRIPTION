@@ -23,6 +23,7 @@ Depends:
 Imports:
     dplyr,
     rappdirs,
+    rlang,
     rstac,
     sf,
     terra,
