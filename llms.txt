@@ -1,0 +1,72 @@
+# drift
+
+Track land cover change in riparian and floodplain areas using free
+satellite imagery.
+
+drift fetches classified rasters from STAC catalogs (Esri IO LULC, ESA
+WorldCover, or your own COGs), applies class labels and colors, and
+summarizes area change over time — ready for reports, maps, and plots.
+
+## Why
+
+Monitoring riparian vegetation loss matters for fish habitat, water
+quality, and restoration planning. Satellite land cover products are
+free and global, but wrangling multi-year STAC data into usable
+summaries takes boilerplate. drift handles the pipeline so you can focus
+on the analysis.
+
+## Install
+
+``` r
+pak::pak("NewGraphEnvironment/drift")
+```
+
+## Quick start
+
+``` r
+library(drift)
+
+# Fetch IO LULC for your AOI
+rasters <- dft_stac_fetch(aoi, source = "io-lulc", years = c(2017, 2020, 2023))
+
+# Classify with standard labels and colors
+classified <- dft_rast_classify(rasters, source = "io-lulc")
+
+# Summarize area by class and year
+summary <- dft_rast_summarize(classified, unit = "ha")
+```
+
+## Documentation
+
+Full reference and a worked example (Neexdzii Kwa floodplain, 2017-2023)
+at the [pkgdown site](https://www.newgraphenvironment.com/drift/).
+
+# Package index
+
+## All functions
+
+- [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
+  : Clear the drift tile cache
+- [`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
+  : Show drift cache info
+- [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
+  : Get drift cache directory path
+- [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+  : Load shipped class lookup table
+- [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+  : Classify a raster with factor levels and colors
+- [`dft_rast_summarize()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.md)
+  : Summarize area by class
+- [`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md)
+  : Extract class table from STAC item metadata
+- [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+  : Get STAC configuration for a known land cover source
+- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  : Fetch STAC-hosted rasters via gdalcubes
+
+# Articles
+
+### All vignettes
+
+- [Land Cover Change — Neexdzii
+  Kwa](https://newgraphenvironment.github.io/drift/articles/neexdzii-kwa.md):
