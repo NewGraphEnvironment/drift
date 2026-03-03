@@ -1,0 +1,11 @@
+code,class_name,color,description
+0,No Data,#000000,No data
+1,Water,#419bdf,Water bodies
+2,Trees,#397d49,Tree cover
+4,Flooded Vegetation,#7a87c6,Flooded vegetation / wetlands
+5,Crops,#e49635,Cropland
+7,Built Area,#c4281b,Built-up / urban areas
+8,Bare Ground,#a59b8f,Bare ground / rock
+9,Snow/Ice,#a8ebff,Snow and ice
+10,Clouds,#616161,Cloud cover
+11,Rangeland,#e3e2c3,Grassland / shrubland

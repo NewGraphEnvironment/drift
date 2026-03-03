@@ -1,0 +1,12 @@
+code,class_name,color,description
+10,Tree cover,#006400,Tree cover
+20,Shrubland,#ffbb22,Shrubland
+30,Grassland,#ffff4c,Grassland
+40,Cropland,#f096ff,Cropland
+50,Built-up,#fa0000,Built-up
+60,Bare / sparse vegetation,#b4b4b4,Bare / sparse vegetation
+70,Snow and ice,#f0f0f0,Snow and ice
+80,Permanent water bodies,#0064c8,Permanent water bodies
+90,Herbaceous wetland,#0096a0,Herbaceous wetland
+95,Mangroves,#00cf75,Mangroves
+100,Moss and lichen,#fae6a0,Moss and lichen

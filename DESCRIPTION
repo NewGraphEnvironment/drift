@@ -1,0 +1,44 @@
+Package: drift
+Title: Detecting Riparian and Inland Floodplain Transitions
+Version: 0.0.0.9000
+Authors@R: c(
+    person("Allan", "Irvine", , "al@newgraphenvironment.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-3495-2128")),
+    person("New Graph Environment", role = "cph")
+    )
+Description: Fetch STAC-hosted land cover rasters, classify and summarize
+    change over time within user-provided AOI polygons, and produce
+    standardized maps, plots, and tables for reporting. Generic STAC
+    pipeline works with any classified raster (Esri IO LULC, ESA
+    WorldCover, custom COGs).
+License: MIT + file LICENSE
+URL: https://github.com/NewGraphEnvironment/drift,
+    https://newgraphenvironment.github.io/drift/
+BugReports: https://github.com/NewGraphEnvironment/drift/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends:
+    R (>= 4.1)
+Imports:
+    dplyr,
+    rappdirs,
+    rstac,
+    sf,
+    terra,
+    tibble
+Suggests:
+    DT,
+    flooded,
+    gdalcubes,
+    ggplot2,
+    gq,
+    gt,
+    knitr,
+    mapgl,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    tidyterra,
+    tmap
+Config/testthat/edition: 3
+VignetteBuilder: knitr
