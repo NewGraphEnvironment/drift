@@ -36,6 +36,12 @@ classified <- dft_rast_classify(rasters, source = "io-lulc")
 summary <- dft_rast_summarize(classified, unit = "ha")
 ```
 
+## Related packages
+
+[flooded](https://github.com/NewGraphEnvironment/flooded) delineates
+floodplain extents from DEMs and stream networks — use it to generate
+the AOI polygons that drift analyzes for land cover change.
+
 ## Documentation
 
 Full reference and a worked example (Neexdzii Kwa floodplain, 2017-2023)
