@@ -140,6 +140,28 @@ knitr::kable(change, digits = 2, caption = "Land cover change 2017–2023 (ha)")
 
 Land cover change 2017–2023 (ha)
 
+## Vegetation Change
+
+Bar plot of the dominant vegetation classes over time. Trees and
+Rangeland show the clearest signal — tree cover declining while
+rangeland expands.
+
+``` r
+library(ggplot2)
+
+summary_tbl |>
+  dplyr::filter(class_name %in% c("Trees", "Rangeland")) |>
+  ggplot(aes(x = year, y = area, fill = year)) +
+  geom_col() +
+  facet_wrap(~class_name, scales = "free_y") +
+  scale_fill_brewer(palette = "YlGnBu") +
+  labs(y = "Area (ha)", x = NULL, fill = "Year",
+       title = "Vegetation cover in Neexdzii Kwa floodplain") +
+  theme_minimal()
+```
+
+![](neexdzii-kwa_files/figure-html/plot-vegetation-1.png)
+
 ## Interactive Map
 
 Toggle between time periods to see how land cover changed across the
