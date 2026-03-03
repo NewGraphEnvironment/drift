@@ -46,6 +46,7 @@ Suggests:
     tidyterra,
     tmap
 Remotes:
+    bhaskarvk/leaflet.extras,
     NewGraphEnvironment/flooded,
     NewGraphEnvironment/gq
 Config/testthat/edition: 3
