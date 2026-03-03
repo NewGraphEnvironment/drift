@@ -22,6 +22,7 @@ library(gdalcubes)
 library(dplyr)
 
 sf::sf_use_s2(FALSE)
+gdalcubes::gdalcubes_options(parallel = parallel::detectCores())
 
 # --- Timing helper ----
 t0 <- Sys.time()
