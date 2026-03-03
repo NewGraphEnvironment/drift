@@ -42,5 +42,8 @@ Suggests:
     tidyr,
     tidyterra,
     tmap
+Remotes:
+    NewGraphEnvironment/flooded,
+    NewGraphEnvironment/gq
 Config/testthat/edition: 3
 VignetteBuilder: knitr
