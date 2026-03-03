@@ -13,13 +13,13 @@ Source:
 [`DESCRIPTION`](https://github.com/NewGraphEnvironment/drift/blob/main/DESCRIPTION)
 
 Irvine A (2026). *drift: Detecting Riparian and Inland Floodplain
-Transitions*. R package version 0.0.0.9000,
+Transitions*. R package version 0.1.0,
 <https://github.com/NewGraphEnvironment/drift>.
 
     @Manual{,
       title = {drift: Detecting Riparian and Inland Floodplain Transitions},
       author = {Allan Irvine},
       year = {2026},
-      note = {R package version 0.0.0.9000},
+      note = {R package version 0.1.0},
       url = {https://github.com/NewGraphEnvironment/drift},
     }

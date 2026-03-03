@@ -136,46 +136,6 @@ knitr::kable(change, digits = 2, caption = "Land cover change 2017–2023 (ha)")
 
 Land cover change 2017–2023 (ha)
 
-## Trees vs Rangeland
-
-The key signal in this floodplain is the shift from Trees to Rangeland
-over time.
-
-``` r
-trees_range <- summary_tbl |>
-  dplyr::filter(class_name %in% c("Trees", "Rangeland")) |>
-  dplyr::select(year, class_name, area, pct)
-
-knitr::kable(trees_range, digits = 2,
-             caption = "Trees and Rangeland area by year (ha)")
-```
-
-| year | class_name |  area |   pct |
-|:-----|:-----------|------:|------:|
-| 2017 | Trees      | 71.27 | 57.89 |
-| 2017 | Rangeland  | 31.86 | 25.88 |
-| 2020 | Trees      | 55.42 | 45.02 |
-| 2020 | Rangeland  | 53.38 | 43.36 |
-| 2023 | Trees      | 50.07 | 40.67 |
-| 2023 | Rangeland  | 61.67 | 50.09 |
-
-Trees and Rangeland area by year (ha)
-
-``` r
-library(ggplot2)
-
-trees_range |>
-  ggplot(aes(x = year, y = area, fill = year)) +
-  geom_col() +
-  facet_wrap(~class_name, scales = "free_y") +
-  scale_fill_brewer(palette = "YlGnBu") +
-  labs(y = "Area (ha)", x = NULL, fill = "Year",
-       title = "Tree cover loss in Neexdzii Kwa floodplain") +
-  theme_minimal()
-```
-
-![](neexdzii-kwa_files/figure-html/plot-trees-rangeland-1.png)
-
 ## Interactive Map
 
 Toggle between time periods to see how land cover changed across the
