@@ -57,18 +57,36 @@ summarize_one <- function(r, class_table, m2_to_unit, year_label = NULL) {
   cell_area_m2 <- res[1] * res[2]
   total_cells <- sum(freq_tbl$count)
 
-  result <- tibble::tibble(
-    code = as.integer(freq_tbl$value),
-    n_cells = as.integer(freq_tbl$count)
-  )
+  if (terra::is.factor(r)) {
+    # Factor raster: freq returns class names in value column
+    result <- tibble::tibble(
+      class_name = as.character(freq_tbl$value),
+      n_cells = as.integer(freq_tbl$count)
+    )
+    # Join code and color from class_table
+    ct_join <- class_table[c("code", "class_name", "color")]
+    result <- dplyr::left_join(result, ct_join, by = "class_name")
+  } else {
+    # Raw integer raster: freq returns codes in value column
+    result <- tibble::tibble(
+      code = as.integer(freq_tbl$value),
+      n_cells = as.integer(freq_tbl$count)
+    )
+    ct_join <- class_table[c("code", "class_name", "color")]
+    result <- dplyr::left_join(result, ct_join, by = "code")
+  }
 
-  # Join class info
-  ct_join <- class_table[c("code", "class_name", "color")]
-  result <- dplyr::left_join(result, ct_join, by = "code")
-
-  # Fill unknown codes
+  # Fill unknown codes/classes
   result$class_name[is.na(result$class_name)] <- paste0("Unknown_", result$code[is.na(result$class_name)])
   result$color[is.na(result$color)] <- "#cccccc"
+  if (is.null(result$code) || any(is.na(result$code))) {
+    # Reverse-lookup codes for classes not in class_table
+    missing <- is.na(result$code)
+    if (any(missing)) {
+      code_lookup <- stats::setNames(class_table$code, class_table$class_name)
+      result$code[missing] <- as.integer(code_lookup[result$class_name[missing]])
+    }
+  }
 
   result$area <- result$n_cells * cell_area_m2 * m2_to_unit
   result$pct <- round(result$n_cells / total_cells * 100, 2)
