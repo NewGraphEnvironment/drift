@@ -175,3 +175,12 @@ trees_range |>
 ```
 
 ![](neexdzii-kwa_files/figure-html/plot-trees-rangeland-1.png)
+
+## Interactive Map
+
+Toggle between time periods to see how land cover changed across the
+floodplain.
+
+``` r
+dft_map_interactive(classified, aoi = aoi)
+```
