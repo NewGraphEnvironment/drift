@@ -176,7 +176,9 @@ trans_colors <- c("Rangeland" = "#e74c3c", "Crops" = "#e67e22",
 
 map <- leaflet::leaflet() |>
   leaflet::addProviderTiles("CartoDB.Positron", group = "Light") |>
-  leaflet::addProviderTiles("Esri.WorldImagery", group = "Satellite")
+  leaflet::addProviderTiles("Esri.WorldImagery", group = "Esri Satellite") |>
+  leaflet::addTiles("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+                     group = "Google Satellite")
 
 overlay_groups <- c()
 
@@ -212,7 +214,7 @@ ext <- terra::ext(terra::project(classified[["2017"]], "EPSG:4326"))
 map <- leaflet::setView(map, lng = mean(c(ext[1], ext[2])),
                          lat = mean(c(ext[3], ext[4])), zoom = 14)
 map <- leaflet::addLayersControl(map,
-        baseGroups = c("Light", "Satellite"),
+        baseGroups = c("Light", "Esri Satellite", "Google Satellite"),
         overlayGroups = overlay_groups,
         options = leaflet::layersControlOptions(collapsed = FALSE))
 map <- leaflet.extras::addFullscreenControl(map)

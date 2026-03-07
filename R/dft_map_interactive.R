@@ -17,8 +17,9 @@
 #'   `"https://titiler.example.com"`). Only used when `x` contains COG URLs.
 #'   Defaults to `getOption("drift.titiler_url")`. If `NULL` in COG mode, an
 #'   error is raised prompting the user to set the option.
-#' @param basemaps Named character vector of provider tile IDs. The first
-#'   element is the default basemap. Names become radio button labels.
+#' @param basemaps Named character vector of provider tile IDs or tile URL
+#'   templates (starting with `http`). The first element is the default
+#'   basemap. Names become radio button labels.
 #' @param legend_position Legend placement passed to [leaflet::addLegend()].
 #'   Set to `NULL` to suppress the legend.
 #' @param zoom Initial zoom level.
@@ -59,7 +60,8 @@ dft_map_interactive <- function(x,
                                 source = "io-lulc",
                                 titiler_url = getOption("drift.titiler_url"),
                                 basemaps = c("Light" = "CartoDB.Positron",
-                                             "Satellite" = "Esri.WorldImagery"),
+                                             "Esri Satellite" = "Esri.WorldImagery",
+                                             "Google Satellite" = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"),
                                 legend_position = "bottomright",
                                 zoom = 14) {
   rlang::check_installed(c("leaflet", "leaflet.extras"))
@@ -113,7 +115,13 @@ dft_map_interactive <- function(x,
   # Add basemaps — first is default
 
   for (i in seq_along(basemaps)) {
-    map <- leaflet::addProviderTiles(map, basemaps[[i]], group = names(basemaps)[[i]])
+    bm <- basemaps[[i]]
+    nm <- names(basemaps)[[i]]
+    if (grepl("^https?://", bm)) {
+      map <- leaflet::addTiles(map, urlTemplate = bm, group = nm)
+    } else {
+      map <- leaflet::addProviderTiles(map, bm, group = nm)
+    }
   }
 
   # Add layers
