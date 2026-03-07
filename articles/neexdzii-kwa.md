@@ -162,6 +162,65 @@ summary_tbl |>
 
 ![](neexdzii-kwa_files/figure-html/plot-vegetation-1.png)
 
+## Transition Detection
+
+Identify exactly which pixels changed from one class to another between
+time steps.
+[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+compares two rasters cell-by-cell and returns a transition raster plus a
+summary table.
+
+``` r
+result <- dft_rast_transition(classified, from = "2017", to = "2023")
+knitr::kable(result$summary, digits = 2, caption = "All land cover transitions 2017–2023")
+```
+
+| from_class         | to_class   | n_cells |  area |   pct |
+|:-------------------|:-----------|--------:|------:|------:|
+| Trees              | Trees      |    4918 | 49.18 | 39.95 |
+| Rangeland          | Rangeland  |    3026 | 30.26 | 24.58 |
+| Trees              | Rangeland  |    2111 | 21.11 | 17.15 |
+| Crops              | Rangeland  |     998 |  9.98 |  8.11 |
+| Water              | Water      |     938 |  9.38 |  7.62 |
+| Trees              | Water      |      98 |  0.98 |  0.80 |
+| Rangeland          | Trees      |      85 |  0.85 |  0.69 |
+| Rangeland          | Water      |      75 |  0.75 |  0.61 |
+| Built Area         | Rangeland  |      28 |  0.28 |  0.23 |
+| Built Area         | Built Area |      26 |  0.26 |  0.21 |
+| Water              | Trees      |       3 |  0.03 |  0.02 |
+| Flooded Vegetation | Rangeland  |       2 |  0.02 |  0.02 |
+| Snow/Ice           | Rangeland  |       2 |  0.02 |  0.02 |
+| Built Area         | Trees      |       1 |  0.01 |  0.01 |
+
+All land cover transitions 2017–2023
+
+### Filter to Tree Loss
+
+Focus on the pixels where Trees in 2017 became agriculture-related
+classes by 2023. At 10 m resolution, Crops, Rangeland, and Bare Ground
+can represent different phases of the same land use depending on
+satellite overpass timing.
+
+``` r
+tree_loss <- dft_rast_transition(classified, from = "2017", to = "2023",
+                                  from_class = "Trees",
+                                  to_class = c("Crops", "Rangeland", "Bare Ground"))
+tree_loss$summary
+#> # A tibble: 1 × 5
+#>   from_class to_class  n_cells  area   pct
+#>   <chr>      <chr>       <int> <dbl> <dbl>
+#> 1 Trees      Rangeland    2111  21.1   100
+```
+
+### Plot Transition Raster
+
+``` r
+terra::plot(result$raster, main = "Land cover transitions 2017–2023",
+            axes = FALSE, mar = c(1, 1, 2, 6))
+```
+
+![](neexdzii-kwa_files/figure-html/plot-transition-1.png)
+
 ## Interactive Map
 
 Toggle between time periods to see how land cover changed across the
@@ -169,4 +228,69 @@ floodplain.
 
 ``` r
 dft_map_interactive(classified, aoi = aoi)
+```
+
+### Transition Map
+
+Each transition from Trees is shown as a separate toggleable layer,
+making it easy to ground-truth specific change types against satellite
+basemaps.
+
+``` r
+# All transitions from Trees (excluding stable Trees->Trees)
+all_from_trees <- dft_rast_transition(classified, from = "2017", to = "2023",
+                                       from_class = "Trees")
+to_classes <- all_from_trees$summary$to_class
+to_classes <- to_classes[to_classes != "Trees"]
+
+# Color palette for transition types
+trans_colors <- c("Rangeland" = "#e74c3c", "Crops" = "#e67e22",
+                  "Bare Ground" = "#8e44ad", "Water" = "#3498db",
+                  "Built Area" = "#2c3e50", "Flooded Vegetation" = "#1abc9c")
+
+map <- leaflet::leaflet() |>
+  leaflet::addProviderTiles("CartoDB.Positron", group = "Light") |>
+  leaflet::addProviderTiles("Esri.WorldImagery", group = "Esri Satellite") |>
+  leaflet::addTiles("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+                     group = "Google Satellite")
+
+overlay_groups <- c()
+
+for (tc in to_classes) {
+  trans <- dft_rast_transition(classified, from = "2017", to = "2023",
+                                from_class = "Trees", to_class = tc)
+  if (nrow(trans$summary) == 0) next
+
+  label <- paste0("Trees -> ", tc)
+  col <- if (tc %in% names(trans_colors)) trans_colors[[tc]] else "#999999"
+  r_proj <- terra::project(trans$raster, "EPSG:4326")
+  map <- leaflet::addRasterImage(map, r_proj, group = label,
+                                  colors = col, project = FALSE)
+  overlay_groups <- c(overlay_groups, label)
+}
+
+# AOI outline
+map <- leaflet::addPolygons(map, data = sf::st_transform(aoi, 4326),
+                             fill = FALSE, color = "red", weight = 2, group = "AOI")
+overlay_groups <- c(overlay_groups, "AOI")
+
+# Legend
+legend_colors <- vapply(to_classes, function(tc) {
+  if (tc %in% names(trans_colors)) trans_colors[[tc]] else "#999999"
+}, character(1))
+map <- leaflet::addLegend(map, position = "bottomright",
+                           colors = legend_colors,
+                           labels = paste0("Trees -> ", to_classes),
+                           title = "Tree Loss 2017-2023", opacity = 1)
+
+# Center and controls
+ext <- terra::ext(terra::project(classified[["2017"]], "EPSG:4326"))
+map <- leaflet::setView(map, lng = mean(c(ext[1], ext[2])),
+                         lat = mean(c(ext[3], ext[4])), zoom = 14)
+map <- leaflet::addLayersControl(map,
+        baseGroups = c("Light", "Esri Satellite", "Google Satellite"),
+        overlayGroups = overlay_groups,
+        options = leaflet::layersControlOptions(collapsed = FALSE))
+map <- leaflet.extras::addFullscreenControl(map)
+map
 ```

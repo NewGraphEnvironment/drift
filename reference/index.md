@@ -16,6 +16,8 @@
   : Classify a raster with factor levels and colors
 - [`dft_rast_summarize()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.md)
   : Summarize area by class
+- [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  : Detect land cover transitions between two time steps
 - [`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md)
   : Extract class table from STAC item metadata
 - [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
