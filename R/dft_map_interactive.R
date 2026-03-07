@@ -1,7 +1,13 @@
-#' Interactive leaflet map for classified rasters
+#' Interactive leaflet map for classified rasters and transitions
 #'
 #' Build a toggleable leaflet map from classified `SpatRaster`s or remote COG
-#' URLs served via titiler. Includes layer control, legend, and fullscreen.
+#' URLs served via titiler. Optionally overlay land cover transitions from
+#' [dft_rast_transition()]. Includes layer control, legend, and fullscreen.
+#'
+#' When only `x` is supplied, classified layers appear as radio-toggle overlays
+#' (one visible at a time). When `transition` is also supplied, each transition
+#' type (e.g. Trees -> Rangeland) is added as a checkbox overlay that can be
+#' shown simultaneously on top of any classified layer.
 #'
 #' @param x A named list of classified [terra::SpatRaster]s (e.g. from
 #'   [dft_rast_classify()]) **or** a named character vector of COG URLs.
@@ -9,6 +15,10 @@
 #'   list/vector. Names become the layer toggle labels (years, seasons, etc.).
 #' @param aoi An `sf` polygon for the area of interest outline. `NULL` (default)
 #'   omits the AOI layer.
+#' @param transition Output of [dft_rast_transition()] — a list with elements
+#'   `raster` (factor `SpatRaster`) and `summary` (tibble). Each transition
+#'   type becomes a toggleable overlay. Stable transitions (same from/to class)
+#'   are excluded by default. `NULL` (default) omits transition overlays.
 #' @param class_table A tibble with columns `code`, `class_name`, `color`
 #'   (hex). When `NULL`, loaded via [dft_class_table()] using `source`.
 #' @param source Character. Used to load a shipped class table when
@@ -25,7 +35,8 @@
 #' @param zoom Initial zoom level.
 #'
 #' @return A [leaflet::leaflet] htmlwidget. The first layer in `x` is visible
-#'   by default; other layers are hidden but toggleable.
+#'   by default; other layers are hidden but toggleable. Transition overlays
+#'   are visible by default when supplied.
 #' @export
 #' @examples
 #' # Single classified raster — returns a leaflet widget
@@ -48,6 +59,12 @@
 #' map <- dft_map_interactive(classified, aoi = aoi)
 #' if (interactive()) map
 #'
+#' # Combined: classified layers + transition overlays
+#' trans <- dft_rast_transition(classified, from = "2017", to = "2023",
+#'                              from_class = "Trees")
+#' map <- dft_map_interactive(classified, aoi = aoi, transition = trans)
+#' if (interactive()) map
+#'
 #' \dontrun{
 #' # Remote COGs via titiler (requires options(drift.titiler_url = "..."))
 #' cogs <- c("2017" = "https://bucket.s3.amazonaws.com/lulc_2017.tif",
@@ -56,6 +73,7 @@
 #' }
 dft_map_interactive <- function(x,
                                 aoi = NULL,
+                                transition = NULL,
                                 class_table = NULL,
                                 source = "io-lulc",
                                 titiler_url = getOption("drift.titiler_url"),
@@ -70,8 +88,15 @@ dft_map_interactive <- function(x,
     class_table <- dft_class_table(source)
   }
 
-  # Detect mode and normalize input
+  # Validate transition input
+  if (!is.null(transition)) {
+    if (!is.list(transition) || !all(c("raster", "summary") %in% names(transition))) {
+      stop("`transition` must be output of dft_rast_transition() ",
+           "(a list with $raster and $summary).")
+    }
+  }
 
+  # Detect mode and normalize input
   cog_mode <- is.character(x)
 
   if (cog_mode) {
@@ -113,7 +138,6 @@ dft_map_interactive <- function(x,
   }
 
   # Add basemaps — first is default
-
   for (i in seq_along(basemaps)) {
     bm <- basemaps[[i]]
     nm <- names(basemaps)[[i]]
@@ -124,7 +148,7 @@ dft_map_interactive <- function(x,
     }
   }
 
-  # Add layers
+  # Add classified layers
   if (cog_mode) {
     for (nm in names(x)) {
       tile_url <- build_titiler_url(titiler_url, x[[nm]], class_table)
@@ -141,8 +165,19 @@ dft_map_interactive <- function(x,
     }
   }
 
-  # AOI outline
+  # Track overlay groups (classified layers are radio-toggled via hideGroup)
   overlay_groups <- names(x)
+
+  # Add transition overlays
+  trans_groups <- character(0)
+  if (!is.null(transition)) {
+    trans_result <- add_transition_layers(map, transition, class_table)
+    map <- trans_result$map
+    trans_groups <- trans_result$groups
+    overlay_groups <- c(overlay_groups, trans_groups)
+  }
+
+  # AOI outline
   if (!is.null(aoi)) {
     map <- leaflet::addPolygons(
       map,
@@ -153,7 +188,7 @@ dft_map_interactive <- function(x,
     overlay_groups <- c(overlay_groups, "AOI")
   }
 
-  # Legend
+  # Legend — land cover classes
   if (!is.null(legend_position)) {
     if (cog_mode) {
       ct_legend <- class_table[class_table$class_name != "No Data", ]
@@ -172,6 +207,19 @@ dft_map_interactive <- function(x,
       title = "Land Cover",
       opacity = 1
     )
+
+    # Legend — transitions
+    if (length(trans_groups) > 0) {
+      trans_colors <- attr(trans_result, "colors")
+      map <- leaflet::addLegend(
+        map,
+        position = legend_position,
+        colors = trans_colors,
+        labels = trans_groups,
+        title = "Transitions",
+        opacity = 1
+      )
+    }
   }
 
   # Layer control + fullscreen
@@ -181,10 +229,76 @@ dft_map_interactive <- function(x,
     overlayGroups = overlay_groups,
     options = leaflet::layersControlOptions(collapsed = FALSE)
   )
+  # Hide all classified layers except the first (radio-style toggle)
   map <- leaflet::hideGroup(map, setdiff(names(x), names(x)[1]))
   map <- leaflet.extras::addFullscreenControl(map)
 
   map
+}
+
+
+#' Add transition overlay layers to a leaflet map
+#'
+#' @param map A leaflet map object.
+#' @param transition Output of [dft_rast_transition()].
+#' @param class_table Class table for color lookup.
+#' @return A list with `map` (updated leaflet), `groups` (overlay group names).
+#'   Has attribute `"colors"` with the hex colors used.
+#' @noRd
+add_transition_layers <- function(map, transition, class_table) {
+  s <- transition$summary
+  r <- transition$raster
+
+  # Exclude stable transitions (from == to)
+  s <- s[s$from_class != s$to_class, , drop = FALSE]
+
+  if (nrow(s) == 0) {
+    result <- list(map = map, groups = character(0))
+    attr(result, "colors") <- character(0)
+    return(result)
+  }
+
+  # Build color lookup from class_table: to_class gets its class color
+  color_lookup <- stats::setNames(class_table$color, class_table$class_name)
+
+  # Get factor levels table
+  lvls <- terra::cats(r)[[1]]
+
+  groups <- character(0)
+  colors <- character(0)
+
+  for (i in seq_len(nrow(s))) {
+    label <- paste0(s$from_class[i], " -> ", s$to_class[i])
+
+    # Find this transition in factor levels
+    lvl_row <- lvls[lvls$transition == label, , drop = FALSE]
+    if (nrow(lvl_row) == 0) next
+
+    # Create binary mask: 1 where this transition, NA elsewhere
+    r_mask <- terra::rast(r)
+    raw_vals <- terra::values(r)
+    terra::values(r_mask) <- ifelse(raw_vals == lvl_row$id[1], 1L, NA_integer_)
+
+    # Color from to_class
+    col <- if (s$to_class[i] %in% names(color_lookup)) {
+      color_lookup[[s$to_class[i]]]
+    } else {
+      "#999999"
+    }
+
+    r_proj <- terra::project(r_mask, "EPSG:4326", method = "near")
+    map <- leaflet::addRasterImage(
+      map, r_proj, group = label,
+      colors = col, project = FALSE
+    )
+
+    groups <- c(groups, label)
+    colors <- c(colors, col)
+  }
+
+  result <- list(map = map, groups = groups)
+  attr(result, "colors") <- colors
+  result
 }
 
 
