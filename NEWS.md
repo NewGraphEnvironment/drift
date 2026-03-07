@@ -2,6 +2,7 @@
 
 - `dft_rast_transition()` — cell-by-cell land cover transition detection with from/to class filters
 - `dft_map_interactive()` — new `transition` parameter overlays transition layers as checkboxes; add Google Satellite and Esri Satellite basemaps; support custom tile URLs
+- `dft_rast_consensus()` — per-pixel mode across classified rasters for temporal noise filtering; optional confidence layer
 - Vignette: transition detection, tree loss filtering, single combined interactive map
 
 # drift 0.1.0
