@@ -1,3 +1,9 @@
+# drift (development)
+
+- `dft_rast_transition()` — cell-by-cell land cover transition detection with from/to class filters
+- `dft_map_interactive()` — add Google Satellite and Esri Satellite basemaps; support custom tile URLs
+- Vignette: transition detection, tree loss filtering, and multi-layer transition map
+
 # drift 0.1.0
 
 Initial public release.
