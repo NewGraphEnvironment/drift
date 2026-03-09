@@ -632,7 +632,7 @@ drift::dft_map_interactive(classified, aoi = aoi)
   [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md)
   serves tiles via titiler — set `options(drift.titiler_url = "...")`
 - See the [drift
-  vignette](https://www.newgraphenvironment.com/drift/articles/neexdzii-kwa.html)
+  vignette](https://www.newgraphenvironment.com/drift/articles/land-cover-change.html)
   for a worked example (Neexdzii Kwa floodplain, 2017-2023)
 
 # Code Check Conventions
