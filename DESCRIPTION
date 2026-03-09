@@ -29,6 +29,7 @@ Imports:
     terra,
     tibble
 Suggests:
+    bookdown,
     DT,
     flooded,
     gdalcubes,
@@ -50,4 +51,4 @@ Remotes:
     NewGraphEnvironment/flooded,
     NewGraphEnvironment/gq
 Config/testthat/edition: 3
-VignetteBuilder: knitr
+VignetteBuilder: knitr, bookdown
