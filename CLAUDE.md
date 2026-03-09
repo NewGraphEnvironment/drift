@@ -505,7 +505,7 @@ drift::dft_map_interactive(classified, aoi = aoi)
 
 - Class colors come from drift's shipped class tables (IO LULC, ESA WorldCover)
 - For production COGs on S3, `dft_map_interactive()` serves tiles via titiler — set `options(drift.titiler_url = "...")`
-- See the [drift vignette](https://www.newgraphenvironment.com/drift/articles/neexdzii-kwa.html) for a worked example (Neexdzii Kwa floodplain, 2017-2023)
+- See the [drift vignette](https://www.newgraphenvironment.com/drift/articles/land-cover-change.html) for a worked example (Neexdzii Kwa floodplain, 2017-2023)
 
 # Code Check Conventions
 
