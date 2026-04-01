@@ -52,6 +52,7 @@ dft_rast_summarize <- function(x,
 #' Summarize a single SpatRaster
 #' @noRd
 summarize_one <- function(r, class_table, m2_to_unit, year_label = NULL) {
+  dft_check_crs(r, "dft_rast_summarize")
   freq_tbl <- terra::freq(r)
   res <- terra::res(r)
   cell_area_m2 <- res[1] * res[2]

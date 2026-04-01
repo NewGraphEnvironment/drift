@@ -109,6 +109,6 @@ test_that("consensus works with dft_rast_transition", {
   )
 
   expect_type(result, "list")
-  expect_named(result, c("raster", "summary"))
+  expect_named(result, c("raster", "summary", "removed"))
   expect_true(nrow(result$summary) > 0)
 })

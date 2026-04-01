@@ -12,7 +12,8 @@ dft_rast_transition(
   source = "io-lulc",
   from_class = NULL,
   to_class = NULL,
-  unit = "ha"
+  unit = "ha",
+  patch_area_min = NULL
 )
 }
 \arguments{
@@ -37,14 +38,22 @@ classes. When \code{NULL} (default), all classes are included.}
 
 \item{unit}{Character. Area unit for the summary. One of \code{"ha"}
 (default), \code{"km2"}, or \code{"m2"}.}
+
+\item{patch_area_min}{Numeric or \code{NULL}. Minimum area in m² for a connected
+patch of changed pixels to be retained. Patches smaller than this threshold
+are set to \code{NA}. Uses 8-connected adjacency. \code{NULL} (default) skips
+filtering.}
 }
 \value{
-A list with two elements:
+A list with three elements:
 \itemize{
 \item \code{raster}: A \code{SpatRaster} with factor levels labelled
 \code{"from_class -> to_class"}. Filtered-out transitions are set to \code{NA}.
 \item \code{summary}: A tibble with columns \code{from_class}, \code{to_class},
 \code{n_cells}, \code{area}, \code{pct}.
+\item \code{removed}: A \code{SpatRaster} of transitions removed by \code{patch_area_min}
+filtering, or \code{NULL} when no filtering is applied. Same factor
+encoding as \code{raster}.
 }
 }
 \description{
@@ -65,4 +74,9 @@ tree_loss <- dft_rast_transition(classified, from = "2017", to = "2020",
                                  from_class = "Trees",
                                  to_class = c("Crops", "Rangeland", "Bare Ground"))
 tree_loss$summary
+
+# Filter small patches (< 500 m² = 5 pixels at 10m)
+filtered <- dft_rast_transition(classified, from = "2017", to = "2020",
+                                patch_area_min = 500)
+filtered$summary
 }
