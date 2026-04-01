@@ -15,7 +15,8 @@ dft_rast_transition(
   source = "io-lulc",
   from_class = NULL,
   to_class = NULL,
-  unit = "ha"
+  unit = "ha",
+  patch_area_min = NULL
 )
 ```
 
@@ -62,15 +63,25 @@ dft_rast_transition(
   Character. Area unit for the summary. One of `"ha"` (default),
   `"km2"`, or `"m2"`.
 
+- patch_area_min:
+
+  Numeric or `NULL`. Minimum area in m² for a connected patch of changed
+  pixels to be retained. Patches smaller than this threshold are set to
+  `NA`. Uses 8-connected adjacency. `NULL` (default) skips filtering.
+
 ## Value
 
-A list with two elements:
+A list with three elements:
 
 - `raster`: A `SpatRaster` with factor levels labelled
   `"from_class -> to_class"`. Filtered-out transitions are set to `NA`.
 
 - `summary`: A tibble with columns `from_class`, `to_class`, `n_cells`,
   `area`, `pct`.
+
+- `removed`: A `SpatRaster` of transitions removed by `patch_area_min`
+  filtering, or `NULL` when no filtering is applied. Same factor
+  encoding as `raster`.
 
 ## Examples
 
@@ -115,4 +126,30 @@ tree_loss$summary
 #>   <chr>      <chr>       <int> <dbl> <dbl>
 #> 1 Trees      Rangeland    1429 14.3  99.9 
 #> 2 Trees      Crops           1  0.01  0.07
+
+# Filter small patches (< 500 m² = 5 pixels at 10m)
+filtered <- dft_rast_transition(classified, from = "2017", to = "2020",
+                                patch_area_min = 500)
+filtered$summary
+#> # A tibble: 18 × 5
+#>    from_class to_class   n_cells  area   pct
+#>    <chr>      <chr>        <int> <dbl> <dbl>
+#>  1 Trees      Trees         5478 54.8  44.8 
+#>  2 Rangeland  Rangeland     2908 29.1  23.8 
+#>  3 Trees      Rangeland     1397 14.0  11.4 
+#>  4 Crops      Rangeland      998  9.98  8.15
+#>  5 Water      Water          940  9.4   7.68
+#>  6 Rangeland  Crops          143  1.43  1.17
+#>  7 Trees      Snow/Ice       120  1.2   0.98
+#>  8 Trees      Water           91  0.91  0.74
+#>  9 Rangeland  Trees           47  0.47  0.38
+#> 10 Built Area Snow/Ice        44  0.44  0.36
+#> 11 Rangeland  Water           42  0.42  0.34
+#> 12 Rangeland  Snow/Ice        19  0.19  0.16
+#> 13 Built Area Built Area      10  0.1   0.08
+#> 14 Water      Rangeland        1  0.01  0.01
+#> 15 Trees      Crops            1  0.01  0.01
+#> 16 Built Area Trees            1  0.01  0.01
+#> 17 Snow/Ice   Trees            1  0.01  0.01
+#> 18 Snow/Ice   Snow/Ice         1  0.01  0.01
 ```

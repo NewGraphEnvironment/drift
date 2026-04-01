@@ -122,8 +122,8 @@ table.</p>
 <div class="section level2">
 <h2 id="classified-rasters">Classified Rasters<a class="anchor" aria-label="anchor" href="#classified-rasters"></a>
 </h2>
-<p>Figure @ref(fig:plot-classified) shows the three classified time
-steps side by side.</p>
+<p>The figure below shows the three classified time steps side by
+side.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">stacked</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/rast.html" class="external-link">rast</a></span><span class="op">(</span><span class="va">classified</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rspatial.github.io/terra/reference/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">stacked</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">classified</span><span class="op">)</span></span>
@@ -138,8 +138,8 @@ time steps.
 <div class="section level2">
 <h2 id="area-summary">Area Summary<a class="anchor" aria-label="anchor" href="#area-summary"></a>
 </h2>
-<p>Table @ref(tab:change-table) shows area by class for each year and
-the net change between 2017 and 2023, sorted by magnitude of change.</p>
+<p>The following table shows area by class for each year and the net
+change between 2017 and 2023, sorted by magnitude of change.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">summary_tbl</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_summarize.html">dft_rast_summarize</a></span><span class="op">(</span><span class="va">classified</span>, source <span class="op">=</span> <span class="st">"io-lulc"</span>, unit <span class="op">=</span> <span class="st">"ha"</span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
@@ -246,9 +246,8 @@ change.</caption>
 <div class="section level2">
 <h2 id="vegetation-change">Vegetation Change<a class="anchor" aria-label="anchor" href="#vegetation-change"></a>
 </h2>
-<p>Trees and Rangeland show the clearest signal in Figure
-@ref(fig:plot-vegetation) — tree cover declining while rangeland
-expands.</p>
+<p>Trees and Rangeland show the clearest signal below — tree cover
+declining while rangeland expands.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span></span>
@@ -271,11 +270,10 @@ Dominant vegetation classes over time in the Neexdzii Kwa floodplain.
 <h2 id="transition-detection">Transition Detection<a class="anchor" aria-label="anchor" href="#transition-detection"></a>
 </h2>
 <p><code><a href="../reference/dft_rast_transition.html">dft_rast_transition()</a></code> compares two rasters cell-by-cell
-and returns a transition raster plus a summary table. Table
-@ref(tab:transition-stable) shows the area that remained in the same
-class (stable pixels), while Table @ref(tab:transition-change) shows
-pixels that changed class. Only transitions representing more than 1% of
-the total area are shown.</p>
+and returns a transition raster plus a summary table. The first table
+below shows the area that remained in the same class (stable pixels),
+while the second shows pixels that changed class. Only transitions
+representing more than 1% of the total area are shown.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span><span class="op">)</span></span>
 <span></span>
@@ -363,8 +361,8 @@ a specific analysis. Here we demonstrate grouping Crops, Rangeland, and
 Bare Ground as “Agriculture” — at 10 m resolution these classes can
 represent different phases of the same land use depending on satellite
 overpass timing.</p>
-<p>Table @ref(tab:tree-loss) shows the area of Trees in 2017 that
-transitioned to agriculture-related classes by 2023.</p>
+<p>The table below shows the area of Trees in 2017 that transitioned to
+agriculture-related classes by 2023.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ag_classes</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Crops"</span>, <span class="st">"Rangeland"</span>, <span class="st">"Bare Ground"</span><span class="op">)</span></span>
 <span></span>
@@ -410,10 +408,10 @@ transitioned to agriculture-related classes by 2023.</p>
 <div class="section level3">
 <h3 id="transition-raster">Transition Raster<a class="anchor" aria-label="anchor" href="#transition-raster"></a>
 </h3>
-<p>Figure @ref(fig:plot-transition) maps pixels that changed class
-between 2017 and 2023. Only transitions representing more than 1% of the
-total area are shown; minor transitions are masked. The AOI outline is
-shown in red.</p>
+<p>The figure below maps pixels that changed class between 2017 and
+2023. Only transitions representing more than 1% of the total area are
+shown; minor transitions are masked. The AOI outline is shown in
+red.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">trans_vals</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/values.html" class="external-link">values</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span></span>
 <span><span class="va">lvls</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/factors.html" class="external-link">cats</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span>
@@ -446,12 +444,127 @@ transitions &gt;1% of total area shown).
 </div>
 </div>
 <div class="section level2">
+<h2 id="filtering-classification-noise">Filtering Classification Noise<a class="anchor" aria-label="anchor" href="#filtering-classification-noise"></a>
+</h2>
+<p>At 10 m resolution, many detected transitions are single-pixel or
+small-cluster noise from field-forest edge effects, seasonal canopy
+variation, or sensor timing differences. The <code>patch_area_min</code>
+parameter removes connected patches of changed pixels smaller than a
+threshold (in m²) before computing the summary.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">patch_min</span> <span class="op">&lt;-</span> <span class="fl">5000</span></span>
+<span><span class="va">n_pixels</span> <span class="op">&lt;-</span> <span class="va">patch_min</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/prod.html" class="external-link">prod</a></span><span class="op">(</span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/dimensions.html" class="external-link">res</a></span><span class="op">(</span><span class="va">classified</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">result_filtered</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span>,</span>
+<span>                                       patch_area_min <span class="op">=</span> <span class="va">patch_min</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">changed_filtered</span> <span class="op">&lt;-</span> <span class="va">result_filtered</span><span class="op">$</span><span class="va">summary</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">from_class</span> <span class="op">!=</span> <span class="va">to_class</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">pct</span> <span class="op">&gt;=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/desc.html" class="external-link">desc</a></span><span class="op">(</span><span class="va">area</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Comparison table: unfiltered vs filtered</span></span>
+<span><span class="va">comparison</span> <span class="op">&lt;-</span> <span class="va">changed</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">from_class</span>, <span class="va">to_class</span>, <span class="va">n_cells</span>, <span class="va">area</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span></span>
+<span>    <span class="va">changed_filtered</span> <span class="op">|&gt;</span></span>
+<span>      <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">from_class</span>, <span class="va">to_class</span>,</span>
+<span>                    n_cells_filtered <span class="op">=</span> <span class="va">n_cells</span>, area_filtered <span class="op">=</span> <span class="va">area</span><span class="op">)</span>,</span>
+<span>    by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"from_class"</span>, <span class="st">"to_class"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/across.html" class="external-link">across</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">n_cells_filtered</span>, <span class="va">area_filtered</span><span class="op">)</span>, <span class="op">~</span><span class="fu">tidyr</span><span class="fu">::</span><span class="fu"><a href="https://tidyr.tidyverse.org/reference/replace_na.html" class="external-link">replace_na</a></span><span class="op">(</span><span class="va">.x</span>, <span class="fl">0</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    cells_removed <span class="op">=</span> <span class="va">n_cells</span> <span class="op">-</span> <span class="va">n_cells_filtered</span>,</span>
+<span>    area_removed <span class="op">=</span> <span class="va">area</span> <span class="op">-</span> <span class="va">area_filtered</span></span>
+<span>  <span class="op">)</span></span></code></pre></div>
+<p>Filtering at 5,000 m² (50 pixels at 10 m resolution) removed 481
+pixels (4.81 ha) of small isolated changes. The table below compares
+unfiltered and filtered results.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">comparison</span>, digits <span class="op">=</span> <span class="fl">2</span>, col.names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"From"</span>, <span class="st">"To"</span>, <span class="st">"Cells"</span>, <span class="st">"Area (ha)"</span>, <span class="st">"Cells (filtered)"</span>,</span>
+<span>  <span class="st">"Area (filtered)"</span>, <span class="st">"Cells removed"</span>, <span class="st">"Area removed"</span></span>
+<span><span class="op">)</span>, caption <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Land cover transitions 2017--2023: unfiltered vs filtered (min patch area "</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">patch_min</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">" m\u00b2)."</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<table style="width:100%;" class="table">
+<caption>Land cover transitions 2017–2023: unfiltered vs filtered (min
+patch area 5,000 m²).</caption>
+<colgroup>
+<col width="6%">
+<col width="10%">
+<col width="6%">
+<col width="10%">
+<col width="18%">
+<col width="17%">
+<col width="15%">
+<col width="14%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">From</th>
+<th align="left">To</th>
+<th align="right">Cells</th>
+<th align="right">Area (ha)</th>
+<th align="right">Cells (filtered)</th>
+<th align="right">Area (filtered)</th>
+<th align="right">Cells removed</th>
+<th align="right">Area removed</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">Trees</td>
+<td align="left">Rangeland</td>
+<td align="right">2111</td>
+<td align="right">21.11</td>
+<td align="right">1632</td>
+<td align="right">16.32</td>
+<td align="right">479</td>
+<td align="right">4.79</td>
+</tr>
+<tr class="even">
+<td align="left">Crops</td>
+<td align="left">Rangeland</td>
+<td align="right">998</td>
+<td align="right">9.98</td>
+<td align="right">996</td>
+<td align="right">9.96</td>
+<td align="right">2</td>
+<td align="right">0.02</td>
+</tr>
+</tbody>
+</table>
+<p>The figure below shows three views: unfiltered transitions, what the
+filter removed (<code>$removed</code>), and the filtered result. The
+<code>$removed</code> raster is returned directly by
+<code><a href="../reference/dft_rast_transition.html">dft_rast_transition()</a></code> when <code>patch_area_min</code> is
+set.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">aoi_proj</span> <span class="op">&lt;-</span> <span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_geometry.html" class="external-link">st_geometry</a></span><span class="op">(</span><span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_transform.html" class="external-link">st_transform</a></span><span class="op">(</span><span class="va">aoi</span>, <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/crs.html" class="external-link">crs</a></span><span class="op">(</span><span class="va">r_change</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">r_change</span>, main <span class="op">=</span> <span class="st">"Unfiltered"</span>, axes <span class="op">=</span> <span class="cn">FALSE</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">aoi_proj</span>, add <span class="op">=</span> <span class="cn">TRUE</span>, border <span class="op">=</span> <span class="st">"red"</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">result_filtered</span><span class="op">$</span><span class="va">removed</span>, main <span class="op">=</span> <span class="st">"Removed patches"</span>, axes <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>            mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">aoi_proj</span>, add <span class="op">=</span> <span class="cn">TRUE</span>, border <span class="op">=</span> <span class="st">"red"</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">result_filtered</span><span class="op">$</span><span class="va">raster</span>, main <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Filtered (min "</span>,</span>
+<span>            <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">patch_min</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">" m\u00b2)"</span><span class="op">)</span>,</span>
+<span>            axes <span class="op">=</span> <span class="cn">FALSE</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">aoi_proj</span>, add <span class="op">=</span> <span class="cn">TRUE</span>, border <span class="op">=</span> <span class="st">"red"</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="land-cover-change_files/figure-html/plot-patch-filter-1.png" class="r-plt" alt="Transition raster before and after minimum patch area filtering (5,000 m²). Centre panel shows removed patches." width="1344"><p class="caption">
+Transition raster before and after minimum patch area filtering (5,000
+m²). Centre panel shows removed patches.
+</p>
+</div>
+</div>
+<div class="section level2">
 <h2 id="multi-year-classification-and-transition-overlay">Multi-Year Classification and Transition Overlay<a class="anchor" aria-label="anchor" href="#multi-year-classification-and-transition-overlay"></a>
 </h2>
 <p>Toggle between classified time periods and overlay tree loss
 transition layers to ground-truth change against multiple satellite
-basemaps (Figure @ref(fig:map-interactive)).</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+basemaps.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tree_trans</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span>,</span>
 <span>                                  from_class <span class="op">=</span> <span class="st">"Trees"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/dft_map_interactive.html">dft_map_interactive</a></span><span class="op">(</span><span class="va">classified</span>, aoi <span class="op">=</span> <span class="va">aoi</span>, transition <span class="op">=</span> <span class="va">tree_trans</span><span class="op">)</span></span></code></pre></div>

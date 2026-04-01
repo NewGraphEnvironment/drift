@@ -11,9 +11,11 @@
 - [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
   : Load shipped class lookup table
 - [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md)
-  : Interactive leaflet map for classified rasters
+  : Interactive leaflet map for classified rasters and transitions
 - [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
   : Classify a raster with factor levels and colors
+- [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)
+  : Compute per-pixel mode across classified rasters
 - [`dft_rast_summarize()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.md)
   : Summarize area by class
 - [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)

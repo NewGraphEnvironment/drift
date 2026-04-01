@@ -56,8 +56,7 @@ terra::levels(classified[["2020"]])[[1]]
 
 ## Classified Rasters
 
-Figure @ref(fig:plot-classified) shows the three classified time steps
-side by side.
+The figure below shows the three classified time steps side by side.
 
 ``` r
 stacked <- terra::rast(classified)
@@ -74,8 +73,8 @@ time steps.
 
 ## Area Summary
 
-Table @ref(tab:change-table) shows area by class for each year and the
-net change between 2017 and 2023, sorted by magnitude of change.
+The following table shows area by class for each year and the net change
+between 2017 and 2023, sorted by magnitude of change.
 
 ``` r
 summary_tbl <- dft_rast_summarize(classified, source = "io-lulc", unit = "ha")
@@ -127,9 +126,8 @@ Net land cover change 2017–2023 (ha), sorted by absolute change.
 
 ## Vegetation Change
 
-Trees and Rangeland show the clearest signal in Figure
-@ref(fig:plot-vegetation) — tree cover declining while rangeland
-expands.
+Trees and Rangeland show the clearest signal below — tree cover
+declining while rangeland expands.
 
 ``` r
 library(ggplot2)
@@ -154,10 +152,10 @@ Dominant vegetation classes over time in the Neexdzii Kwa floodplain.
 
 [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
 compares two rasters cell-by-cell and returns a transition raster plus a
-summary table. Table @ref(tab:transition-stable) shows the area that
-remained in the same class (stable pixels), while Table
-@ref(tab:transition-change) shows pixels that changed class. Only
-transitions representing more than 1% of the total area are shown.
+summary table. The first table below shows the area that remained in the
+same class (stable pixels), while the second shows pixels that changed
+class. Only transitions representing more than 1% of the total area are
+shown.
 
 ``` r
 result <- dft_rast_transition(classified, from = "2017", to = "2023")
@@ -207,8 +205,8 @@ Bare Ground as “Agriculture” — at 10 m resolution these classes can
 represent different phases of the same land use depending on satellite
 overpass timing.
 
-Table @ref(tab:tree-loss) shows the area of Trees in 2017 that
-transitioned to agriculture-related classes by 2023.
+The table below shows the area of Trees in 2017 that transitioned to
+agriculture-related classes by 2023.
 
 ``` r
 ag_classes <- c("Crops", "Rangeland", "Bare Ground")
@@ -243,10 +241,9 @@ Percent is of all pixels classified as Trees in 2017.
 
 ### Transition Raster
 
-Figure @ref(fig:plot-transition) maps pixels that changed class between
-2017 and 2023. Only transitions representing more than 1% of the total
-area are shown; minor transitions are masked. The AOI outline is shown
-in red.
+The figure below maps pixels that changed class between 2017 and 2023.
+Only transitions representing more than 1% of the total area are shown;
+minor transitions are masked. The AOI outline is shown in red.
 
 ``` r
 trans_vals <- terra::values(result$raster)[, 1]
@@ -280,11 +277,95 @@ shown).](land-cover-change_files/figure-html/plot-transition-1.png)
 Spatial distribution of land cover transitions 2017–2023 (only
 transitions \>1% of total area shown).
 
+## Filtering Classification Noise
+
+At 10 m resolution, many detected transitions are single-pixel or
+small-cluster noise from field-forest edge effects, seasonal canopy
+variation, or sensor timing differences. The `patch_area_min` parameter
+removes connected patches of changed pixels smaller than a threshold (in
+m²) before computing the summary.
+
+``` r
+patch_min <- 5000
+n_pixels <- patch_min / prod(terra::res(classified[[1]]))
+
+result_filtered <- dft_rast_transition(classified, from = "2017", to = "2023",
+                                       patch_area_min = patch_min)
+
+changed_filtered <- result_filtered$summary |>
+  dplyr::filter(from_class != to_class) |>
+  dplyr::filter(pct >= 1) |>
+  dplyr::arrange(dplyr::desc(area))
+
+# Comparison table: unfiltered vs filtered
+comparison <- changed |>
+  dplyr::select(from_class, to_class, n_cells, area) |>
+  dplyr::left_join(
+    changed_filtered |>
+      dplyr::select(from_class, to_class,
+                    n_cells_filtered = n_cells, area_filtered = area),
+    by = c("from_class", "to_class")
+  ) |>
+  dplyr::mutate(
+    dplyr::across(c(n_cells_filtered, area_filtered), ~tidyr::replace_na(.x, 0)),
+    cells_removed = n_cells - n_cells_filtered,
+    area_removed = area - area_filtered
+  )
+```
+
+Filtering at 5,000 m² (50 pixels at 10 m resolution) removed 481 pixels
+(4.81 ha) of small isolated changes. The table below compares unfiltered
+and filtered results.
+
+``` r
+knitr::kable(comparison, digits = 2, col.names = c(
+  "From", "To", "Cells", "Area (ha)", "Cells (filtered)",
+  "Area (filtered)", "Cells removed", "Area removed"
+), caption = paste0(
+  "Land cover transitions 2017--2023: unfiltered vs filtered (min patch area ",
+  format(patch_min, big.mark = ","), " m\u00b2)."))
+```
+
+| From  | To        | Cells | Area (ha) | Cells (filtered) | Area (filtered) | Cells removed | Area removed |
+|:------|:----------|------:|----------:|-----------------:|----------------:|--------------:|-------------:|
+| Trees | Rangeland |  2111 |     21.11 |             1632 |           16.32 |           479 |         4.79 |
+| Crops | Rangeland |   998 |      9.98 |              996 |            9.96 |             2 |         0.02 |
+
+Land cover transitions 2017–2023: unfiltered vs filtered (min patch area
+5,000 m²).
+
+The figure below shows three views: unfiltered transitions, what the
+filter removed (`$removed`), and the filtered result. The `$removed`
+raster is returned directly by
+[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+when `patch_area_min` is set.
+
+``` r
+aoi_proj <- sf::st_geometry(sf::st_transform(aoi, terra::crs(r_change)))
+
+par(mfrow = c(1, 3))
+terra::plot(r_change, main = "Unfiltered", axes = FALSE, mar = c(1, 1, 2, 6))
+plot(aoi_proj, add = TRUE, border = "red", lwd = 2)
+terra::plot(result_filtered$removed, main = "Removed patches", axes = FALSE,
+            mar = c(1, 1, 2, 6))
+plot(aoi_proj, add = TRUE, border = "red", lwd = 2)
+terra::plot(result_filtered$raster, main = paste0("Filtered (min ",
+            format(patch_min, big.mark = ","), " m\u00b2)"),
+            axes = FALSE, mar = c(1, 1, 2, 6))
+plot(aoi_proj, add = TRUE, border = "red", lwd = 2)
+```
+
+![Transition raster before and after minimum patch area filtering (5,000
+m²). Centre panel shows removed
+patches.](land-cover-change_files/figure-html/plot-patch-filter-1.png)
+
+Transition raster before and after minimum patch area filtering (5,000
+m²). Centre panel shows removed patches.
+
 ## Multi-Year Classification and Transition Overlay
 
 Toggle between classified time periods and overlay tree loss transition
-layers to ground-truth change against multiple satellite basemaps
-(Figure @ref(fig:map-interactive)).
+layers to ground-truth change against multiple satellite basemaps.
 
 ``` r
 tree_trans <- dft_rast_transition(classified, from = "2017", to = "2023",

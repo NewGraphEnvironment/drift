@@ -53,7 +53,8 @@ and summary table. Each pixel is encoded with its from→to class pair.</p>
 <span>  source <span class="op">=</span> <span class="st">"io-lulc"</span>,</span>
 <span>  from_class <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  to_class <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  unit <span class="op">=</span> <span class="st">"ha"</span></span>
+<span>  unit <span class="op">=</span> <span class="st">"ha"</span>,</span>
+<span>  patch_area_min <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -98,13 +99,23 @@ classes. When <code>NULL</code> (default), all classes are included.</p></dd>
 <dd><p>Character. Area unit for the summary. One of <code>"ha"</code>
 (default), <code>"km2"</code>, or <code>"m2"</code>.</p></dd>
 
+
+<dt id="arg-patch-area-min">patch_area_min<a class="anchor" aria-label="anchor" href="#arg-patch-area-min"></a></dt>
+<dd><p>Numeric or <code>NULL</code>. Minimum area in m² for a connected
+patch of changed pixels to be retained. Patches smaller than this threshold
+are set to <code>NA</code>. Uses 8-connected adjacency. <code>NULL</code> (default) skips
+filtering.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list with two elements:</p><ul><li><p><code>raster</code>: A <code>SpatRaster</code> with factor levels labelled
+    <p>A list with three elements:</p><ul><li><p><code>raster</code>: A <code>SpatRaster</code> with factor levels labelled
 <code>"from_class -&gt; to_class"</code>. Filtered-out transitions are set to <code>NA</code>.</p></li>
 <li><p><code>summary</code>: A tibble with columns <code>from_class</code>, <code>to_class</code>,
 <code>n_cells</code>, <code>area</code>, <code>pct</code>.</p></li>
+<li><p><code>removed</code>: A <code>SpatRaster</code> of transitions removed by <code>patch_area_min</code>
+filtering, or <code>NULL</code> when no filtering is applied. Same factor
+encoding as <code>raster</code>.</p></li>
 </ul></div>
 
     <div class="section level2">
@@ -149,6 +160,32 @@ classes. When <code>NULL</code> (default), all classes are included.</p></dd>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>       <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> Trees      Rangeland    <span style="text-decoration: underline;">1</span>429 14.3  99.9 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> Trees      Crops           1  0.01  0.07</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Filter small patches (&lt; 500 m² = 5 pixels at 10m)</span></span></span>
+<span class="r-in"><span><span class="va">filtered</span> <span class="op">&lt;-</span> <span class="fu">dft_rast_transition</span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2020"</span>,</span></span>
+<span class="r-in"><span>                                patch_area_min <span class="op">=</span> <span class="fl">500</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">filtered</span><span class="op">$</span><span class="va">summary</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 18 × 5</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    from_class to_class   n_cells  area   pct</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>      <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 1</span> Trees      Trees         <span style="text-decoration: underline;">5</span>478 54.8  44.8 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 2</span> Rangeland  Rangeland     <span style="text-decoration: underline;">2</span>908 29.1  23.8 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 3</span> Trees      Rangeland     <span style="text-decoration: underline;">1</span>397 14.0  11.4 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 4</span> Crops      Rangeland      998  9.98  8.15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 5</span> Water      Water          940  9.4   7.68</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 6</span> Rangeland  Crops          143  1.43  1.17</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 7</span> Trees      Snow/Ice       120  1.2   0.98</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 8</span> Trees      Water           91  0.91  0.74</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;"> 9</span> Rangeland  Trees           47  0.47  0.38</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">10</span> Built Area Snow/Ice        44  0.44  0.36</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">11</span> Rangeland  Water           42  0.42  0.34</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">12</span> Rangeland  Snow/Ice        19  0.19  0.16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">13</span> Built Area Built Area      10  0.1   0.08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">14</span> Water      Rangeland        1  0.01  0.01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">15</span> Trees      Crops            1  0.01  0.01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">16</span> Built Area Trees            1  0.01  0.01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">17</span> Snow/Ice   Trees            1  0.01  0.01</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">18</span> Snow/Ice   Snow/Ice         1  0.01  0.01</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
