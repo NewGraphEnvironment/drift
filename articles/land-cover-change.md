@@ -17,7 +17,7 @@ connections needed.
 ``` r
 library(drift)
 library(terra)
-#> terra 1.9.1
+#> terra 1.9.11
 library(sf)
 #> Linking to GEOS 3.12.1, GDAL 3.8.4, PROJ 9.4.0; sf_use_s2() is TRUE
 
