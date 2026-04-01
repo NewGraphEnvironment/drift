@@ -2,15 +2,17 @@
 % Please edit documentation in R/dft_map_interactive.R
 \name{dft_map_interactive}
 \alias{dft_map_interactive}
-\title{Interactive leaflet map for classified rasters}
+\title{Interactive leaflet map for classified rasters and transitions}
 \usage{
 dft_map_interactive(
   x,
   aoi = NULL,
+  transition = NULL,
   class_table = NULL,
   source = "io-lulc",
   titiler_url = getOption("drift.titiler_url"),
-  basemaps = c(Light = "CartoDB.Positron", Satellite = "Esri.WorldImagery"),
+  basemaps = c(Light = "CartoDB.Positron", `Esri Satellite` = "Esri.WorldImagery",
+    `Google Satellite` = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"),
   legend_position = "bottomright",
   zoom = 14
 )
@@ -24,6 +26,11 @@ list/vector. Names become the layer toggle labels (years, seasons, etc.).}
 \item{aoi}{An \code{sf} polygon for the area of interest outline. \code{NULL} (default)
 omits the AOI layer.}
 
+\item{transition}{Output of \code{\link[=dft_rast_transition]{dft_rast_transition()}} — a list with elements
+\code{raster} (factor \code{SpatRaster}) and \code{summary} (tibble). Each transition
+type becomes a toggleable overlay. Stable transitions (same from/to class)
+are excluded by default. \code{NULL} (default) omits transition overlays.}
+
 \item{class_table}{A tibble with columns \code{code}, \code{class_name}, \code{color}
 (hex). When \code{NULL}, loaded via \code{\link[=dft_class_table]{dft_class_table()}} using \code{source}.}
 
@@ -35,8 +42,9 @@ omits the AOI layer.}
 Defaults to \code{getOption("drift.titiler_url")}. If \code{NULL} in COG mode, an
 error is raised prompting the user to set the option.}
 
-\item{basemaps}{Named character vector of provider tile IDs. The first
-element is the default basemap. Names become radio button labels.}
+\item{basemaps}{Named character vector of provider tile IDs or tile URL
+templates (starting with \code{http}). The first element is the default
+basemap. Names become radio button labels.}
 
 \item{legend_position}{Legend placement passed to \code{\link[leaflet:addLegend]{leaflet::addLegend()}}.
 Set to \code{NULL} to suppress the legend.}
@@ -45,11 +53,19 @@ Set to \code{NULL} to suppress the legend.}
 }
 \value{
 A \link[leaflet:leaflet]{leaflet::leaflet} htmlwidget. The first layer in \code{x} is visible
-by default; other layers are hidden but toggleable.
+by default; other layers are hidden but toggleable. Transition overlays
+are visible by default when supplied.
 }
 \description{
 Build a toggleable leaflet map from classified \code{SpatRaster}s or remote COG
-URLs served via titiler. Includes layer control, legend, and fullscreen.
+URLs served via titiler. Optionally overlay land cover transitions from
+\code{\link[=dft_rast_transition]{dft_rast_transition()}}. Includes layer control, legend, and fullscreen.
+}
+\details{
+When only \code{x} is supplied, classified layers appear as radio-toggle overlays
+(one visible at a time). When \code{transition} is also supplied, each transition
+type (e.g. Trees -> Rangeland) is added as a checkbox overlay that can be
+shown simultaneously on top of any classified layer.
 }
 \examples{
 # Single classified raster — returns a leaflet widget
@@ -70,6 +86,12 @@ rasters <- lapply(files, function(f) {
 })
 classified <- dft_rast_classify(rasters, source = "io-lulc")
 map <- dft_map_interactive(classified, aoi = aoi)
+if (interactive()) map
+
+# Combined: classified layers + transition overlays
+trans <- dft_rast_transition(classified, from = "2017", to = "2023",
+                             from_class = "Trees")
+map <- dft_map_interactive(classified, aoi = aoi, transition = trans)
 if (interactive()) map
 
 \dontrun{

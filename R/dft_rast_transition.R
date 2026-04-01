@@ -17,12 +17,19 @@
 #'   classes. When `NULL` (default), all classes are included.
 #' @param unit Character. Area unit for the summary. One of `"ha"`
 #'   (default), `"km2"`, or `"m2"`.
+#' @param patch_area_min Numeric or `NULL`. Minimum area in m² for a connected
+#'   patch of changed pixels to be retained. Patches smaller than this threshold
+#'   are set to `NA`. Uses 8-connected adjacency. `NULL` (default) skips
+#'   filtering.
 #'
-#' @return A list with two elements:
+#' @return A list with three elements:
 #'   - `raster`: A `SpatRaster` with factor levels labelled
 #'     `"from_class -> to_class"`. Filtered-out transitions are set to `NA`.
 #'   - `summary`: A tibble with columns `from_class`, `to_class`,
 #'     `n_cells`, `area`, `pct`.
+#'   - `removed`: A `SpatRaster` of transitions removed by `patch_area_min`
+#'     filtering, or `NULL` when no filtering is applied. Same factor
+#'     encoding as `raster`.
 #' @export
 #' @examples
 #' r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
@@ -38,6 +45,11 @@
 #'                                  from_class = "Trees",
 #'                                  to_class = c("Crops", "Rangeland", "Bare Ground"))
 #' tree_loss$summary
+#'
+#' # Filter small patches (< 500 m² = 5 pixels at 10m)
+#' filtered <- dft_rast_transition(classified, from = "2017", to = "2020",
+#'                                 patch_area_min = 500)
+#' filtered$summary
 dft_rast_transition <- function(x,
                                 from,
                                 to,
@@ -45,8 +57,16 @@ dft_rast_transition <- function(x,
                                 source = "io-lulc",
                                 from_class = NULL,
                                 to_class = NULL,
-                                unit = "ha") {
+                                unit = "ha",
+                                patch_area_min = NULL) {
   unit <- match.arg(unit, c("ha", "km2", "m2"))
+
+  if (!is.null(patch_area_min)) {
+    if (!is.numeric(patch_area_min) || length(patch_area_min) != 1 ||
+          is.na(patch_area_min) || patch_area_min < 0) {
+      stop("`patch_area_min` must be a single non-negative number or NULL.")
+    }
+  }
 
   if (!is.list(x) || inherits(x, "SpatRaster")) {
     stop("`x` must be a named list of SpatRasters, not a single SpatRaster.")
@@ -60,6 +80,8 @@ dft_rast_transition <- function(x,
 
   r_from <- x[[from]]
   r_to <- x[[to]]
+  dft_check_crs(r_from, "dft_rast_transition")
+  dft_check_crs(r_to, "dft_rast_transition")
 
   # Resolve class names to codes
   code_lookup <- stats::setNames(class_table$class_name, class_table$code)
@@ -91,6 +113,29 @@ dft_rast_transition <- function(x,
   r_trans <- terra::rast(r_from)
   terra::values(r_trans) <- trans_code
 
+  # Filter small patches of changed pixels
+  removed_codes <- NULL
+  if (!is.null(patch_area_min) && patch_area_min > 0) {
+    # Binary raster of actual changes only (from != to), not same-class pixels
+    changed <- !is.na(trans_code) & (v_from != v_to)
+    r_changed <- terra::rast(r_from)
+    r_changed_vals <- rep(NA_integer_, length(trans_code))
+    r_changed_vals[changed] <- 1L
+    terra::values(r_changed) <- r_changed_vals
+    p <- terra::patches(r_changed, directions = 8)
+    cell_area_m2 <- prod(terra::res(r_from))
+    f <- terra::freq(p)
+    f <- f[!is.na(f$value), ]
+    small_ids <- f$value[f$count * cell_area_m2 < patch_area_min]
+    if (length(small_ids) > 0) {
+      p_vals <- terra::values(p)[, 1]
+      mask_small <- !is.na(p_vals) & (p_vals %in% small_ids)
+      removed_codes <- trans_code[mask_small]
+      trans_code[mask_small] <- NA_integer_
+      terra::values(r_trans) <- trans_code
+    }
+  }
+
   # Build factor table from observed transitions
   valid <- !is.na(trans_code)
   unique_codes <- sort(unique(trans_code[valid]))
@@ -103,7 +148,7 @@ dft_rast_transition <- function(x,
       from_class = character(0), to_class = character(0),
       n_cells = integer(0), area = numeric(0), pct = numeric(0)
     )
-    return(list(raster = r_trans, summary = summary_tbl))
+    return(list(raster = r_trans, summary = summary_tbl, removed = NULL))
   }
 
   from_codes <- unique_codes %/% 1000L
@@ -123,7 +168,7 @@ dft_rast_transition <- function(x,
 
   freq_tbl <- terra::freq(r_trans)
   freq_tbl <- freq_tbl[!is.na(freq_tbl$value), ]
-  total_valid <- sum(keep)
+  total_valid <- sum(!is.na(trans_code))
 
   # freq on a factor raster returns labels in $value — map back to codes
   label_to_code <- stats::setNames(lvl_df$id, lvl_df$transition)
@@ -139,5 +184,25 @@ dft_rast_transition <- function(x,
 
   summary_tbl <- summary_tbl[order(summary_tbl$n_cells, decreasing = TRUE), ]
 
-  list(raster = r_trans, summary = summary_tbl)
+  # Build removed raster when patch filtering was applied
+  r_removed <- NULL
+  if (!is.null(removed_codes)) {
+    r_removed <- terra::rast(r_from)
+    rem_vals <- rep(NA_integer_, terra::ncell(r_from))
+    rem_positions <- which(!is.na(p_vals) & (p_vals %in% small_ids))
+    rem_vals[rem_positions] <- removed_codes
+    terra::values(r_removed) <- rem_vals
+    # Build factor table from removed codes
+    rem_unique <- sort(unique(removed_codes[!is.na(removed_codes)]))
+    rem_from <- rem_unique %/% 1000L
+    rem_to <- rem_unique %% 1000L
+    rem_labels <- paste0(
+      code_lookup[as.character(rem_from)], " -> ",
+      code_lookup[as.character(rem_to)]
+    )
+    terra::set.cats(r_removed, layer = 1,
+                    value = data.frame(id = rem_unique, transition = rem_labels))
+  }
+
+  list(raster = r_trans, summary = summary_tbl, removed = r_removed)
 }
