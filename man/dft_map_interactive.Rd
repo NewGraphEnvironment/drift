@@ -12,7 +12,8 @@ dft_map_interactive(
   source = "io-lulc",
   titiler_url = getOption("drift.titiler_url"),
   basemaps = c(Light = "CartoDB.Positron", `Esri Satellite` = "Esri.WorldImagery",
-    `Google Satellite` = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"),
+    `Google Satellite` = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+    OpenTopoMap = "OpenTopoMap"),
   legend_position = "bottomright",
   zoom = 14
 )
