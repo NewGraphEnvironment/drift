@@ -1,9 +1,11 @@
-# drift (development)
+# drift 0.2.0
 
-- `dft_rast_transition()` — cell-by-cell land cover transition detection with from/to class filters
-- `dft_map_interactive()` — new `transition` parameter overlays transition layers as checkboxes; add Google Satellite and Esri Satellite basemaps; support custom tile URLs
+- `dft_rast_transition()` — add `patch_area_min` parameter to filter small connected patches of changed pixels; return `$removed` raster for visual QA of filtered patches; add `from_class`/`to_class` filters
+- `dft_transition_vectors()` — vectorize transition raster into sf polygons with per-patch area, transition labels, and optional zone attribution
 - `dft_rast_consensus()` — per-pixel mode across classified rasters for temporal noise filtering; optional confidence layer
-- Vignette: transition detection, tree loss filtering, single combined interactive map
+- `dft_map_interactive()` — new `transition` parameter overlays transition layers as checkboxes; Google Satellite and Esri Satellite basemaps; custom tile URL support
+- `dft_check_crs()` — internal helper that errors on geographic CRS input; wired into `dft_rast_transition()` and `dft_rast_summarize()`
+- Vignette: transition detection, tree loss filtering, patch area filtering with comparison table, interactive map with transition overlays
 
 # drift 0.1.0
 
