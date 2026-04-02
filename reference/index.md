@@ -26,3 +26,5 @@
   : Get STAC configuration for a known land cover source
 - [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
   : Fetch STAC-hosted rasters via gdalcubes
+- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  : Vectorize transition raster into individual change patches
