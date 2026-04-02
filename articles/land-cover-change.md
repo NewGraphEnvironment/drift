@@ -418,8 +418,11 @@ layers to ground-truth change against multiple satellite basemaps.
 ``` r
 tree_trans <- dft_rast_transition(classified, from = "2017", to = "2023",
                                   from_class = "Trees")
-dft_map_interactive(classified, aoi = aoi, transition = tree_trans)
+dft_map_interactive(classified, aoi = aoi, transition = tree_trans,
+                    legend_position = "bottomleft")
 ```
 
 Classified land cover by year (radio toggle) with tree loss transitions
-overlaid as toggleable layers.
+overlaid as toggleable layers. Use the fullscreen button (top left) to
+expand the map and access transition toggles in the layer control (top
+right).
