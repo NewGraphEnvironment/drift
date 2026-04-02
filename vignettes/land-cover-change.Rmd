@@ -284,7 +284,39 @@ terra::plot(result_filtered$raster, main = paste0("Filtered (min ",
 plot(aoi_proj, add = TRUE, border = "red", lwd = 2)
 ```
 
-## Multi-Year Classification and Transition Overlay
+## Vector Patches
+
+`dft_transition_vectors()` converts the transition raster into `sf`
+polygons — one row per connected patch. This is the format needed for
+GIS QA (click patches, filter by size) and spatial attribution to
+management zones.
+
+```{r transition-vectors}
+patches <- dft_transition_vectors(result$raster)
+
+# Only actual changes (exclude same-class "transitions")
+patches_changed <- patches[grepl("->", patches$transition) &
+  !sapply(strsplit(patches$transition, " -> "), \(x) x[1] == x[2]), ]
+
+knitr::kable(
+  head(sf::st_drop_geometry(patches_changed[order(-patches_changed$area_ha), ]), 10),
+  digits = 2,
+  caption = "Ten largest change patches (same-class transitions excluded)."
+)
+```
+
+When `zones` is supplied, each patch is intersected with the zone
+polygons. Here we use the floodplain AOI as a single zone — in
+practice this would be sub-basins, parcels, or management units.
+
+```{r transition-zones}
+aoi$zone <- "Neexdzii Kwa floodplain"
+patches_zoned <- dft_transition_vectors(result$raster, zones = aoi,
+                                        zone_col = "zone")
+cat("Patches inside AOI:", nrow(patches_zoned), "of", nrow(patches), "total\n")
+```
+
+## Interactive Map
 
 Toggle between classified time periods and overlay tree loss transition
 layers to ground-truth change against multiple satellite basemaps.
