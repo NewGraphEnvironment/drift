@@ -559,12 +559,113 @@ m²). Centre panel shows removed patches.
 </div>
 </div>
 <div class="section level2">
-<h2 id="multi-year-classification-and-transition-overlay">Multi-Year Classification and Transition Overlay<a class="anchor" aria-label="anchor" href="#multi-year-classification-and-transition-overlay"></a>
+<h2 id="vector-patches">Vector Patches<a class="anchor" aria-label="anchor" href="#vector-patches"></a>
+</h2>
+<p><code><a href="../reference/dft_transition_vectors.html">dft_transition_vectors()</a></code> converts the transition raster
+into <code>sf</code> polygons — one row per connected patch. This is the
+format needed for GIS QA (click patches, filter by size) and spatial
+attribution to management zones.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">patches</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_vectors.html">dft_transition_vectors</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Only actual changes (exclude same-class "transitions")</span></span>
+<span><span class="va">patches_changed</span> <span class="op">&lt;-</span> <span class="va">patches</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"-&gt;"</span>, <span class="va">patches</span><span class="op">$</span><span class="va">transition</span><span class="op">)</span> <span class="op">&amp;</span></span>
+<span>  <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span><span class="va">patches</span><span class="op">$</span><span class="va">transition</span>, <span class="st">" -&gt; "</span><span class="op">)</span>, \<span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="op">==</span> <span class="va">x</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span>, <span class="op">]</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rspatial.github.io/terra/reference/headtail.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_geometry.html" class="external-link">st_drop_geometry</a></span><span class="op">(</span><span class="va">patches_changed</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="op">-</span><span class="va">patches_changed</span><span class="op">$</span><span class="va">area_ha</span><span class="op">)</span>, <span class="op">]</span><span class="op">)</span>, <span class="fl">10</span><span class="op">)</span>,</span>
+<span>  digits <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  caption <span class="op">=</span> <span class="st">"Ten largest change patches (same-class transitions excluded)."</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<caption>Ten largest change patches (same-class transitions
+excluded).</caption>
+<thead><tr class="header">
+<th align="left"></th>
+<th align="right">patch_id</th>
+<th align="left">transition</th>
+<th align="right">area_ha</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">109</td>
+<td align="right">109</td>
+<td align="left">Crops -&gt; Rangeland</td>
+<td align="right">9.96</td>
+</tr>
+<tr class="even">
+<td align="left">97</td>
+<td align="right">97</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">7.99</td>
+</tr>
+<tr class="odd">
+<td align="left">61</td>
+<td align="right">61</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">2.41</td>
+</tr>
+<tr class="even">
+<td align="left">90</td>
+<td align="right">90</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">1.51</td>
+</tr>
+<tr class="odd">
+<td align="left">59</td>
+<td align="right">59</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.94</td>
+</tr>
+<tr class="even">
+<td align="left">91</td>
+<td align="right">91</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.81</td>
+</tr>
+<tr class="odd">
+<td align="left">81</td>
+<td align="right">81</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.75</td>
+</tr>
+<tr class="even">
+<td align="left">54</td>
+<td align="right">54</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.70</td>
+</tr>
+<tr class="odd">
+<td align="left">5</td>
+<td align="right">5</td>
+<td align="left">Trees -&gt; Water</td>
+<td align="right">0.55</td>
+</tr>
+<tr class="even">
+<td align="left">105</td>
+<td align="right">105</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.53</td>
+</tr>
+</tbody>
+</table>
+<p>When <code>zones</code> is supplied, each patch is intersected with
+the zone polygons. Here we use the floodplain AOI as a single zone — in
+practice this would be sub-basins, parcels, or management units.</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">aoi</span><span class="op">$</span><span class="va">zone</span> <span class="op">&lt;-</span> <span class="st">"Neexdzii Kwa floodplain"</span></span>
+<span><span class="va">patches_zoned</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_vectors.html">dft_transition_vectors</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span>, zones <span class="op">=</span> <span class="va">aoi</span>,</span>
+<span>                                        zone_col <span class="op">=</span> <span class="st">"zone"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Patches inside AOI:"</span>, <span class="fu"><a href="https://rspatial.github.io/terra/reference/dimensions.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">patches_zoned</span><span class="op">)</span>, <span class="st">"of"</span>, <span class="fu"><a href="https://rspatial.github.io/terra/reference/dimensions.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">patches</span><span class="op">)</span>, <span class="st">"total\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Patches inside AOI: 165 of 165 total</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="interactive-map">Interactive Map<a class="anchor" aria-label="anchor" href="#interactive-map"></a>
 </h2>
 <p>Toggle between classified time periods and overlay tree loss
 transition layers to ground-truth change against multiple satellite
 basemaps.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tree_trans</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span>,</span>
 <span>                                  from_class <span class="op">=</span> <span class="st">"Trees"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/dft_map_interactive.html">dft_map_interactive</a></span><span class="op">(</span><span class="va">classified</span>, aoi <span class="op">=</span> <span class="va">aoi</span>, transition <span class="op">=</span> <span class="va">tree_trans</span><span class="op">)</span></span></code></pre></div>

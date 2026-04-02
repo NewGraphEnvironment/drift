@@ -362,7 +362,55 @@ patches.](land-cover-change_files/figure-html/plot-patch-filter-1.png)
 Transition raster before and after minimum patch area filtering (5,000
 m²). Centre panel shows removed patches.
 
-## Multi-Year Classification and Transition Overlay
+## Vector Patches
+
+[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+converts the transition raster into `sf` polygons — one row per
+connected patch. This is the format needed for GIS QA (click patches,
+filter by size) and spatial attribution to management zones.
+
+``` r
+patches <- dft_transition_vectors(result$raster)
+
+# Only actual changes (exclude same-class "transitions")
+patches_changed <- patches[grepl("->", patches$transition) &
+  !sapply(strsplit(patches$transition, " -> "), \(x) x[1] == x[2]), ]
+
+knitr::kable(
+  head(sf::st_drop_geometry(patches_changed[order(-patches_changed$area_ha), ]), 10),
+  digits = 2,
+  caption = "Ten largest change patches (same-class transitions excluded)."
+)
+```
+
+|     | patch_id | transition          | area_ha |
+|:----|---------:|:--------------------|--------:|
+| 109 |      109 | Crops -\> Rangeland |    9.96 |
+| 97  |       97 | Trees -\> Rangeland |    7.99 |
+| 61  |       61 | Trees -\> Rangeland |    2.41 |
+| 90  |       90 | Trees -\> Rangeland |    1.51 |
+| 59  |       59 | Trees -\> Rangeland |    0.94 |
+| 91  |       91 | Trees -\> Rangeland |    0.81 |
+| 81  |       81 | Trees -\> Rangeland |    0.75 |
+| 54  |       54 | Trees -\> Rangeland |    0.70 |
+| 5   |        5 | Trees -\> Water     |    0.55 |
+| 105 |      105 | Trees -\> Rangeland |    0.53 |
+
+Ten largest change patches (same-class transitions excluded).
+
+When `zones` is supplied, each patch is intersected with the zone
+polygons. Here we use the floodplain AOI as a single zone — in practice
+this would be sub-basins, parcels, or management units.
+
+``` r
+aoi$zone <- "Neexdzii Kwa floodplain"
+patches_zoned <- dft_transition_vectors(result$raster, zones = aoi,
+                                        zone_col = "zone")
+cat("Patches inside AOI:", nrow(patches_zoned), "of", nrow(patches), "total\n")
+#> Patches inside AOI: 165 of 165 total
+```
+
+## Interactive Map
 
 Toggle between classified time periods and overlay tree loss transition
 layers to ground-truth change against multiple satellite basemaps.
