@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,21 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.0" id="drift-020">drift 0.2.0<a class="anchor" aria-label="anchor" href="#drift-020"></a></h2>
+<ul><li>
+<code><a href="../reference/dft_rast_transition.html">dft_rast_transition()</a></code> — add <code>patch_area_min</code> parameter to filter small connected patches of changed pixels; return <code>$removed</code> raster for visual QA of filtered patches; add <code>from_class</code>/<code>to_class</code> filters</li>
+<li>
+<code><a href="../reference/dft_transition_vectors.html">dft_transition_vectors()</a></code> — vectorize transition raster into sf polygons with per-patch area, transition labels, and optional zone attribution</li>
+<li>
+<code><a href="../reference/dft_rast_consensus.html">dft_rast_consensus()</a></code> — per-pixel mode across classified rasters for temporal noise filtering; optional confidence layer</li>
+<li>
+<code><a href="../reference/dft_map_interactive.html">dft_map_interactive()</a></code> — new <code>transition</code> parameter overlays transition layers as checkboxes; Google Satellite and Esri Satellite basemaps; custom tile URL support</li>
+<li>
+<code>dft_check_crs()</code> — internal helper that errors on geographic CRS input; wired into <code><a href="../reference/dft_rast_transition.html">dft_rast_transition()</a></code> and <code><a href="../reference/dft_rast_summarize.html">dft_rast_summarize()</a></code>
+</li>
+<li>Vignette: transition detection, tree loss filtering, patch area filtering with comparison table, interactive map with transition overlays</li>
+</ul></div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="drift-010">drift 0.1.0<a class="anchor" aria-label="anchor" href="#drift-010"></a></h2>
 <p>Initial public release.</p>
 <ul><li>
@@ -54,7 +69,8 @@
 </li>
 <li>Vignette: Neexdzii Kwa floodplain land cover change 2017-2023</li>
 </ul></div>
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">
