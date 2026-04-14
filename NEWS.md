@@ -1,3 +1,9 @@
+# drift 0.2.1
+
+- Startup quote ritual: `library(drift)` prints a random fact-checked quote from 15 hip-hop artists on attach. Italic quote, grey attribution, clickable blue `source` hyperlink to the primary-source interview. Suppress via `options(drift.quote_show_source = FALSE)`.
+- Curated via the soul `/quotes-enable` skill using multi-agent research + independent primary-source fact-check. 61 entries. See `data-raw/quotes_build.R` for full provenance.
+- `cli` added to Imports for OSC 8 hyperlinks and styling in `R/zzz.R`.
+
 # drift 0.2.0
 
 - `dft_rast_transition()` — add `patch_area_min` parameter to filter small connected patches of changed pixels; return `$removed` raster for visual QA of filtered patches; add `from_class`/`to_class` filters
