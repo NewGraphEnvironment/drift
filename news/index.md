@@ -1,5 +1,19 @@
 # Changelog
 
+## drift 0.2.2
+
+- Startup quote pool expanded to 113. Adds 52 domain-expert quotes from
+  11 voices across floodplain/river process (David Montgomery, Ellen
+  Wohl), Indigenous stewardship (Robin Wall Kimmerer, Kyle Whyte, Nancy
+  Turner, Jeannette Armstrong), ecosystem valuation (Kai Chan), Canadian
+  public voices (David Suzuki, Wade Davis), and legacy conservation
+  (Aldo Leopold, Wendell Berry).
+- Tim Beechie was on the target list but yielded zero — no public
+  interview / podcast / documentary footprint. Process-paper voice only.
+- Same rigor as v0.2.1: parallel research agents, independent fact-check
+  pass (3 dropped for misattribution or text drift, 2 fixed from
+  fact-check flags).
+
 ## drift 0.2.1
 
 - Startup quote ritual:
