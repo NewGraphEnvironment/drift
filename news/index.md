@@ -1,5 +1,18 @@
 # Changelog
 
+## drift 0.2.1
+
+- Startup quote ritual:
+  [`library(drift)`](https://github.com/NewGraphEnvironment/drift)
+  prints a random fact-checked quote from 15 hip-hop artists on attach.
+  Italic quote, grey attribution, clickable blue `source` hyperlink to
+  the primary-source interview. Suppress via
+  `options(drift.quote_show_source = FALSE)`.
+- Curated via the soul `/quotes-enable` skill using multi-agent
+  research + independent primary-source fact-check. 61 entries. See
+  `data-raw/quotes_build.R` for full provenance.
+- `cli` added to Imports for OSC 8 hyperlinks and styling in `R/zzz.R`.
+
 ## drift 0.2.0
 
 - [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)

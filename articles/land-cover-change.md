@@ -16,6 +16,9 @@ connections needed.
 
 ``` r
 library(drift)
+#> 
+#>  'It's feeling confident I'm going to go up with the music, but I'm down every day. It's the challenge of trying to be the best at your worst times.' - Offset
+#>   source
 library(terra)
 #> terra 1.9.11
 library(sf)
