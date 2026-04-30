@@ -25,7 +25,7 @@ jobs:
           packages: cffr
 
       - name: Update CITATION.cff
-        run: Rscript -e 'cffr::cff_write()'
+        run: Rscript -e 'x <- cffr::cff_create(); x$references <- NULL; cffr::cff_write(x = x)'
 
       - name: Commit if changed
         run: |
