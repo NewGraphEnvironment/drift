@@ -1,6 +1,7 @@
 Package: drift
-Title: Delineations of Change from Cloud-Native Rasters
+Title: Detecting Riparian and Inland Floodplain Transitions
 Version: 0.2.2
+Date: 2026-04-14
 Authors@R: c(
     person("Allan", "Irvine", , "al@newgraphenvironment.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-3495-2128")),
