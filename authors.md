@@ -12,12 +12,12 @@
 Source:
 [`DESCRIPTION`](https://github.com/NewGraphEnvironment/drift/blob/main/DESCRIPTION)
 
-Irvine A (2026). *drift: Delineations of Change from Cloud-Native
-Rasters*. R package version 0.2.2,
+Irvine A (2026). *drift: Detecting Riparian and Inland Floodplain
+Transitions*. R package version 0.2.2,
 <https://github.com/NewGraphEnvironment/drift>.
 
     @Manual{,
-      title = {drift: Delineations of Change from Cloud-Native Rasters},
+      title = {drift: Detecting Riparian and Inland Floodplain Transitions},
       author = {Allan Irvine},
       year = {2026},
       note = {R package version 0.2.2},
