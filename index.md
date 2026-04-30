@@ -18,12 +18,14 @@ on the analysis.
 ## Install
 
 ``` r
+
 pak::pak("NewGraphEnvironment/drift")
 ```
 
 ## Quick start
 
 ``` r
+
 library(drift)
 
 # Fetch IO LULC for your AOI

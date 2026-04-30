@@ -15,6 +15,7 @@ connections needed.
 ## Load Data
 
 ``` r
+
 library(drift)
 #> 
 #>  'It's feeling confident I'm going to go up with the music, but I'm down every day. It's the challenge of trying to be the best at your worst times.' - Offset
@@ -44,6 +45,7 @@ names(rasters) <- years
 Apply IO LULC class names and colors from the shipped class table.
 
 ``` r
+
 classified <- dft_rast_classify(rasters, source = "io-lulc")
 
 # Check factor levels
@@ -62,6 +64,7 @@ terra::levels(classified[["2020"]])[[1]]
 The figure below shows the three classified time steps side by side.
 
 ``` r
+
 stacked <- terra::rast(classified)
 names(stacked) <- names(classified)
 terra::plot(stacked, axes = FALSE, mar = c(1, 1, 2, 1))
@@ -80,10 +83,12 @@ The following table shows area by class for each year and the net change
 between 2017 and 2023, sorted by magnitude of change.
 
 ``` r
+
 summary_tbl <- dft_rast_summarize(classified, source = "io-lulc", unit = "ha")
 ```
 
 ``` r
+
 library(dplyr)
 #> 
 #> Attaching package: 'dplyr'
@@ -126,6 +131,7 @@ knitr::kable(change, digits = 2, caption = "Net land cover change 2017--2023 (ha
 | Snow/Ice           |  0.02 |  1.85 |  0.00 |  -0.02 |     -100.0 |
 
 Net land cover change 2017–2023 (ha), sorted by absolute change.
+{.table}
 
 ## Vegetation Change
 
@@ -133,6 +139,7 @@ Trees and Rangeland show the clearest signal below — tree cover
 declining while rangeland expands.
 
 ``` r
+
 library(ggplot2)
 
 summary_tbl |>
@@ -161,6 +168,7 @@ class. Only transitions representing more than 1% of the total area are
 shown.
 
 ``` r
+
 result <- dft_rast_transition(classified, from = "2017", to = "2023")
 
 stable <- result$summary |>
@@ -175,6 +183,7 @@ changed <- result$summary |>
 ```
 
 ``` r
+
 knitr::kable(stable, digits = 2,
              caption = "Stable land cover 2017--2023 (only transitions >1% of total area shown).")
 ```
@@ -186,8 +195,10 @@ knitr::kable(stable, digits = 2,
 | Water      | Water     |     938 |  9.38 |  7.62 |
 
 Stable land cover 2017–2023 (only transitions \>1% of total area shown).
+{.table}
 
 ``` r
+
 knitr::kable(changed, digits = 2,
              caption = "Land cover transitions 2017--2023 (only transitions >1% of total area shown).")
 ```
@@ -198,7 +209,7 @@ knitr::kable(changed, digits = 2,
 | Crops      | Rangeland |     998 |  9.98 |  8.11 |
 
 Land cover transitions 2017–2023 (only transitions \>1% of total area
-shown).
+shown). {.table}
 
 ### Grouping Classes for Domain-Specific Analysis
 
@@ -212,6 +223,7 @@ The table below shows the area of Trees in 2017 that transitioned to
 agriculture-related classes by 2023.
 
 ``` r
+
 ag_classes <- c("Crops", "Rangeland", "Bare Ground")
 
 # All transitions from Trees to get total Trees-origin pixel count
@@ -240,7 +252,7 @@ knitr::kable(tree_loss_tbl, digits = 2,
 | Trees      | Agriculture |    2111 | 21.11 |        29.62 |
 
 Tree loss to agriculture (Crops + Rangeland + Bare Ground) 2017–2023.
-Percent is of all pixels classified as Trees in 2017.
+Percent is of all pixels classified as Trees in 2017. {.table}
 
 ### Transition Raster
 
@@ -249,6 +261,7 @@ Only transitions representing more than 1% of the total area are shown;
 minor transitions are masked. The AOI outline is shown in red.
 
 ``` r
+
 trans_vals <- terra::values(result$raster)[, 1]
 lvls <- terra::cats(result$raster)[[1]]
 
@@ -289,6 +302,7 @@ removes connected patches of changed pixels smaller than a threshold (in
 m²) before computing the summary.
 
 ``` r
+
 patch_min <- 5000
 n_pixels <- patch_min / prod(terra::res(classified[[1]]))
 
@@ -321,6 +335,7 @@ Filtering at 5,000 m² (50 pixels at 10 m resolution) removed 481 pixels
 and filtered results.
 
 ``` r
+
 knitr::kable(comparison, digits = 2, col.names = c(
   "From", "To", "Cells", "Area (ha)", "Cells (filtered)",
   "Area (filtered)", "Cells removed", "Area removed"
@@ -329,13 +344,13 @@ knitr::kable(comparison, digits = 2, col.names = c(
   format(patch_min, big.mark = ","), " m\u00b2)."))
 ```
 
-| From  | To        | Cells | Area (ha) | Cells (filtered) | Area (filtered) | Cells removed | Area removed |
-|:------|:----------|------:|----------:|-----------------:|----------------:|--------------:|-------------:|
-| Trees | Rangeland |  2111 |     21.11 |             1632 |           16.32 |           479 |         4.79 |
-| Crops | Rangeland |   998 |      9.98 |              996 |            9.96 |             2 |         0.02 |
+| From | To | Cells | Area (ha) | Cells (filtered) | Area (filtered) | Cells removed | Area removed |
+|:---|:---|---:|---:|---:|---:|---:|---:|
+| Trees | Rangeland | 2111 | 21.11 | 1632 | 16.32 | 479 | 4.79 |
+| Crops | Rangeland | 998 | 9.98 | 996 | 9.96 | 2 | 0.02 |
 
 Land cover transitions 2017–2023: unfiltered vs filtered (min patch area
-5,000 m²).
+5,000 m²). {.table style="width:100%;"}
 
 The figure below shows three views: unfiltered transitions, what the
 filter removed (`$removed`), and the filtered result. The `$removed`
@@ -344,6 +359,7 @@ raster is returned directly by
 when `patch_area_min` is set.
 
 ``` r
+
 aoi_proj <- sf::st_geometry(sf::st_transform(aoi, terra::crs(r_change)))
 
 par(mfrow = c(1, 3))
@@ -373,6 +389,7 @@ connected patch. This is the format needed for GIS QA (click patches,
 filter by size) and spatial attribution to management zones.
 
 ``` r
+
 patches <- dft_transition_vectors(result$raster)
 
 # Only actual changes (exclude same-class "transitions")
@@ -399,13 +416,14 @@ knitr::kable(
 | 5   |        5 | Trees -\> Water     |    0.55 |
 | 105 |      105 | Trees -\> Rangeland |    0.53 |
 
-Ten largest change patches (same-class transitions excluded).
+Ten largest change patches (same-class transitions excluded). {.table}
 
 When `zones` is supplied, each patch is intersected with the zone
 polygons. Here we use the floodplain AOI as a single zone — in practice
 this would be sub-basins, parcels, or management units.
 
 ``` r
+
 aoi$zone <- "Neexdzii Kwa floodplain"
 patches_zoned <- dft_transition_vectors(result$raster, zones = aoi,
                                         zone_col = "zone")
@@ -419,6 +437,7 @@ Toggle between classified time periods and overlay tree loss transition
 layers to ground-truth change against multiple satellite basemaps.
 
 ``` r
+
 tree_trans <- dft_rast_transition(classified, from = "2017", to = "2023",
                                   from_class = "Trees")
 dft_map_interactive(classified, aoi = aoi, transition = tree_trans,
