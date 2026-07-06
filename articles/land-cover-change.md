@@ -21,7 +21,7 @@ library(drift)
 #>  'It's feeling confident I'm going to go up with the music, but I'm down every day. It's the challenge of trying to be the best at your worst times.' - Offset
 #>   source
 library(terra)
-#> terra 1.9.11
+#> terra 1.9.34
 library(sf)
 #> Linking to GEOS 3.12.1, GDAL 3.8.4, PROJ 9.4.0; sf_use_s2() is TRUE
 
