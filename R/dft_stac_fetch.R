@@ -5,6 +5,13 @@
 #' collection hosting single-band classified rasters (IO LULC, ESA WorldCover,
 #' custom COGs).
 #'
+#' Fetched rasters are cached under [dft_cache_path()] as
+#' `<source>/<year>_<key>.nc`, where `key` is a hash of the AOI geometry and
+#' every fetch parameter that affects the output (`res`, `crs`, `dt`,
+#' `aggregation`, `resampling`, `stac_url`, `collection`, `asset`). Repeat
+#' calls with the same AOI and parameters reuse the cache; changing any of
+#' them re-fetches.
+#'
 #' @param aoi An `sf` polygon defining the area of interest.
 #' @param source Character. A known source name passed to [dft_stac_config()].
 #'   Ignored when `stac_url`, `collection`, and `asset` are all provided.
