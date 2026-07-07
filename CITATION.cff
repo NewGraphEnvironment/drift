@@ -1,14 +1,14 @@
-# --------------------------------------------
-# CITATION file created with {cffr} R package
+# ------------------------------------------------
+# CITATION.cff file created with {cffr} R package
 # See also: https://docs.ropensci.org/cffr/
-# --------------------------------------------
+# ------------------------------------------------
  
 cff-version: 1.2.0
 message: 'To cite package "drift" in publications use:'
 type: software
 license: MIT
 title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
-version: 0.2.2
+version: 0.2.3
 abstract: Fetch STAC-hosted land cover rasters, classify and summarize change over
   time within user-provided AOI polygons, and produce standardized maps, plots, and
   tables for reporting. Generic STAC pipeline works with any classified raster (Esri
@@ -20,7 +20,7 @@ authors:
   orcid: https://orcid.org/0000-0002-3495-2128
 repository-code: https://github.com/NewGraphEnvironment/drift
 url: https://newgraphenvironment.github.io/drift/
-date-released: '2026-04-14'
+date-released: '2026-07-06'
 contact:
 - family-names: Irvine
   given-names: Allan
