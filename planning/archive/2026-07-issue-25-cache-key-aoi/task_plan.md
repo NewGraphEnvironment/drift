@@ -29,4 +29,4 @@ AOI's raster masked to the second AOI**. No warning, no error — just wrong dat
 - [x] Tests pass
 - [x] `/code-check` clean on each commit
 - [x] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion
+- [x] `/planning-archive` on completion
