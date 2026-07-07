@@ -5,6 +5,10 @@
 #' transition type. Useful for QA in GIS, spatial attribution to management
 #' zones, and patch-level reporting.
 #'
+#' Patches are 8-connected components of same-valued cells, computed in a
+#' single pass over the grid, so large sparse rasters vectorize without
+#' per-class memory cost.
+#'
 #' @param x A factor `SpatRaster` from [dft_rast_transition()] (the `$raster`
 #'   element). Must have a projected CRS.
 #' @param zones Optional `sf` polygon layer for spatial attribution. Any
@@ -15,7 +19,8 @@
 #'   smaller than this are dropped before returning. `NULL` (default) keeps all.
 #'
 #' @return An `sf` data frame (polygon geometry) with columns:
-#'   - `patch_id` (integer) — connected component ID
+#'   - `patch_id` (integer) — connected component ID, numbered in raster
+#'     scan order
 #'   - `transition` (character) — transition label (e.g. "Trees -> Rangeland")
 #'   - `area_ha` (numeric) — patch area in hectares
 #'   - Zone column (if `zones` supplied) — from spatial intersection
@@ -65,62 +70,31 @@ dft_transition_vectors <- function(x,
     }
   }
 
-  lvls <- terra::cats(x)[[1]]
-  vals <- terra::values(x)[, 1]
+  # Single pass: 8-connected components of same-valued cells.
+  # Requires terra >= 1.8-10 (earlier versions falsely connect patches
+  # across the left/right raster edges with values = TRUE).
+  p <- terra::patches(x, directions = 8, values = TRUE)
+  names(p) <- "pid"
+  polys_sf <- sf::st_as_sf(terra::as.polygons(p))
 
-  if (all(is.na(vals))) {
+  if (nrow(polys_sf) == 0) {
     return(sf::st_sf(
       patch_id = integer(0), transition = character(0),
       area_ha = numeric(0), geometry = sf::st_sfc(crs = sf::st_crs(x))
     ))
   }
 
-  # Build unique patch IDs per transition type
-  patch_ids <- rep(NA_integer_, terra::ncell(x))
-  patch_transition <- integer(0)
-  offset <- 0L
+  # Map each patch to its transition label, touching only the non-NA cells
+  cell_idx <- terra::cells(p)
+  pid_at <- terra::extract(p, cell_idx)[, 1]
+  lab_at <- as.character(terra::extract(x, cell_idx)[, 1])
+  first <- !duplicated(pid_at)
+  lab_map <- stats::setNames(lab_at[first], pid_at[first])
 
-  for (i in seq_len(nrow(lvls))) {
-    code <- lvls$id[i]
-    mask <- which(vals == code)
-    if (length(mask) == 0) next
-
-    r_mask <- terra::rast(x)
-    mask_vals <- rep(NA_integer_, terra::ncell(x))
-    mask_vals[mask] <- 1L
-    terra::values(r_mask) <- mask_vals
-    p <- terra::patches(r_mask, directions = 8)
-    p_vals <- terra::values(p)[, 1]
-
-    valid <- !is.na(p_vals)
-    unique_pids <- sort(unique(p_vals[valid]))
-    for (pid in unique_pids) {
-      offset <- offset + 1L
-      patch_ids[valid & p_vals == pid] <- offset
-      patch_transition <- c(patch_transition, code)
-    }
-  }
-
-  if (offset == 0L) {
-    return(sf::st_sf(
-      patch_id = integer(0), transition = character(0),
-      area_ha = numeric(0), geometry = sf::st_sfc(crs = sf::st_crs(x))
-    ))
-  }
-
-  # Vectorize patch IDs
-  r_pid <- terra::rast(x)
-  names(r_pid) <- "pid"
-  terra::values(r_pid) <- patch_ids
-  polys <- terra::as.polygons(r_pid)
-  polys_sf <- sf::st_as_sf(polys)
-
-  # Map patch IDs to transition labels
-  code_to_label <- stats::setNames(lvls$transition, lvls$id)
-  polys_sf$patch_id <- as.integer(polys_sf$pid)
-  polys_sf$transition <- as.character(
-    code_to_label[as.character(patch_transition[polys_sf$pid])]
-  )
+  polys_sf$transition <- unname(lab_map[as.character(polys_sf$pid)])
+  # Cell values with no cats() entry have no label — drop their patches
+  polys_sf <- polys_sf[!is.na(polys_sf$transition), ]
+  polys_sf$patch_id <- seq_len(nrow(polys_sf))
   polys_sf$area_ha <- as.numeric(sf::st_area(polys_sf)) * 1e-4
   polys_sf$pid <- NULL
 
