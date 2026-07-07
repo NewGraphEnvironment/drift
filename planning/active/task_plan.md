@@ -13,15 +13,15 @@ floodplain this exhausts memory and the R process is OOM-killed.
 
 ## Phase 2: Docs + release
 
-- [ ] Roxygen: note single-pass implementation and that `patch_id` numbering is scan-order; `devtools::document()`
-- [ ] NEWS.md 0.2.4: OOM fix (grid-cell x n-class x n-patch churn → single pass), identical output guarantee, patch_id ordering note, new terra floor
-- [ ] File follow-up issue for `dft_rast_transition()`'s full-grid value pipeline (same OOM class; needs its own refactor + harness)
-- [ ] `lintr` clean + full `devtools::test()` pass
-- [ ] Version bump to 0.2.4 in DESCRIPTION as final commit
+- [x] Roxygen: note single-pass implementation and that `patch_id` numbering is scan-order; `devtools::document()`
+- [x] NEWS.md 0.2.4: OOM fix (grid-cell x n-class x n-patch churn → single pass), identical output guarantee, patch_id ordering note, new terra floor
+- [x] File follow-up issue for `dft_rast_transition()`'s full-grid value pipeline (same OOM class; needs its own refactor + harness) — filed as #28
+- [x] `lintr` clean + full `devtools::test()` pass (211 pass; one pre-existing vignette lint, untouched by this branch)
+- [x] Version bump to 0.2.4 in DESCRIPTION as final commit
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion

@@ -10,4 +10,6 @@
   before the rewrite: 185 patches / 123.11 ha / 57 at patch_area_min = 1000 — new code matches.
 - Final-implementation benchmark: 24M cells, 4,799 patches → 1.9 s (old code: 122 s with only
   1,232 patches)
-- Next: Phase 2 (docs + release)
+- Phase 2 complete: roxygen single-pass/scan-order notes, NEWS 0.2.4, follow-up issue #28
+  filed for dft_rast_transition's full-grid pipeline, version bump
+- Next: /planning-archive + /gh-pr-push
