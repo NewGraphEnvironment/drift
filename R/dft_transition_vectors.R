@@ -5,6 +5,10 @@
 #' transition type. Useful for QA in GIS, spatial attribution to management
 #' zones, and patch-level reporting.
 #'
+#' Patches are 8-connected components of same-valued cells, computed in a
+#' single pass over the grid, so large sparse rasters vectorize without
+#' per-class memory cost.
+#'
 #' @param x A factor `SpatRaster` from [dft_rast_transition()] (the `$raster`
 #'   element). Must have a projected CRS.
 #' @param zones Optional `sf` polygon layer for spatial attribution. Any
@@ -15,7 +19,8 @@
 #'   smaller than this are dropped before returning. `NULL` (default) keeps all.
 #'
 #' @return An `sf` data frame (polygon geometry) with columns:
-#'   - `patch_id` (integer) — connected component ID
+#'   - `patch_id` (integer) — connected component ID, numbered in raster
+#'     scan order
 #'   - `transition` (character) — transition label (e.g. "Trees -> Rangeland")
 #'   - `area_ha` (numeric) — patch area in hectares
 #'   - Zone column (if `zones` supplied) — from spatial intersection

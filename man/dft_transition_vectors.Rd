@@ -22,7 +22,8 @@ smaller than this are dropped before returning. \code{NULL} (default) keeps all.
 \value{
 An \code{sf} data frame (polygon geometry) with columns:
 \itemize{
-\item \code{patch_id} (integer) — connected component ID
+\item \code{patch_id} (integer) — connected component ID, numbered in raster
+scan order
 \item \code{transition} (character) — transition label (e.g. "Trees -> Rangeland")
 \item \code{area_ha} (numeric) — patch area in hectares
 \item Zone column (if \code{zones} supplied) — from spatial intersection
@@ -33,6 +34,11 @@ Convert a transition \code{SpatRaster} (from \code{\link[=dft_rast_transition]{d
 polygons — one row per connected patch of pixels sharing the same
 transition type. Useful for QA in GIS, spatial attribution to management
 zones, and patch-level reporting.
+}
+\details{
+Patches are 8-connected components of same-valued cells, computed in a
+single pass over the grid, so large sparse rasters vectorize without
+per-class memory cost.
 }
 \examples{
 r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
