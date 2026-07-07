@@ -13,7 +13,7 @@ custom COGs)."><meta property="og:image" content="https://newgraphenvironment.gi
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -129,7 +129,10 @@ for categorical data).</p></dd>
 
 
 <dt id="arg-force">force<a class="anchor" aria-label="anchor" href="#arg-force"></a></dt>
-<dd><p>Logical. Re-fetch even if cached (default <code>FALSE</code>).</p></dd>
+<dd><p>Logical. Re-fetch even if cached, overwriting the cached file
+(default <code>FALSE</code>). A raster returned by an earlier call with the same
+parameters is backed by that file and may silently pick up the rewritten
+contents.</p></dd>
 
 
 <dt id="arg-sign-fn">sign_fn<a class="anchor" aria-label="anchor" href="#arg-sign-fn"></a></dt>
@@ -142,6 +145,15 @@ for categorical data).</p></dd>
     <p>A named list of <a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a> objects, one per year. The STAC
 items are attached as <code>attr(, "stac_items")</code> for use with
 <code><a href="dft_stac_classes.html">dft_stac_classes()</a></code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Fetched rasters are cached under <code><a href="dft_cache_path.html">dft_cache_path()</a></code> as
+<code>&lt;source&gt;/&lt;year&gt;_&lt;key&gt;.nc</code>, where <code>key</code> is a hash of the AOI geometry and
+every fetch parameter that affects the output (<code>res</code>, <code>crs</code>, <code>dt</code>,
+<code>aggregation</code>, <code>resampling</code>, <code>stac_url</code>, <code>collection</code>, <code>asset</code>). Repeat
+calls with the same AOI and parameters reuse the cache; changing any of
+them re-fetches.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

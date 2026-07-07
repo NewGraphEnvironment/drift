@@ -1,5 +1,22 @@
 # Changelog
 
+## drift 0.2.3
+
+- Fix silent cross-AOI cache collision in
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  ([\#25](https://github.com/NewGraphEnvironment/drift/issues/25)).
+  Cache files were keyed by source + year only, so fetching a second AOI
+  with the same source/year silently returned the first AOI’s raster
+  masked to the second AOI’s extent. Cache filenames now include a hash
+  of the AOI geometry and all fetch-affecting parameters (`res`, `crs`,
+  `dt`, `aggregation`, `resampling`, `stac_url`, `collection`, `asset`).
+  Existing caches re-fetch on first use after upgrading;
+  [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
+  reclaims the orphaned old-format files.
+- `force = TRUE` now overwrites the cached file instead of erroring with
+  “File already exists”
+  ([\#25](https://github.com/NewGraphEnvironment/drift/issues/25)).
+
 ## drift 0.2.2
 
 - Startup quote pool expanded to 113. Adds 52 domain-expert quotes from

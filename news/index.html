@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,6 +35,12 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.3" id="drift-023">drift 0.2.3<a class="anchor" aria-label="anchor" href="#drift-023"></a></h2>
+<ul><li>Fix silent cross-AOI cache collision in <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> (<a href="https://github.com/NewGraphEnvironment/drift/issues/25" class="external-link">#25</a>). Cache files were keyed by source + year only, so fetching a second AOI with the same source/year silently returned the first AOI’s raster masked to the second AOI’s extent. Cache filenames now include a hash of the AOI geometry and all fetch-affecting parameters (<code>res</code>, <code>crs</code>, <code>dt</code>, <code>aggregation</code>, <code>resampling</code>, <code>stac_url</code>, <code>collection</code>, <code>asset</code>). Existing caches re-fetch on first use after upgrading; <code><a href="../reference/dft_cache_clear.html">dft_cache_clear()</a></code> reclaims the orphaned old-format files.</li>
+<li>
+<code>force = TRUE</code> now overwrites the cached file instead of erroring with “File already exists” (<a href="https://github.com/NewGraphEnvironment/drift/issues/25" class="external-link">#25</a>).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.2" id="drift-022">drift 0.2.2<a class="anchor" aria-label="anchor" href="#drift-022"></a></h2>
 <ul><li>Startup quote pool expanded to 113. Adds 52 domain-expert quotes from 11 voices across floodplain/river process (David Montgomery, Ellen Wohl), Indigenous stewardship (Robin Wall Kimmerer, Kyle Whyte, Nancy Turner, Jeannette Armstrong), ecosystem valuation (Kai Chan), Canadian public voices (David Suzuki, Wade Davis), and legacy conservation (Aldo Leopold, Wendell Berry).</li>

@@ -87,7 +87,10 @@ dft_stac_fetch(
 
 - force:
 
-  Logical. Re-fetch even if cached (default `FALSE`).
+  Logical. Re-fetch even if cached, overwriting the cached file (default
+  `FALSE`). A raster returned by an earlier call with the same
+  parameters is backed by that file and may silently pick up the
+  rewritten contents.
 
 - sign_fn:
 
@@ -101,3 +104,13 @@ A named list of
 objects, one per year. The STAC items are attached as
 `attr(, "stac_items")` for use with
 [`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md).
+
+## Details
+
+Fetched rasters are cached under
+[`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
+as `<source>/<year>_<key>.nc`, where `key` is a hash of the AOI geometry
+and every fetch parameter that affects the output (`res`, `crs`, `dt`,
+`aggregation`, `resampling`, `stac_url`, `collection`, `asset`). Repeat
+calls with the same AOI and parameters reuse the cache; changing any of
+them re-fetches.
