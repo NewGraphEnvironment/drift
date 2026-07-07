@@ -19,14 +19,14 @@ AOI's raster masked to the second AOI**. No warning, no error — just wrong dat
 
 ## Phase 3: Docs + release
 
-- [ ] Roxygen note in `dft_stac_fetch` docs: cache entries keyed by AOI geometry + fetch parameters; `devtools::document()`
-- [ ] NEWS.md entry for 0.2.3: bug + fix, existing caches will refetch, `dft_cache_clear()` reclaims space
-- [ ] `lintr::lint_package()` clean + full `devtools::test()` pass
-- [ ] Version bump to 0.2.3 in DESCRIPTION as final commit
+- [x] Roxygen note in `dft_stac_fetch` docs: cache entries keyed by AOI geometry + fetch parameters; `devtools::document()`
+- [x] NEWS.md entry for 0.2.3: bug + fix, existing caches will refetch, `dft_cache_clear()` reclaims space
+- [x] `lintr::lint_package()` clean + full `devtools::test()` pass (one pre-existing vignette lint, untouched by this branch)
+- [x] Version bump to 0.2.3 in DESCRIPTION as final commit
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
