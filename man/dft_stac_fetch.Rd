@@ -53,7 +53,10 @@ for categorical data).}
 \item{cache_dir}{Character. Cache directory path. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
 
-\item{force}{Logical. Re-fetch even if cached (default \code{FALSE}).}
+\item{force}{Logical. Re-fetch even if cached, overwriting the cached file
+(default \code{FALSE}). A raster returned by an earlier call with the same
+parameters is backed by that file and may silently pick up the rewritten
+contents.}
 
 \item{sign_fn}{A signing function for STAC assets. Default is
 \code{\link[rstac:items_sign_planetary_computer]{rstac::sign_planetary_computer()}}.}
@@ -68,4 +71,12 @@ Query a STAC catalog, build a gdalcubes image collection, and extract
 per-year rasters cropped and masked to the AOI. Works with any STAC
 collection hosting single-band classified rasters (IO LULC, ESA WorldCover,
 custom COGs).
+}
+\details{
+Fetched rasters are cached under \code{\link[=dft_cache_path]{dft_cache_path()}} as
+\verb{<source>/<year>_<key>.nc}, where \code{key} is a hash of the AOI geometry and
+every fetch parameter that affects the output (\code{res}, \code{crs}, \code{dt},
+\code{aggregation}, \code{resampling}, \code{stac_url}, \code{collection}, \code{asset}). Repeat
+calls with the same AOI and parameters reuse the cache; changing any of
+them re-fetches.
 }

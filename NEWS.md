@@ -1,3 +1,8 @@
+# drift 0.2.3
+
+- Fix silent cross-AOI cache collision in `dft_stac_fetch()` (#25). Cache files were keyed by source + year only, so fetching a second AOI with the same source/year silently returned the first AOI's raster masked to the second AOI's extent. Cache filenames now include a hash of the AOI geometry and all fetch-affecting parameters (`res`, `crs`, `dt`, `aggregation`, `resampling`, `stac_url`, `collection`, `asset`). Existing caches re-fetch on first use after upgrading; `dft_cache_clear()` reclaims the orphaned old-format files.
+- `force = TRUE` now overwrites the cached file instead of erroring with "File already exists" (#25).
+
 # drift 0.2.2
 
 - Startup quote pool expanded to 113. Adds 52 domain-expert quotes from 11 voices across floodplain/river process (David Montgomery, Ellen Wohl), Indigenous stewardship (Robin Wall Kimmerer, Kyle Whyte, Nancy Turner, Jeannette Armstrong), ecosystem valuation (Kai Chan), Canadian public voices (David Suzuki, Wade Davis), and legacy conservation (Aldo Leopold, Wendell Berry).
