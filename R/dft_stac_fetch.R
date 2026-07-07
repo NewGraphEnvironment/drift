@@ -97,10 +97,14 @@ dft_stac_fetch <- function(aoi,
   source_label <- if (!is.null(source)) source else "custom"
   cache_source_dir <- file.path(cache_base, source_label)
   dir.create(cache_source_dir, recursive = TRUE, showWarnings = FALSE)
+  cache_key <- stac_cache_key(
+    aoi_target, res, target_crs, dt, aggregation, resampling,
+    stac_url, collection, asset
+  )
 
   # Fetch per year
   result <- lapply(years, function(yr) {
-    cache_file <- file.path(cache_source_dir, paste0(yr, ".nc"))
+    cache_file <- file.path(cache_source_dir, paste0(yr, "_", cache_key, ".nc"))
 
     if (!force && file.exists(cache_file)) {
       message("  ", yr, ": cached")
@@ -133,6 +137,29 @@ dft_stac_fetch <- function(aoi,
   names(result) <- as.character(years)
   attr(result, "stac_items") <- items
   result
+}
+
+
+#' Cache key for one STAC fetch parameter set
+#'
+#' Hashes everything that changes the written raster except year, which stays
+#' as the readable filename prefix (all years of one call share a key). The
+#' geometry is hashed as WKB so sf attribute columns and PROJ-version CRS
+#' representation differences can't change the key; the CRS enters separately
+#' as `target_crs`. `res` is coerced to double so `10L` and `10` key alike.
+#' Callers must pass post-resolution `stac_url`/`collection`/`asset`, never
+#' the raw possibly-NULL arguments.
+#' @noRd
+stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
+                           resampling, stac_url, collection, asset) {
+  geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
+  substr(
+    rlang::hash(list(
+      geom_wkb, as.numeric(res), target_crs, dt, aggregation,
+      resampling, stac_url, collection, asset
+    )),
+    1, 12
+  )
 }
 
 

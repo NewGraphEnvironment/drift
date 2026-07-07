@@ -5,4 +5,6 @@
 - Plan-mode exploration — phases approved by user (extent check explicitly skipped)
 - Created branch `25-dft-stac-fetch-cache-key-omits-aoi-secon` off main
 - Scaffolded PWF baseline from issue #25 with approved phases
-- Next: start Phase 1
+- Phase 1 complete: `stac_cache_key()` helper + `<year>_<key>.nc` filenames + 5 local key tests
+  (suite: 192 pass, 0 fail; lint clean)
+- Next: Phase 2 (force overwrite)

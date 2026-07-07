@@ -8,9 +8,9 @@ AOI's raster masked to the second AOI**. No warning, no error — just wrong dat
 
 ## Phase 1: Cache key includes AOI + fetch parameters
 
-- [ ] Add internal `stac_cache_key()` helper in `R/dft_stac_fetch.R` — WKB geometry + `as.numeric(res)` + `target_crs` + `dt` + `aggregation` + `resampling` + post-resolution `stac_url`/`collection`/`asset`, `rlang::hash()`, 12-char prefix
-- [ ] Compute key once after AOI/CRS resolution; cache filename becomes `<year>_<key>.nc` (`R/dft_stac_fetch.R:103`)
-- [ ] Unit tests in `tests/testthat/test-dft_stac_fetch.R` (all local, no network): determinism; shifted geometry → different key; different `res`/`crs`/`collection`/`asset`/`stac_url` → different keys; `res = 10` vs `10L` → same key; sf-with-attributes vs bare sfc → same key; key matches `^[0-9a-f]{12}$`
+- [x] Add internal `stac_cache_key()` helper in `R/dft_stac_fetch.R` — WKB geometry + `as.numeric(res)` + `target_crs` + `dt` + `aggregation` + `resampling` + post-resolution `stac_url`/`collection`/`asset`, `rlang::hash()`, 12-char prefix
+- [x] Compute key once after AOI/CRS resolution; cache filename becomes `<year>_<key>.nc` (`R/dft_stac_fetch.R:103`)
+- [x] Unit tests in `tests/testthat/test-dft_stac_fetch.R` (all local, no network): determinism; shifted geometry → different key; different `res`/`crs`/`collection`/`asset`/`stac_url` → different keys; `res = 10` vs `10L` → same key; sf-with-attributes vs bare sfc → same key; key matches `^[0-9a-f]{12}$`
 
 ## Phase 2: force = TRUE overwrites cleanly
 
