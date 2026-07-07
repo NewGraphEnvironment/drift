@@ -7,4 +7,5 @@
 - Scaffolded PWF baseline from issue #25 with approved phases
 - Phase 1 complete: `stac_cache_key()` helper + `<year>_<key>.nc` filenames + 5 local key tests
   (suite: 192 pass, 0 fail; lint clean)
-- Next: Phase 2 (force overwrite)
+- Phase 2 complete: `write_ncdf(..., overwrite = TRUE)` + `@param force` doc caveat
+- Next: Phase 3 (docs + release)

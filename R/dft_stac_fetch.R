@@ -24,7 +24,10 @@
 #'   for categorical data).
 #' @param cache_dir Character. Cache directory path. When `NULL`, uses
 #'   [dft_cache_path()].
-#' @param force Logical. Re-fetch even if cached (default `FALSE`).
+#' @param force Logical. Re-fetch even if cached, overwriting the cached file
+#'   (default `FALSE`). A raster returned by an earlier call with the same
+#'   parameters is backed by that file and may silently pick up the rewritten
+#'   contents.
 #' @param sign_fn A signing function for STAC assets. Default is
 #'   [rstac::sign_planetary_computer()].
 #'
@@ -127,7 +130,7 @@ dft_stac_fetch <- function(aoi,
         resampling = resampling
       )
       cube <- gdalcubes::raster_cube(col, v)
-      gdalcubes::write_ncdf(cube, cache_file)
+      gdalcubes::write_ncdf(cube, cache_file, overwrite = TRUE)
       r <- terra::rast(cache_file)
     }
 

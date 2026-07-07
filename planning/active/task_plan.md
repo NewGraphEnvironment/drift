@@ -14,8 +14,8 @@ AOI's raster masked to the second AOI**. No warning, no error — just wrong dat
 
 ## Phase 2: force = TRUE overwrites cleanly
 
-- [ ] `gdalcubes::write_ncdf(cube, cache_file, overwrite = TRUE)` (`R/dft_stac_fetch.R:126`)
-- [ ] Update `@param force` roxygen — overwrites the cached file; note that a SpatRaster returned earlier and backed by the same file may silently see new content on POSIX
+- [x] `gdalcubes::write_ncdf(cube, cache_file, overwrite = TRUE)` (`R/dft_stac_fetch.R:126`)
+- [x] Update `@param force` roxygen — overwrites the cached file; note that a SpatRaster returned earlier and backed by the same file may silently see new content on POSIX
 
 ## Phase 3: Docs + release
 
