@@ -28,7 +28,7 @@ Imports:
     rlang,
     rstac,
     sf,
-    terra,
+    terra (>= 1.8-10),
     tibble
 Suggests:
     bookdown,

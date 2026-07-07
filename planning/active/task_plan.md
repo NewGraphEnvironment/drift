@@ -6,10 +6,10 @@ floodplain this exhausts memory and the R process is OOM-killed.
 
 ## Phase 1: Single-pass patches(values = TRUE) rewrite
 
-- [ ] Replace the per-class/per-patch loop (`R/dft_transition_vectors.R:68-125`) with single-pass `terra::patches(x, directions = 8, values = TRUE)` → `terra::as.polygons()` → sparse pid→label map via `terra::cells()` + `terra::extract()`; keep signature, validation, `patch_area_min` filter, zones block, and return columns unchanged; drop rows whose value has no `cats()` entry (old behavior)
-- [ ] Add `terra (>= 1.8-10)` floor to DESCRIPTION Imports (patches(values=TRUE) edge-wraparound bug fixed in 1.8-10 — correctness, not nicety)
-- [ ] New tests in `tests/testthat/test-dft_transition_vectors.R`: synthetic decomposition test (~60x80 factor raster with engineered topology — diagonal-only joins, adjacent different classes, crossed diagonals, a code-0 class, holes) asserting equal patch count / per-class counts / sorted areas vs a brute-force per-class reference computed in-test; all-NA raster returns empty sf with correct columns + CRS; fixture regression guard (185 patches / 123.11 total ha)
-- [ ] All 10 existing tests stay green unchanged (behavior contract)
+- [x] Replace the per-class/per-patch loop (`R/dft_transition_vectors.R:68-125`) with single-pass `terra::patches(x, directions = 8, values = TRUE)` → `terra::as.polygons()` → sparse pid→label map via `terra::cells()` + `terra::extract()`; keep signature, validation, `patch_area_min` filter, zones block, and return columns unchanged; drop rows whose value has no `cats()` entry (old behavior)
+- [x] Add `terra (>= 1.8-10)` floor to DESCRIPTION Imports (patches(values=TRUE) edge-wraparound bug fixed in 1.8-10 — correctness, not nicety)
+- [x] New tests in `tests/testthat/test-dft_transition_vectors.R`: synthetic decomposition test (~60x80 factor raster with engineered topology — diagonal-only joins, adjacent different classes, crossed diagonals, a code-0 class, holes) asserting equal patch count / per-class counts / sorted areas vs a brute-force per-class reference computed in-test; all-NA raster returns empty sf with correct columns + CRS; fixture regression guard (185 patches / 123.11 total ha)
+- [x] All 10 existing tests stay green unchanged (behavior contract)
 
 ## Phase 2: Docs + release
 
