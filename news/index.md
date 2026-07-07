@@ -1,5 +1,22 @@
 # Changelog
 
+## drift 0.2.4
+
+- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  no longer exhausts memory on large-extent rasters
+  ([\#27](https://github.com/NewGraphEnvironment/drift/issues/27)). The
+  per-class loop allocated full-grid vectors per class and per patch —
+  ncell × n_patches churn that OOM-killed a 102.6M-cell, 56-class
+  floodplain. Replaced by a single `terra::patches(values = TRUE)` pass
+  plus a sparse patch-to-label map. Output is identical (verified
+  patch-by-patch against the old implementation); only `patch_id`
+  numbering / row order changes, to raster scan order. Benchmark at 24M
+  cells: 1.9 s for a 4,799-patch raster; the old code took 122 s on a
+  milder 1,232-patch raster of the same size.
+- terra dependency floored at `>= 1.8-10`: earlier versions had an
+  edge-wraparound bug in `patches(values = TRUE)` that silently merged
+  patches touching opposite raster edges.
+
 ## drift 0.2.3
 
 - Fix silent cross-AOI cache collision in

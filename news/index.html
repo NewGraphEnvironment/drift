@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,6 +35,12 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.4" id="drift-024">drift 0.2.4<a class="anchor" aria-label="anchor" href="#drift-024"></a></h2>
+<ul><li>
+<code><a href="../reference/dft_transition_vectors.html">dft_transition_vectors()</a></code> no longer exhausts memory on large-extent rasters (<a href="https://github.com/NewGraphEnvironment/drift/issues/27" class="external-link">#27</a>). The per-class loop allocated full-grid vectors per class and per patch — ncell × n_patches churn that OOM-killed a 102.6M-cell, 56-class floodplain. Replaced by a single <code>terra::patches(values = TRUE)</code> pass plus a sparse patch-to-label map. Output is identical (verified patch-by-patch against the old implementation); only <code>patch_id</code> numbering / row order changes, to raster scan order. Benchmark at 24M cells: 1.9 s for a 4,799-patch raster; the old code took 122 s on a milder 1,232-patch raster of the same size.</li>
+<li>terra dependency floored at <code>&gt;= 1.8-10</code>: earlier versions had an edge-wraparound bug in <code>patches(values = TRUE)</code> that silently merged patches touching opposite raster edges.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.3" id="drift-023">drift 0.2.3<a class="anchor" aria-label="anchor" href="#drift-023"></a></h2>
 <ul><li>Fix silent cross-AOI cache collision in <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> (<a href="https://github.com/NewGraphEnvironment/drift/issues/25" class="external-link">#25</a>). Cache files were keyed by source + year only, so fetching a second AOI with the same source/year silently returned the first AOI’s raster masked to the second AOI’s extent. Cache filenames now include a hash of the AOI geometry and all fetch-affecting parameters (<code>res</code>, <code>crs</code>, <code>dt</code>, <code>aggregation</code>, <code>resampling</code>, <code>stac_url</code>, <code>collection</code>, <code>asset</code>). Existing caches re-fetch on first use after upgrading; <code><a href="../reference/dft_cache_clear.html">dft_cache_clear()</a></code> reclaims the orphaned old-format files.</li>

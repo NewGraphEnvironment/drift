@@ -405,16 +405,16 @@ knitr::kable(
 
 |     | patch_id | transition          | area_ha |
 |:----|---------:|:--------------------|--------:|
-| 109 |      109 | Crops -\> Rangeland |    9.96 |
-| 97  |       97 | Trees -\> Rangeland |    7.99 |
-| 61  |       61 | Trees -\> Rangeland |    2.41 |
-| 90  |       90 | Trees -\> Rangeland |    1.51 |
-| 59  |       59 | Trees -\> Rangeland |    0.94 |
-| 91  |       91 | Trees -\> Rangeland |    0.81 |
-| 81  |       81 | Trees -\> Rangeland |    0.75 |
-| 54  |       54 | Trees -\> Rangeland |    0.70 |
-| 5   |        5 | Trees -\> Water     |    0.55 |
-| 105 |      105 | Trees -\> Rangeland |    0.53 |
+| 35  |       35 | Crops -\> Rangeland |    9.96 |
+| 139 |      139 | Trees -\> Rangeland |    7.99 |
+| 55  |       55 | Trees -\> Rangeland |    2.41 |
+| 129 |      129 | Trees -\> Rangeland |    1.51 |
+| 27  |       27 | Trees -\> Rangeland |    0.94 |
+| 130 |      130 | Trees -\> Rangeland |    0.81 |
+| 109 |      109 | Trees -\> Rangeland |    0.75 |
+| 9   |        9 | Trees -\> Rangeland |    0.70 |
+| 38  |       38 | Trees -\> Water     |    0.55 |
+| 164 |      164 | Trees -\> Rangeland |    0.53 |
 
 Ten largest change patches (same-class transitions excluded). {.table}
 

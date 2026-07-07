@@ -13,7 +13,7 @@ zones, and patch-level reporting."><meta property="og:image" content="https://ne
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,11 +80,18 @@ smaller than this are dropped before returning. <code>NULL</code> (default) keep
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>An <code>sf</code> data frame (polygon geometry) with columns:</p><ul><li><p><code>patch_id</code> (integer) — connected component ID</p></li>
+    <p>An <code>sf</code> data frame (polygon geometry) with columns:</p><ul><li><p><code>patch_id</code> (integer) — connected component ID, numbered in raster
+scan order</p></li>
 <li><p><code>transition</code> (character) — transition label (e.g. "Trees -&gt; Rangeland")</p></li>
 <li><p><code>area_ha</code> (numeric) — patch area in hectares</p></li>
 <li><p>Zone column (if <code>zones</code> supplied) — from spatial intersection</p></li>
 </ul></div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Patches are 8-connected components of same-valued cells, computed in a
+single pass over the grid, so large sparse rasters vectorize without
+per-class memory cost.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -99,15 +106,15 @@ smaller than this are dropped before returning. <code>NULL</code> (default) keep
 <span class="r-out co"><span class="r-pr">#&gt;</span> Simple feature collection with 6 features and 3 fields</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Geometry type: GEOMETRY</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Dimension:     XY</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Bounding box:  xmin: 683391.9 ymin: 6029786 xmax: 686631.9 ymax: 6030196</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Bounding box:  xmin: 683911.9 ymin: 6029066 xmax: 685681.9 ymax: 6030576</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Projected CRS: WGS 84 / UTM zone 9N</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   patch_id         transition area_ha                       geometry</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1        1     Water -&gt; Water    5.91 POLYGON ((686221.9 6030196,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2        2     Water -&gt; Water    3.49 POLYGON ((683391.9 6030126,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3        3 Water -&gt; Rangeland    0.01 POLYGON ((686441.9 6030106,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4        4     Trees -&gt; Water    0.02 POLYGON ((686151.9 6030186,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5        5     Trees -&gt; Water    0.35 MULTIPOLYGON (((686441.9 60...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6        6     Trees -&gt; Water    0.01 POLYGON ((683401.9 6030136,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   patch_id             transition area_ha                       geometry</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1        1         Trees -&gt; Trees   24.46 MULTIPOLYGON (((685251.9 60...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2        2 Rangeland -&gt; Rangeland   14.72 POLYGON ((684831.9 6030566,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3        3     Rangeland -&gt; Crops    1.16 POLYGON ((684871.9 6030566,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4        4     Rangeland -&gt; Trees    0.01 POLYGON ((684881.9 6030566,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5        5         Trees -&gt; Trees    0.65 MULTIPOLYGON (((684591.9 60...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6        6     Rangeland -&gt; Trees    0.04 MULTIPOLYGON (((684631.9 60...</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Filter to large patches only</span></span></span>
 <span class="r-in"><span><span class="va">patches_large</span> <span class="op">&lt;-</span> <span class="fu">dft_transition_vectors</span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span>, patch_area_min <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></span>
@@ -115,15 +122,15 @@ smaller than this are dropped before returning. <code>NULL</code> (default) keep
 <span class="r-out co"><span class="r-pr">#&gt;</span> Simple feature collection with 6 features and 3 fields</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Geometry type: GEOMETRY</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Dimension:     XY</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Bounding box:  xmin: 683391.9 ymin: 6029066 xmax: 686631.9 ymax: 6030576</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Bounding box:  xmin: 683911.9 ymin: 6029066 xmax: 685711.9 ymax: 6030576</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Projected CRS: WGS 84 / UTM zone 9N</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    patch_id     transition area_ha                       geometry</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1         1 Water -&gt; Water    5.91 POLYGON ((686221.9 6030196,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2         2 Water -&gt; Water    3.49 POLYGON ((683391.9 6030126,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5         5 Trees -&gt; Water    0.35 MULTIPOLYGON (((686441.9 60...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11       11 Trees -&gt; Water    0.28 POLYGON ((683591.9 6030026,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13       13 Trees -&gt; Water    0.12 POLYGON ((686511.9 6029836,...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15       15 Trees -&gt; Trees   24.46 MULTIPOLYGON (((685251.9 60...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    patch_id             transition area_ha                       geometry</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1         1         Trees -&gt; Trees   24.46 MULTIPOLYGON (((685251.9 60...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2         2 Rangeland -&gt; Rangeland   14.72 POLYGON ((684831.9 6030566,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3         3     Rangeland -&gt; Crops    1.16 POLYGON ((684871.9 6030566,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5         5         Trees -&gt; Trees    0.65 MULTIPOLYGON (((684591.9 60...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16       16 Built Area -&gt; Snow/Ice    0.35 POLYGON ((685661.9 6030406,...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23       23     Rangeland -&gt; Crops    0.18 POLYGON ((684911.9 6030366,...</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
