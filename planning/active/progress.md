@@ -9,4 +9,9 @@
 - Empirically verified the gdalcubes/rstac/terra APIs read-only (see findings.md).
 - Created branch `30-continuous-index-trajectory-change-detec` off main.
 - Scaffolded PWF baseline from issue #30 with approved phases.
-- Next: start Phase 1 (config restructure + Sentinel-2 source + tests).
+- **Phase 1 done** (config role-based schema + sentinel-2-l2a + fetch guard + tests).
+  Fresh-eyes code-check caught a dangling `[dft_stac_cube()]` roxygen link (R CMD
+  check WARNING) → downgraded to code spans until Phase 3; hardened the fetch guard
+  to key on `isTRUE(cfg$cube)` alone. 27 config + 16 fetch assertions green.
+- Next: Phase 2 (index registry + `dft_index_expr()`) — code + tests already written
+  (15 assertions green), pending its own code-check + commit.

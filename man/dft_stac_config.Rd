@@ -2,30 +2,43 @@
 % Please edit documentation in R/dft_stac_config.R
 \name{dft_stac_config}
 \alias{dft_stac_config}
-\title{Get STAC configuration for a known land cover source}
+\title{Get STAC configuration for a known source}
 \usage{
-dft_stac_config(source = c("io-lulc", "esa-worldcover"))
+dft_stac_config(source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a"))
 }
 \arguments{
-\item{source}{Character. One of \code{"io-lulc"} (Esri IO LULC annual v02)
-or \code{"esa-worldcover"} (ESA WorldCover).}
+\item{source}{Character. One of \code{"io-lulc"} (Esri IO LULC annual v02),
+\code{"esa-worldcover"} (ESA WorldCover), or \code{"sentinel-2-l2a"} (Sentinel-2
+L2A surface reflectance, a cube source).}
 }
 \value{
-A list with elements:
-\describe{
-\item{stac_url}{STAC API endpoint}
-\item{collection}{Collection ID}
-\item{asset}{Asset name to download}
-\item{available_years}{Integer vector of available years}
-}
+A list. Categorical sources have elements \code{stac_url}, \code{collection},
+\code{asset}, \code{available_years}. Cube sources have \code{stac_url}, \code{collection},
+\code{cube = TRUE}, \code{roles} (a named list mapping \code{red}/\code{nir}/\code{swir16}/\code{mask}
+to asset names), \code{mask_values} (integer mask classes to exclude),
+\code{scale}/\code{offset} (DN → reflectance affine transform), and
+\code{available_datetime} (an ISO 8601 interval string). The \code{cube} field is
+absent (not \code{FALSE}) for categorical sources; test with \code{isTRUE(cfg$cube)}.
 }
 \description{
 Returns connection details for pre-configured STAC collections.
-Used as a convenience wrapper around \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} so users
-don't need to remember STAC URLs and collection IDs.
+Used as a convenience wrapper around \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} (categorical
+sources) and \code{dft_stac_cube()} (continuous index-trajectory sources) so
+users don't need to remember STAC URLs, collection IDs, and band names.
+}
+\details{
+Sources are of two kinds. \strong{Categorical} sources (\code{"io-lulc"},
+\code{"esa-worldcover"}) host single-band classified rasters and carry a flat
+\code{asset} name for \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}. \strong{Cube} sources (\code{"sentinel-2-l2a"})
+host multi-band reflectance imagery and instead carry a role-based band map
+(\code{red}/\code{nir}/\code{swir16}/\code{mask}), mask values, and reflectance scale/offset for
+\code{dft_stac_cube()}; they are marked with \code{cube = TRUE}. The role-based schema
+means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
+change — only the role→asset map and scale/offset differ.
 }
 \examples{
 dft_stac_config("io-lulc")
 dft_stac_config("esa-worldcover")
+dft_stac_config("sentinel-2-l2a")
 
 }
