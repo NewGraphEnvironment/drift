@@ -24,6 +24,7 @@ dft_stac_cube(
   dt = "P1M",
   aggregation = "median",
   resampling = "bilinear",
+  clip = TRUE,
   cloud_cover_max = 60,
   months = NULL,
   mask_values = NULL,
@@ -83,6 +84,21 @@ dft_stac_cube(
 
   Character. Spatial resampling (default `"bilinear"`).
 
+- clip:
+
+  Logical. When `TRUE` (default), clip the returned stack to the AOI
+  polygon with
+  [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html)
+  (cells outside → `NA` on every layer), so
+  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+  /
+  [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  reduce only in-polygon pixels. Set `FALSE` to keep the full bounding
+  box (e.g. for surrounding context, or to mask later with a different
+  polygon). Note this clips the *output* only — the full bbox of COGs is
+  still streamed either way (the AOI cannot be pushed into the read on
+  the pinned gdalcubes build; see `inst/notes/gdalcubes-pc-gotchas.md`).
+
 - cloud_cover_max:
 
   Numeric. Scene-level `eo:cloud_cover` maximum percent for the STAC
@@ -127,13 +143,12 @@ dft_stac_cube(
 A
 [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
 index stack — one layer per time step, with a time value per layer —
-cached as a GeoTIFF. The stack spans the AOI **bounding box**
-(cloud-masked but not clipped to the AOI polygon); clip the reduced
-raster from
+cached as a GeoTIFF. By default (`clip = TRUE`) the stack is clipped to
+the AOI polygon (cloud-masked, cells outside the polygon `NA`), so the
+reduced raster from
 [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
-with
-[`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html)
-if a tight AOI is needed. For sources with a reflectance-offset baseline
+is already polygon-tight; pass `clip = FALSE` for the full AOI
+**bounding box**. For sources with a reflectance-offset baseline
 boundary (Sentinel-2), items are split at the boundary and
 offset-corrected per side, so a series crossing it carries no artificial
 index step.

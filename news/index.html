@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,11 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.5.0" id="drift-050">drift 0.5.0<a class="anchor" aria-label="anchor" href="#drift-050"></a></h2>
+<ul><li>
+<code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> gains <code>clip</code> (default <code>TRUE</code>), restoring AOI-polygon-tight output (<a href="https://github.com/NewGraphEnvironment/drift/issues/32" class="external-link">#32</a>). The assembled index stack is masked to the AOI polygon with <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> — client-side, because <code><a href="https://rdrr.io/pkg/gdalcubes/man/filter_geom.html" class="external-link">gdalcubes::filter_geom()</a></code> segfaults / returns an all-NA cube on the pinned build — so cells outside the polygon are <code>NA</code> on every layer. The reduced raster from <code><a href="../reference/dft_rast_break.html">dft_rast_break()</a></code>/<code><a href="../reference/dft_rast_trend.html">dft_rast_trend()</a></code> is now polygon-tight with no caller-side mask, and those reducers skip out-of-AOI pixels via their valid-observation gate. <code>clip = FALSE</code> keeps the full bounding box. This is an output change for callers that relied on the bounding-box extent, and the clip is folded into the cube cache key, so existing cached cubes rebuild once. Note the clip affects the <em>output</em> only — the full bbox of COGs is still streamed either way (the AOI cannot be pushed into the read on the pinned gdalcubes build).</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.4.0" id="drift-040">drift 0.4.0<a class="anchor" aria-label="anchor" href="#drift-040"></a></h2>
 <ul><li>Categorical land-cover change detection no longer exhausts memory on large-floodplain AOIs (<a href="https://github.com/NewGraphEnvironment/drift/issues/34" class="external-link">#34</a>, <a href="https://github.com/NewGraphEnvironment/drift/issues/28" class="external-link">#28</a>). <code><a href="../reference/dft_rast_transition.html">dft_rast_transition()</a></code> was rewritten to stream entirely through <code>terra</code> — transitions are encoded and filtered with raster arithmetic, <code><a href="https://rspatial.github.io/terra/reference/subst.html" class="external-link">terra::subst()</a></code>, <code><a href="https://rspatial.github.io/terra/reference/patches.html" class="external-link">patches()</a></code>, and a single <code><a href="https://rspatial.github.io/terra/reference/freq.html" class="external-link">terra::freq()</a></code>, with no <code><a href="https://rspatial.github.io/terra/reference/values.html" class="external-link">terra::values()</a></code> pull and no full-grid R vectors — so peak memory scales with the number of distinct transitions and patches, not the grid size (producer-only peak at 16M cells dropped from 2.66 GB to 1.63 GB). Output is byte-identical to the previous version, verified by a golden snapshot across the full parameter matrix.</li>

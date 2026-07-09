@@ -1,5 +1,26 @@
 # Changelog
 
+## drift 0.5.0
+
+- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  gains `clip` (default `TRUE`), restoring AOI-polygon-tight output
+  ([\#32](https://github.com/NewGraphEnvironment/drift/issues/32)). The
+  assembled index stack is masked to the AOI polygon with
+  [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html)
+  — client-side, because
+  [`gdalcubes::filter_geom()`](https://rdrr.io/pkg/gdalcubes/man/filter_geom.html)
+  segfaults / returns an all-NA cube on the pinned build — so cells
+  outside the polygon are `NA` on every layer. The reduced raster from
+  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)/[`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  is now polygon-tight with no caller-side mask, and those reducers skip
+  out-of-AOI pixels via their valid-observation gate. `clip = FALSE`
+  keeps the full bounding box. This is an output change for callers that
+  relied on the bounding-box extent, and the clip is folded into the
+  cube cache key, so existing cached cubes rebuild once. Note the clip
+  affects the *output* only — the full bbox of COGs is still streamed
+  either way (the AOI cannot be pushed into the read on the pinned
+  gdalcubes build).
+
 ## drift 0.4.0
 
 - Categorical land-cover change detection no longer exhausts memory on

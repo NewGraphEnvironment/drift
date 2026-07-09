@@ -17,7 +17,7 @@ breakpoint detection."><meta property="og:image" content="https://newgraphenviro
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,6 +68,7 @@ breakpoint detection.</p>
 <span>  dt <span class="op">=</span> <span class="st">"P1M"</span>,</span>
 <span>  aggregation <span class="op">=</span> <span class="st">"median"</span>,</span>
 <span>  resampling <span class="op">=</span> <span class="st">"bilinear"</span>,</span>
+<span>  clip <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  cloud_cover_max <span class="op">=</span> <span class="fl">60</span>,</span>
 <span>  months <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mask_values <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -124,6 +125,16 @@ must agree with.</p></dd>
 <dd><p>Character. Spatial resampling (default <code>"bilinear"</code>).</p></dd>
 
 
+<dt id="arg-clip">clip<a class="anchor" aria-label="anchor" href="#arg-clip"></a></dt>
+<dd><p>Logical. When <code>TRUE</code> (default), clip the returned stack to the AOI
+polygon with <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> (cells outside → <code>NA</code> on every layer), so
+<code><a href="dft_rast_break.html">dft_rast_break()</a></code> / <code><a href="dft_rast_trend.html">dft_rast_trend()</a></code> reduce only in-polygon pixels. Set
+<code>FALSE</code> to keep the full bounding box (e.g. for surrounding context, or to
+mask later with a different polygon). Note this clips the <em>output</em> only — the
+full bbox of COGs is still streamed either way (the AOI cannot be pushed into
+the read on the pinned gdalcubes build; see <code>inst/notes/gdalcubes-pc-gotchas.md</code>).</p></dd>
+
+
 <dt id="arg-cloud-cover-max">cloud_cover_max<a class="anchor" aria-label="anchor" href="#arg-cloud-cover-max"></a></dt>
 <dd><p>Numeric. Scene-level <code>eo:cloud_cover</code> maximum percent
 for the STAC pre-filter (default 60).</p></dd>
@@ -164,12 +175,13 @@ cloud / shadow / cirrus classes).</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a> index stack — one layer per time step, with a
-time value per layer — cached as a GeoTIFF. The stack spans the AOI
-<strong>bounding box</strong> (cloud-masked but not clipped to the AOI polygon); clip the
-reduced raster from <code><a href="dft_rast_break.html">dft_rast_break()</a></code> with <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> if a tight AOI is
-needed. For sources with a reflectance-offset baseline boundary (Sentinel-2),
-items are split at the boundary and offset-corrected per side, so a series
-crossing it carries no artificial index step.</p>
+time value per layer — cached as a GeoTIFF. By default (<code>clip = TRUE</code>) the
+stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
+<code>NA</code>), so the reduced raster from <code><a href="dft_rast_break.html">dft_rast_break()</a></code> is already polygon-tight;
+pass <code>clip = FALSE</code> for the full AOI <strong>bounding box</strong>. For sources with a
+reflectance-offset baseline boundary (Sentinel-2), items are split at the
+boundary and offset-corrected per side, so a series crossing it carries no
+artificial index step.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
