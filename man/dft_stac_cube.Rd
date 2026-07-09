@@ -65,7 +65,9 @@ cloud / shadow / cirrus classes).}
 }
 \value{
 A \code{gdalcubes} data cube with a single band named \code{index}, backed by
-the cached NetCDF file.
+the cached NetCDF file. The cube spans the AOI \strong{bounding box} (cloud-masked
+but not clipped to the AOI polygon); clip the reduced raster from
+\code{\link[=dft_rast_break]{dft_rast_break()}} with \code{terra::mask()} if a tight AOI is needed.
 }
 \description{
 Sibling of \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} for continuous change detection. Where

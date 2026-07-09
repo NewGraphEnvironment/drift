@@ -50,7 +50,9 @@
 #'   [rstac::sign_planetary_computer()].
 #'
 #' @return A `gdalcubes` data cube with a single band named `index`, backed by
-#'   the cached NetCDF file.
+#'   the cached NetCDF file. The cube spans the AOI **bounding box** (cloud-masked
+#'   but not clipped to the AOI polygon); clip the reduced raster from
+#'   [dft_rast_break()] with `terra::mask()` if a tight AOI is needed.
 #'
 #' @seealso [dft_rast_break()] (the reducer that consumes this cube),
 #'   [dft_index_expr()] (the index applied), [dft_stac_fetch()] (categorical
@@ -176,11 +178,15 @@ dft_stac_cube <- function(aoi,
     aggregation = aggregation, resampling = resampling
   )
 
+  # The cube spans the AOI bounding box. Clipping to the AOI polygon with
+  # gdalcubes::filter_geom() inside the pipeline yields an all-NA cube (and can
+  # crash the compute worker) on the pinned gdalcubes build, so we mask clouds
+  # here and leave polygon clipping to the caller (terra::mask() on the reduced
+  # raster), matching how the categorical sibling dft_stac_fetch() masks.
   cube <- gdalcubes::raster_cube(
     col, v,
     mask = gdalcubes::image_mask(mask_asset, values = mask_values)
-  ) |>
-    gdalcubes::filter_geom(sf::st_geometry(aoi_target))
+  )
 
   idx <- dft_index_expr(cube, index = index, source = source,
                         roles = cfg$roles, scale = scale, offset = offset)
