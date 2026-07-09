@@ -41,7 +41,7 @@ network-decoupled vignette. **Whole pipeline on one branch, single 0.3.0 release
 - [x] `devtools::document()`; `lintr::lint_package()` clean; full `devtools::test()` passes (286 pass, network/bfast-gated tests skip)
 - [x] File follow-up issues: #31 (bolt-on labels), #32 (AOI-polygon clip). The S2 offset was NOT deferred — implemented via the baseline-conditional split (offset half of #32 closed)
 - [x] NEWS.md `0.3.0` section
-- [ ] Bump DESCRIPTION `0.2.4 → 0.3.0` as the **final** commit
+- [x] Bump DESCRIPTION `0.2.4 → 0.3.0` as the **final** commit. `R CMD check`: 0 errors / 0 warnings / 0 notes
 
 ## Validation
 - [x] Tests pass (`devtools::test()`), network/bfast tests skip cleanly (286 pass)
