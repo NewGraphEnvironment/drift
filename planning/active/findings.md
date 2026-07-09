@@ -58,3 +58,25 @@ summer 2023 — timing annual LULC cannot give," with the regional 2023 dip ackn
 
 **Reducer decision:** keep `bfastmonitor(start = c(2022,1))` — cuts are 2022–2023 (in-window), and the
 2017–2021 history is a strong baseline. Full `bfast()` not needed for this example.
+
+## Pivot: categorical-vs-continuous reconciliation → the real value (QA + trend)
+
+User pushed on why bfast's gentle signal disagrees with LULC's dramatic Trees→Rangeland *inside* the
+floodplain. Diagnosed with the cached cube: the LULC "tree-loss" pixels had kNDVI baseline **0.43**
+(vs 0.50 intact), only **14%** forest-like (>0.5), dropped a median of **0.037** by 2023, only **2%**
+a genuine high→low crash. So on this **deciduous-riparian** reach, IO LULC "Trees" is a loose label
+and its "Trees→Rangeland" is largely **borderline pixels flipping category on a tiny greenness
+change** — the categorical product **overstates** forest loss. In peak summer, deciduous riparian
+trees and grass are both green (~0.43), so kNDVI/bfast structurally cannot separate them the way the
+structure-based classifier can → the trajectory tools are **weak** on this landscape for tree-vs-grass,
+but valuable as a **QA check** on the categorical change and for **gradual degradation/recovery**.
+
+**Added `dft_rast_trend()`** (Theil-Sen slope + Mann-Kendall p, robust to the 2023 dip). AOI-restricted
+trend by group: tree-loss median **~0** (6% sig-declining), intact forest **+0.0026** (2%), open
+background **+0.013** (17% recovering). → floodplain is **stable-to-recovering**, and the mapped
+"forest loss" is **not backed by a real greenness decline** — an evidence-based "leave it standing"
+result and the honest, goal-aligned framing the vignette now uses.
+
+**Palette bug caught in self-review:** `hcl.colors("Blue-Red 3")` puts red at the HIGH end, so
+red = recovering by default; captions said red = declining. Fixed with `rev = TRUE` on both maps so
+red = declining/loss (intuitive), consistent across the trend and break maps.

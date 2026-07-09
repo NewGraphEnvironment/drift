@@ -32,7 +32,24 @@ logging. Commits land on the **same branch / PR #33**.
 - [x] Atomic commit on branch `30-continuous-index-trajectory-change-detec` (joins PR #33)
 - [ ] `/planning-archive` (append to / supersede the existing #30 archive)
 
+## Phase 6: Reframe as QA + degradation/recovery (goal-aligned rebuild)
+
+Investigating why bfast's gentle signal disagrees with LULC's dramatic Trees→Rangeland
+revealed the real value: LULC "tree-loss" pixels had kNDVI baseline 0.43 (vs 0.50 intact),
+dropped only 0.037 by 2023, only 2% a real crash. So on this deciduous-riparian reach IO LULC
+likely **overstates** forest loss (borderline label flips), and the continuous trajectory's job is
+to **question/QA** the categorical change and catch **gradual degradation/recovery** the annual
+labels miss — which is exactly the project goal (justify leave-standing / restoration). User
+approved the reframe.
+
+- [x] `R/dft_rast_trend.R`: new export — Theil-Sen slope + Mann-Kendall p, mclapply, `.dft_trend_pixel` helper. 16 tests pass, lint clean
+- [x] NEWS 0.3.0 updated to list `dft_rast_trend`; docs regenerated
+- [x] Rebuilt `vignettes/trajectory-break-detection.Rmd` around QA + degradation/recovery. **QA result (AOI): LULC tree-loss median trend ~0, only ~6% significantly declining (vs ~2% elsewhere); open floodplain greening (+0.013/yr, 17% recovering); intact forest stable.** So the mapped "forest loss" is mostly not real greenness decline — caution on area numbers. Fixed an inverted trend-map palette (red must = declining)
+- [x] Generator precomputes break + trend + LULC-QA table + grouped trajectory (AOI-restricted groups) → artifact
+- [x] Render + `R CMD check` (0/0/1 spurious-timestamp) + `lintr` clean + `/code-check` (stats verified correct; added nlyr>=2 + min_obs>=2 guards for clean failure); commit on PR #33
+
 ## Validation
-- [ ] Tests pass; check clean
-- [ ] PWF checkboxes match landed work
-- [ ] Commits on PR #33, not a new branch
+- [x] Tests pass (302); check clean (0 err / 0 warn / 1 spurious NOTE)
+- [x] PWF checkboxes match landed work
+- [x] Commits on PR #33, not a new branch
+- [ ] `/planning-archive` on completion
