@@ -1,3 +1,7 @@
+# drift 0.5.0
+
+- `dft_stac_cube()` gains `clip` (default `TRUE`), restoring AOI-polygon-tight output (#32). The assembled index stack is masked to the AOI polygon with `terra::mask()` — client-side, because `gdalcubes::filter_geom()` segfaults / returns an all-NA cube on the pinned build — so cells outside the polygon are `NA` on every layer. The reduced raster from `dft_rast_break()`/`dft_rast_trend()` is now polygon-tight with no caller-side mask, and those reducers skip out-of-AOI pixels via their valid-observation gate. `clip = FALSE` keeps the full bounding box. This is an output change for callers that relied on the bounding-box extent, and the clip is folded into the cube cache key, so existing cached cubes rebuild once. Note the clip affects the *output* only — the full bbox of COGs is still streamed either way (the AOI cannot be pushed into the read on the pinned gdalcubes build).
+
 # drift 0.4.0
 
 - Categorical land-cover change detection no longer exhausts memory on large-floodplain AOIs (#34, #28). `dft_rast_transition()` was rewritten to stream entirely through `terra` — transitions are encoded and filtered with raster arithmetic, `terra::subst()`, `patches()`, and a single `terra::freq()`, with no `terra::values()` pull and no full-grid R vectors — so peak memory scales with the number of distinct transitions and patches, not the grid size (producer-only peak at 16M cells dropped from 2.66 GB to 1.63 GB). Output is byte-identical to the previous version, verified by a golden snapshot across the full parameter matrix.

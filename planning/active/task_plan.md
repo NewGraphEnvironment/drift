@@ -28,15 +28,15 @@ Fetch-time streaming stays bbox-bound (documented residual).
 - [x] `/code-check`: normalize `clip <- isTRUE(as.logical(clip))` once so the mask gate
       and cache key can't disagree for truthy-but-non-TRUE inputs (silent wrong-extent fix)
 
-## Phase 3: Docs + gotchas note + NEWS + version
-- [ ] update `inst/notes/gdalcubes-pc-gotchas.md` filter_geom bullet (#32 resolved + residual)
-- [ ] `NEWS.md` 0.5.0 entry (behavior change + cache rebuild + Closes #32)
-- [ ] `DESCRIPTION` 0.4.0 → 0.5.0 + Date (final commit)
+## Phase 3: Docs + gotchas note + NEWS
+- [x] update `inst/notes/gdalcubes-pc-gotchas.md` filter_geom bullet (#32 resolved + residual)
+- [x] `NEWS.md` 0.5.0 entry (behavior change + cache rebuild + Closes #32)
 
-## Phase 4: Validate, archive, PR, release
+## Phase 4: Validate, bump, archive, PR, release
 - [ ] `devtools::test()` / `lint` / `document` / `check` clean (network tests skip)
+- [ ] `DESCRIPTION` 0.4.0 → 0.5.0 + Date, committed as `Release v0.5.0` (final code commit)
 - [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #32`, `Relates to NewGraphEnvironment/sred-2025-2026#16`)
-- [ ] `/gh-pr-merge` → release v0.5.0
+- [ ] `/gh-pr-merge` → tag v0.5.0
 
 ## Validation
 - [ ] Tests pass (`devtools::test()`); network/bfast tests skip cleanly

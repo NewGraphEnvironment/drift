@@ -27,4 +27,9 @@
   comment updates. `/code-check` (1 fresh-eyes round) found a fragile mismatch — `isTRUE`
   gate vs `as.logical` key disagree for `clip = 1`/`"TRUE"`; fixed by normalizing
   `clip <- isTRUE(as.logical(clip))` once up front. Full suite 319 pass, lint clean.
-- Next: Phase 3 — gotchas note + NEWS 0.5.0 + DESCRIPTION bump.
+- Phase 3 (commit pending): recorded the #32 resolution in the gotchas note
+  (clip restored via cube-level `terra::mask()`; residual = fetch-time streaming
+  still bbox-bound); added the `NEWS.md` 0.5.0 entry (behavior change + cache
+  rebuild + Closes #32). DESCRIPTION bump deferred to Phase 4 as the final
+  `Release v0.5.0` commit (r-packages "bump last" rule; matches #34).
+- Next: Phase 4 — validate (check/test), Release v0.5.0 bump, archive, PR, merge.
