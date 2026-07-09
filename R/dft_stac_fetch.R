@@ -164,18 +164,23 @@ dft_stac_fetch <- function(aoi,
 #' representation differences can't change the key; the CRS enters separately
 #' as `target_crs`. `res` is coerced to double so `10L` and `10` key alike.
 #' Callers must pass post-resolution `stac_url`/`collection`/`asset`, never
-#' the raw possibly-NULL arguments.
+#' the raw possibly-NULL arguments. `tile_size` (the download-tiling grid, #36)
+#' is appended to the hash ONLY when non-NULL, so an untiled fetch keeps the
+#' exact legacy 9-element hash (existing caches stay valid) while a tiled fetch
+#' keys distinctly. It must arrive already snapped by the caller.
 #' @noRd
 stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
-                           resampling, stac_url, collection, asset) {
+                           resampling, stac_url, collection, asset,
+                           tile_size = NULL) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
-  substr(
-    rlang::hash(list(
-      geom_wkb, as.numeric(res), target_crs, dt, aggregation,
-      resampling, stac_url, collection, asset
-    )),
-    1, 12
+  parts <- list(
+    geom_wkb, as.numeric(res), target_crs, dt, aggregation,
+    resampling, stac_url, collection, asset
   )
+  # A tiled fetch caches a terra .tif mosaic; an untiled fetch caches a
+  # gdalcubes .nc. Keying them apart stops one being served as the other.
+  if (!is.null(tile_size)) parts <- c(parts, list(as.numeric(tile_size)))
+  substr(rlang::hash(parts), 1, 12)
 }
 
 

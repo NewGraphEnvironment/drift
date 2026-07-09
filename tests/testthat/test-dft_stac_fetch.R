@@ -43,9 +43,14 @@ square_aoi <- function(dx = 0) {
 cache_key <- function(aoi = square_aoi(), res = 10, target_crs = "EPSG:32609",
                       dt = "P1Y", aggregation = "first", resampling = "near",
                       stac_url = "https://example.com/stac",
-                      collection = "test-collection", asset = "data") {
+                      collection = "test-collection", asset = "data",
+                      tile_size = NULL) {
+  # mirror production: dft_stac_fetch() snaps tile_size once (tile_size_check)
+  # before it reaches both the tile grid and the cache key
+  ts <- if (is.null(tile_size)) NULL else
+    suppressMessages(drift:::tile_size_check(tile_size, res))
   drift:::stac_cache_key(aoi, res, target_crs, dt, aggregation, resampling,
-                         stac_url, collection, asset)
+                         stac_url, collection, asset, tile_size = ts)
 }
 
 test_that("stac_cache_key is deterministic and 12-char hex", {
@@ -73,6 +78,26 @@ test_that("stac_cache_key changes with each fetch-affecting parameter", {
 
 test_that("stac_cache_key treats integer and double res alike", {
   expect_equal(cache_key(res = 10L), cache_key(res = 10))
+})
+
+test_that("stac_cache_key(tile_size = NULL) reproduces the legacy pre-tiling hash", {
+  # Frozen guardian of legacy-cache preservation (#36): adding tile_size must
+  # NOT change the key for an untiled fetch, or every cached io-lulc fetch
+  # silently re-downloads on upgrade. If this literal must change, that is a
+  # deliberate cache-format break — flag it, don't just re-freeze.
+  expect_equal(cache_key(), "79f67b7b9dae")
+})
+
+test_that("stac_cache_key keys a tiled fetch distinctly from an untiled one", {
+  base <- cache_key()
+  expect_false(cache_key(tile_size = 500) == base)
+  expect_false(cache_key(tile_size = 1000) == base)
+  expect_false(cache_key(tile_size = 500) == cache_key(tile_size = 1000))
+})
+
+test_that("stac_cache_key snaps tile_size before hashing (aligned sizes key alike)", {
+  # 504 and 500 both snap to 500 (res 10), so they must hit the same cache
+  expect_equal(cache_key(tile_size = 504), cache_key(tile_size = 500))
 })
 
 test_that("stac_cache_key ignores sf attribute columns", {

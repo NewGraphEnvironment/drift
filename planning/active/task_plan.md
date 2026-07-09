@@ -19,9 +19,9 @@ tracked separately as #38 (out of scope).
 - [x] implement `tile_grid()` + normalization; new tests green
 
 ## Phase 2: cache key — conditional `tile_size` append (offline)
-- [ ] golden regression: `cache_key(tile_size = NULL)` == frozen current 12-char hash for fixed inputs (guards legacy-cache preservation)
-- [ ] `cache_key(tile_size = 500) != cache_key(tile_size = NULL)`; distinct sizes → distinct keys; snap-before-key: `504` and `500` (res 10) → same key
-- [ ] `stac_cache_key()` gains `tile_size = NULL`; append only when non-NULL; call site passes `tile_size`; tests green
+- [x] golden regression: `cache_key(tile_size = NULL)` == frozen `79f67b7b9dae` for fixed inputs (guards legacy-cache preservation)
+- [x] `cache_key(tile_size = 500) != cache_key(tile_size = NULL)`; distinct sizes → distinct keys; snap-before-key: `504` and `500` (res 10) → same key
+- [x] `stac_cache_key()` gains `tile_size = NULL`; appends only when non-NULL (real call-site wiring lands in Phase 4 with the fetch param); tests green
 
 ## Phase 3: extract `fetch_extent_to()`, refactor untiled path (behavior-preserving)
 - [ ] extract helper; untiled path routes through it, writing straight to `<yr>_<key>.nc` — identical filename/format
