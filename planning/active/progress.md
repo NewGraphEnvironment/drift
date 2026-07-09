@@ -23,4 +23,14 @@
 - **Phase 4 empirical gate RUN** (bfast 1.7.2 installed): proved closure-capture in
   the reduce_time R-callback DOES NOT WORK (worker process, any parallel setting) —
   the design must build a self-contained FUN. Embed-helper-object approach works at
-  parallel 1 and 2. See findings.md. Next: write `R/dft_rast_break.R` per proven design.
+  parallel 1 and 2. See findings.md.
+- **Phase 4 done** (`dft_rast_break()` + `.dft_break_pixel`/`cadence_frequency`/
+  `build_break_reducer`/`break_cache_key`; bfast→Suggests). 30 assertions green;
+  full suite 291 pass. Code-check Clean.
+- **Real-S2 E2E surfaced a `dft_stac_cube` bug**: `gdalcubes::filter_geom()` yields
+  an all-NA cube (and intermittently segfaults the compute worker) on this gdalcubes
+  build. Proven sibling `dft_stac_fetch` works on the same AOI, and the cube stages
+  work WITHOUT filter_geom (valid kNDVI 0..1). Fix: drop filter_geom; the cube spans
+  the AOI bbox (cloud-masked), callers clip the reduced raster with terra::mask()
+  (matches how dft_stac_fetch masks). Verifying the fixed E2E, then committing the
+  fix + Phase 5 (vignette + NEWS + 0.3.0).
