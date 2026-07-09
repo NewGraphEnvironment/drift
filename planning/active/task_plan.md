@@ -60,8 +60,9 @@ Full design + verified terra semantics in `findings.md`.
   `patch_id` densening note.
 - [x] Document `floodplains` follow-up (caller passes `changes_only=TRUE`, drops the
   `:115` `from!=to` post-filter) — findings.md "Cross-repo follow-up"; user to file/wire.
-- [ ] Bump `DESCRIPTION` 0.3.0 → 0.4.0 as the **final** commit; terra floor unchanged
-  (1.8-10 sufficient — Phase 1 semantics gate passed).
+- [x] Bump `DESCRIPTION` 0.3.0 → 0.4.0 as the **final** commit; terra floor unchanged
+  (1.8-10 sufficient — Phase 1 semantics gate passed). `devtools::check(vignettes=FALSE)`:
+  0 errors / 0 warnings / 0 notes.
 
 ## Validation
 - [ ] Tests pass (`devtools::test()`); network/bfast tests skip cleanly
