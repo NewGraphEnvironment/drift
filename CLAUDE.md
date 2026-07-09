@@ -11,16 +11,29 @@ change in riparian and floodplain areas using free satellite imagery.
 ## Architecture
 
 - `dft_` prefix for all exported functions
+- Two pipelines: **categorical** (classified land cover → transitions)
+  and **continuous** (Sentinel-2 spectral-index trajectories → abrupt
+  breaks + gradual trends). The continuous path complements the
+  categorical one — it can QA which mapped transitions carry a real
+  spectral change, and catch gradual degradation/recovery the annual
+  labels miss.
 - Generic STAC pipeline — works with any classified raster (IO LULC, ESA
   WorldCover, custom COGs)
 - `R/` — package functions, `tests/testthat/` — testthat 3e tests,
   `vignettes/` — worked examples
 - `inst/lulc_classes/` — shipped CSV class tables (code, class_name,
   color, description)
+- `inst/indices/` — spectral-index registry CSV (ndvi, kndvi, ndmi) read
+  by
+  [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
 - `inst/extdata/` — small test rasters (Neexdzii Kwa reach, 204KB total)
+- `inst/notes/` — durable technical reference (see Reference docs below)
 - `data-raw/` — scripts to regenerate test data (flooded + gdalcubes)
+  and vignette artifacts
 
 ## Core Pipeline
+
+Categorical land-cover change:
 
 ``` r
 
@@ -28,6 +41,17 @@ rasters    <- dft_stac_fetch(aoi, source = "io-lulc", years = c(2017, 2020, 2023
 classified <- dft_rast_classify(rasters, source = "io-lulc")
 summary    <- dft_rast_summarize(classified, unit = "ha")
 dft_map_interactive(classified, aoi = aoi)
+```
+
+Continuous index-trajectory change (v0.3.0; see the
+`trajectory-break-detection` vignette):
+
+``` r
+
+cube   <- dft_stac_cube(aoi, source = "sentinel-2-l2a", index = "kndvi",
+                        datetime = "2017-01-01/2023-12-31", months = 6:9)  # returns a terra stack
+breaks <- dft_rast_break(cube, start = c(2022, 1))   # abrupt change, dated (BFAST bfastmonitor)
+trend  <- dft_rast_trend(cube)                        # gradual change (Theil-Sen slope + Mann-Kendall)
 ```
 
 ## Key Patterns
@@ -57,9 +81,36 @@ dft_map_interactive(classified, aoi = aoi)
 ``` r
 
 devtools::document()   # after roxygen changes
-devtools::test()       # 100 tests, all local (no network)
+devtools::test()       # ~300 tests; network/bfast tests skip by default (opt-in via env var)
 devtools::install()    # needed before rendering vignettes
 ```
+
+## Working Conventions
+
+### Parameter naming — noun-first
+
+`patch_area_min`, not `min_patch_area`.
+
+**Why:** Groups related parameters by prefix (`patch_area_min`,
+`patch_area_max`, `patch_count`) so they autocomplete together and read
+as a family.
+
+**How to apply:** When adding a parameter that could have siblings, lead
+with the noun/concept, then the modifier — same spirit as the NGE
+`noun_verb-detail` convention.
+
+### SRED cross-reference
+
+Tag PR bodies with `Relates to NewGraphEnvironment/sred-2025-2026#16`
+(the issue ref is year-stamped — update it each SRED year).
+
+## Reference docs
+
+- [`inst/notes/gdalcubes-pc-gotchas.md`](https://newgraphenvironment.github.io/drift/inst/notes/gdalcubes-pc-gotchas.md)
+  — non-obvious gdalcubes 0.7.3 + Planetary Computer Sentinel-2 gotchas
+  (filter_geom segfault, reduce_time worker closures, terra↔︎gdalcubes
+  NetCDF round-trip, the S2 +1000 DN offset boundary at 2022-01-25, PC
+  pagination). Read before touching the continuous pipeline.
 
 # Cartography
 
