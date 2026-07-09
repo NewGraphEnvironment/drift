@@ -30,6 +30,12 @@
 #'   - `removed`: A `SpatRaster` of transitions removed by `patch_area_min`
 #'     filtering, or `NULL` when no filtering is applied. Same factor
 #'     encoding as `raster`.
+#'
+#' @details
+#' The transition raster, filters, and patch removal are computed with streamed
+#' `terra` operations (`ifel`, `patches`, `freq`) on the underlying class codes —
+#' no full-grid vectors are pulled into R — so peak memory scales with the number
+#' of distinct transitions and patches, not the grid size.
 #' @export
 #' @examples
 #' r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
@@ -83,65 +89,55 @@ dft_rast_transition <- function(x,
   dft_check_crs(r_from, "dft_rast_transition")
   dft_check_crs(r_to, "dft_rast_transition")
 
-  # Resolve class names to codes
+  # code -> class name lookup (small; used only for factor labels + summary)
   code_lookup <- stats::setNames(class_table$class_name, class_table$code)
 
-  # Get raw integer values (strip factor)
-  v_from <- terra::values(r_from)[, 1]
-  v_to <- terra::values(r_to)[, 1]
+  # Strip factor to raw integer codes as streamed rasters. `* 1L` returns a new
+  # non-factor raster of codes, preserves NA, and does NOT mutate the inputs
+  # (they are references into the caller's list). Encode each transition as
+  # from_code * 1000 + to_code; NA propagates wherever either input is NA. No
+  # full-grid R vector is materialized.
+  code_from <- r_from * 1L
+  code_to <- r_to * 1L
+  r_trans <- code_from * 1000L + code_to
 
-  # Map codes to class names
-  name_from <- code_lookup[as.character(v_from)]
-  name_to <- code_lookup[as.character(v_to)]
+  # from_class / to_class filters as integer code-set membership (streamed)
+  r_trans <- apply_codeset(r_trans, code_from, from_class, class_table)
+  r_trans <- apply_codeset(r_trans, code_to, to_class, class_table)
 
-  # Encode transitions: from_code * 1000 + to_code (supports up to 999 classes)
-  trans_code <- v_from * 1000L + v_to
+  cell_area_m2 <- prod(terra::res(r_from))
 
-  # Build mask for filters
-
-  keep <- rep(TRUE, length(trans_code))
-  if (!is.null(from_class)) keep <- keep & (name_from %in% from_class)
-  if (!is.null(to_class)) keep <- keep & (name_to %in% to_class)
-
-  # Also mask where either raster is NA
-  keep <- keep & !is.na(v_from) & !is.na(v_to)
-
-  trans_code[!keep] <- NA_integer_
-
-
-  # Build transition raster
-  r_trans <- terra::rast(r_from)
-  terra::values(r_trans) <- trans_code
-
-  # Filter small patches of changed pixels
-  removed_codes <- NULL
+  # Filter small patches of *changed* pixels (streamed; no rep()/values())
+  r_removed <- NULL
   if (!is.null(patch_area_min) && patch_area_min > 0) {
-    # Binary raster of actual changes only (from != to), not same-class pixels
-    changed <- !is.na(trans_code) & (v_from != v_to)
-    r_changed <- terra::rast(r_from)
-    r_changed_vals <- rep(NA_integer_, length(trans_code))
-    r_changed_vals[changed] <- 1L
-    terra::values(r_changed) <- r_changed_vals
+    r_changed <- terra::ifel(!is.na(r_trans) & (code_from != code_to), 1L, NA)
     p <- terra::patches(r_changed, directions = 8)
-    cell_area_m2 <- prod(terra::res(r_from))
-    f <- terra::freq(p)
-    f <- f[!is.na(f$value), ]
-    small_ids <- f$value[f$count * cell_area_m2 < patch_area_min]
-    if (length(small_ids) > 0) {
-      p_vals <- terra::values(p)[, 1]
-      mask_small <- !is.na(p_vals) & (p_vals %in% small_ids)
-      removed_codes <- trans_code[mask_small]
-      trans_code[mask_small] <- NA_integer_
-      terra::values(r_trans) <- trans_code
+    f <- tryCatch(terra::freq(p), error = function(e) NULL)   # NULL when no changes
+    if (!is.null(f)) {
+      f <- f[!is.na(f$value), , drop = FALSE]
+      small_ids <- f$value[f$count * cell_area_m2 < patch_area_min]
+      if (length(small_ids) > 0) {
+        # 1 at small-patch cells, NA elsewhere (incl. p == NA / stable cells).
+        # subst() is exact-match and scales; SpatRaster `%in%` is not dispatched
+        # when terra is imported (not attached).
+        sm <- terra::subst(p, small_ids, 1L, others = NA)
+        r_removed <- terra::ifel(!is.na(sm), r_trans, NA)   # capture removed codes first
+        r_trans <- terra::ifel(!is.na(sm), NA, r_trans)     # then drop them
+      }
     }
   }
 
-  # Build factor table from observed transitions
-  valid <- !is.na(trans_code)
-  unique_codes <- sort(unique(trans_code[valid]))
+  # Observed transition codes + counts from a single native freq (value == code,
+  # NA excluded). freq() errors on an all-NA raster -> treat as no transitions.
+  freq_tbl <- tryCatch(terra::freq(r_trans), error = function(e) NULL)
+  if (!is.null(freq_tbl)) {
+    freq_tbl <- freq_tbl[!is.na(freq_tbl$value), , drop = FALSE]
+  }
 
-  if (length(unique_codes) == 0) {
-    # No transitions found — return empty
+  m2_to_unit <- switch(unit, "m2" = 1, "ha" = 1e-4, "km2" = 1e-6)
+  cell_area <- cell_area_m2 * m2_to_unit
+
+  if (is.null(freq_tbl) || nrow(freq_tbl) == 0) {
     terra::set.cats(r_trans, layer = 1,
                     value = data.frame(id = integer(0), transition = character(0)))
     summary_tbl <- tibble::tibble(
@@ -151,58 +147,57 @@ dft_rast_transition <- function(x,
     return(list(raster = r_trans, summary = summary_tbl, removed = NULL))
   }
 
-  from_codes <- unique_codes %/% 1000L
-  to_codes <- unique_codes %% 1000L
+  freq_tbl <- freq_tbl[order(freq_tbl$value), , drop = FALSE]
+  codes <- freq_tbl$value
+  from_codes <- codes %/% 1000L
+  to_codes <- codes %% 1000L
   labels <- paste0(
     code_lookup[as.character(from_codes)], " -> ",
     code_lookup[as.character(to_codes)]
   )
-
-  lvl_df <- data.frame(id = unique_codes, transition = labels)
-  terra::set.cats(r_trans, layer = 1, value = lvl_df)
+  terra::set.cats(r_trans, layer = 1,
+                  value = data.frame(id = codes, transition = labels))
 
   # Summary table
-  m2_to_unit <- switch(unit, "m2" = 1, "ha" = 1e-4, "km2" = 1e-6)
-  res <- terra::res(r_from)
-  cell_area <- res[1] * res[2] * m2_to_unit
-
-  freq_tbl <- terra::freq(r_trans)
-  freq_tbl <- freq_tbl[!is.na(freq_tbl$value), ]
-  total_valid <- sum(!is.na(trans_code))
-
-  # freq on a factor raster returns labels in $value — map back to codes
-  label_to_code <- stats::setNames(lvl_df$id, lvl_df$transition)
-  freq_codes <- label_to_code[as.character(freq_tbl$value)]
-
+  total_valid <- sum(freq_tbl$count)
   summary_tbl <- tibble::tibble(
-    from_class = code_lookup[as.character(freq_codes %/% 1000L)],
-    to_class = code_lookup[as.character(freq_codes %% 1000L)],
+    from_class = code_lookup[as.character(from_codes)],
+    to_class = code_lookup[as.character(to_codes)],
     n_cells = as.integer(freq_tbl$count),
     area = freq_tbl$count * cell_area,
     pct = round(freq_tbl$count / total_valid * 100, 2)
   )
-
   summary_tbl <- summary_tbl[order(summary_tbl$n_cells, decreasing = TRUE), ]
 
-  # Build removed raster when patch filtering was applied
-  r_removed <- NULL
-  if (!is.null(removed_codes)) {
-    r_removed <- terra::rast(r_from)
-    rem_vals <- rep(NA_integer_, terra::ncell(r_from))
-    rem_positions <- which(!is.na(p_vals) & (p_vals %in% small_ids))
-    rem_vals[rem_positions] <- removed_codes
-    terra::values(r_removed) <- rem_vals
-    # Build factor table from removed codes
-    rem_unique <- sort(unique(removed_codes[!is.na(removed_codes)]))
-    rem_from <- rem_unique %/% 1000L
-    rem_to <- rem_unique %% 1000L
-    rem_labels <- paste0(
-      code_lookup[as.character(rem_from)], " -> ",
-      code_lookup[as.character(rem_to)]
-    )
-    terra::set.cats(r_removed, layer = 1,
-                    value = data.frame(id = rem_unique, transition = rem_labels))
+  # Factor levels for the removed raster (only when patch filtering removed cells)
+  if (!is.null(r_removed)) {
+    rf <- terra::freq(r_removed)
+    rf <- rf[!is.na(rf$value), , drop = FALSE]
+    rf <- rf[order(rf$value), , drop = FALSE]
+    terra::set.cats(r_removed, layer = 1, value = data.frame(
+      id = rf$value,
+      transition = paste0(code_lookup[as.character(rf$value %/% 1000L)], " -> ",
+                          code_lookup[as.character(rf$value %% 1000L)])
+    ))
   }
 
   list(raster = r_trans, summary = summary_tbl, removed = r_removed)
+}
+
+#' Mask a transition raster to a from/to class set (streamed)
+#'
+#' Reproduces the old full-grid `name %in% from_class` filter using integer
+#' code-set membership on a code raster, so no full-grid character vector is
+#' built. `code_r %in% keep_codes` is FALSE (not NA) at NA cells, matching the
+#' base-R string filter's NA handling. `NULL` selection is a no-op; an empty
+#' selection (no class name matched) masks everything to NA.
+#' @noRd
+apply_codeset <- function(r_trans, code_r, names_sel, class_table) {
+  if (is.null(names_sel)) return(r_trans)
+  keep_codes <- class_table$code[class_table$class_name %in% names_sel]
+  if (length(keep_codes) == 0L) return(r_trans * NA)   # impossible filter -> all NA
+  # subst(): 1 at in-set codes, NA at out-of-set and NA cells. Avoids SpatRaster
+  # `%in%`, which is not dispatched when terra is imported (not attached).
+  keep_mask <- terra::subst(code_r, keep_codes, 1L, others = NA)
+  terra::ifel(!is.na(keep_mask), r_trans, NA)
 }

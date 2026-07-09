@@ -131,6 +131,25 @@ filter (`:115`). Only then does NECR complete end-to-end. Separate floodplains P
 - Confirms the two-driver diagnosis and the fix targets. Semantics-gate assertions are
   the pre-implementation gate for Phase 3; they passed, so the rewrite proceeds.
 
+## Phase 3 result (2026-07-09)
+
+- Rewrote `dft_rast_transition` to stream everything (`* 1L` factor-strip → code
+  rasters → `code_from*1000L+code_to`; `apply_codeset()` filters; `patches`/`subst`
+  for `patch_area_min`; `freq` for codes + `total_valid` + summary). Zero
+  `terra::values()`, zero `rep(NA, ncell)`.
+- **Discovery mid-implementation:** SpatRaster `%in%` is NOT dispatched when terra is
+  *imported* (package context) — only when *attached* (`library(terra)`). `code_r %in%
+  keep_codes` in package code fell through to base `match()` → "match requires vector
+  arguments". The semantics-gate benchmark used `library(terra)` so it passed there;
+  package context differs. Fix: `terra::subst(x, from, 1L, others = NA)` (exact-match,
+  scales, dispatches when imported). Codified this as a gotcha.
+- `terra::freq()` **errors** on an all-NA raster (does NOT return 0 rows) — guarded the
+  two producer freq calls with `tryCatch(..., error = \(e) NULL)` → empty-return path.
+- Golden (Phase 2) stays byte-identical; full suite 303 pass / 4 skip; lint clean;
+  `/code-check` round 1 Clean (independent old-vs-new byte-identical across 14 cases +
+  ESA WorldCover 3-digit codes). Producer-only peak RSS at 16M cells (patch_area_min=500):
+  **2.66 GB (old) → 1.63 GB (new)**, gap widening with grid size.
+
 ## Git base note
 
 Branch `34-lulc-transition-classify-ooms-on-large-f` is off `origin/main` (6ba10bb), NOT

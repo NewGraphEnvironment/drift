@@ -25,4 +25,8 @@
   impossible). Canonicalized (sorted) digest → content-strict, order-independent.
   `expect_snapshot_value(style="serialize")` golden at `_snaps/dft_rast_transition.md`.
   Fixed empty-case handling (cats()[[1]] NULL + freq() errors on all-NA). 44 pass, 0 skip.
-- Next: Phase 3 — terra-native rewrite of `dft_rast_transition`; the golden must stay green.
+- **Phase 3 done** (commit pending): terra-native `dft_rast_transition` rewrite. Golden
+  byte-identical; 303 pass / 4 skip; lint clean; /code-check round 1 Clean. Hit the
+  imported-terra `%in%` non-dispatch gotcha (→ `subst`) and the freq-on-all-NA error
+  (→ tryCatch). Producer peak RSS at 16M cells: 2.66 → 1.63 GB.
+- Next: Phase 4 — vectorizer `changes_only` + small-patch raster pre-filter.

@@ -29,12 +29,16 @@ Full design + verified terra semantics in `findings.md`.
   `raster` cats + `freq(value,count)`, `removed` cats. This is the rewrite's contract.
 
 ## Phase 3: Producer terra-native rewrite (#28)
-- [ ] Rewrite `R/dft_rast_transition.R`: `code_from/code_to <- r_from/r_to * 1L`;
+- [x] Rewrite `R/dft_rast_transition.R`: `code_from/code_to <- r_from/r_to * 1L`;
   `r_trans <- code_from*1000L + code_to`; `apply_codeset()` `@noRd` for from/to filters
-  (empty-set guard); streamed `patch_area_min` via `ifel`/`patches`/`freq`/`ifel`
+  (empty-set guard); streamed `patch_area_min` via `ifel`/`patches`/`subst`/`ifel`
   (empty-id guard); freq-derived codes + `total_valid`; removed raster via `ifel` +
   freq cats; preserve empty-return `removed=NULL`. No `terra::values()`, no `rep(NA,ncell)`.
-- [ ] Green: full `test-dft_rast_transition.R` + Phase-2 golden identical.
+  (subst, not `%in%`: SpatRaster `%in%` isn't dispatched when terra is imported.)
+- [x] Green: full `test-dft_rast_transition.R` + Phase-2 golden byte-identical; full
+  suite 303 pass / 4 skip; lint clean; `/code-check` round 1 Clean (old-vs-new
+  byte-identical across 14 cases incl. ESA 3-digit codes). Producer-only peak RSS at
+  16M cells: 2.66 GB (old) → 1.63 GB (new).
 
 ## Phase 4: Vectorizer working-set cap (#34 core)
 - [ ] `R/dft_transition_vectors.R`: add `changes_only = FALSE` (raster-level stable
