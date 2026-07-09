@@ -8,8 +8,15 @@ bfast 1.7.2.
 - **`gdalcubes::filter_geom()` segfaults / returns an all-NA cube** on this build
   (crashes `gc_exec_worker`, `address 0x120`). Do NOT clip to an AOI polygon
   inside the cube pipeline. Use the AOI bbox in `cube_view(extent=)` and
-  `terra::mask()` the reduced raster afterward (as `dft_stac_fetch()` does).
-  Tracked as drift#32.
+  `terra::mask()` afterward, as `dft_stac_fetch()` does. **Resolved (#32):**
+  `dft_stac_cube(clip = TRUE)` (the default) masks the assembled terra stack to
+  the AOI polygon client-side (helper `stac_cube_clip()` = `terra::mask(stk,
+  terra::vect(aoi))`), so the cube is polygon-tight and
+  `dft_rast_break()`/`dft_rast_trend()` skip out-of-AOI pixels via their
+  `rowSums(!is.na) >= min_obs` gate. **Residual:** this clips the *output* only —
+  `cube_view(extent = bbox)` still streams the full bbox of COGs, so fetch time is
+  unchanged; pushing the AOI into the read would need a working `filter_geom` or
+  server-side windowing. `clip = FALSE` keeps the full bbox.
 - **`reduce_time()` R-callback runs in spawned worker processes at EVERY parallel
   setting** (incl. `parallel = 1`). A closure over enclosing locals fails there
   (`object 'band' not found`). Options: build a self-contained callback (inline

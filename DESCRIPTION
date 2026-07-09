@@ -1,6 +1,6 @@
 Package: drift
 Title: Detecting Riparian and Inland Floodplain Transitions
-Version: 0.4.0
+Version: 0.5.0
 Date: 2026-07-09
 Authors@R: c(
     person("Allan", "Irvine", , "al@newgraphenvironment.com", role = c("aut", "cre"),

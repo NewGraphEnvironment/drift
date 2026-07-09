@@ -36,11 +36,11 @@ cube_key <- function(aoi = square_aoi(), res = 10, target_crs = "EPSG:32609",
                      datetime = "2019-01-01/2023-12-31", index = "kndvi",
                      cloud_cover_max = 60, mask_values = c(3, 8, 9, 10, 11),
                      scale = 1e-4, offset = -0.1, months = NULL,
-                     offset_before = 0) {
+                     offset_before = 0, clip = TRUE) {
   drift:::stac_cube_cache_key(
     aoi, res, target_crs, dt, aggregation, resampling, stac_url, collection,
     band_assets, datetime, index, cloud_cover_max, mask_values, scale, offset,
-    months, offset_before
+    months, offset_before, clip
   )
 }
 
@@ -67,6 +67,9 @@ test_that("stac_cube_cache_key changes with each cube-affecting parameter", {
   expect_false(cube_key(offset = -0.2) == base)
   expect_false(cube_key(months = 6:9) == base)
   expect_false(cube_key(offset_before = -0.1) == base)
+  # clip must key distinctly, or a clip=FALSE request silently hits a clipped
+  # (or vice-versa) cached .tif and returns wrong-extent data
+  expect_false(cube_key(clip = FALSE) == base)
 })
 
 test_that("stac_cube_cache_key normalizes months order", {
@@ -83,6 +86,30 @@ test_that("stac_cube_cache_key ignores sf attribute columns", {
   bare <- square_aoi()
   with_attrs <- sf::st_sf(name = "a", area = 1.5, geometry = bare)
   expect_equal(cube_key(with_attrs), cube_key(bare))
+})
+
+# stac_cube_clip(): the AOI-polygon clip that replaces gdalcubes::filter_geom
+# (#32). Network-free — a synthetic stack + a half-covering polygon. Cells whose
+# centre is outside the polygon become NA on every layer; nlyr is preserved.
+test_that("stac_cube_clip masks cells outside the AOI polygon on every layer", {
+  r <- terra::rast(nrows = 10, ncols = 10, xmin = 0, xmax = 10,
+                   ymin = 0, ymax = 10, crs = "EPSG:32609", nlyrs = 2)
+  terra::values(r) <- 1                       # every cell valid on both layers
+  # AOI covers the left half (x in [0, 5]); no cell centre lands exactly on 5
+  aoi <- sf::st_sfc(
+    sf::st_polygon(list(rbind(
+      c(0, 0), c(5, 0), c(5, 10), c(0, 10), c(0, 0)
+    ))),
+    crs = 32609
+  )
+  out <- drift:::stac_cube_clip(r, aoi)
+
+  expect_s4_class(out, "SpatRaster")
+  expect_equal(terra::nlyr(out), 2L)          # layers preserved
+  vals <- terra::values(out)
+  inside <- terra::xyFromCell(out, seq_len(terra::ncell(out)))[, 1] < 5
+  expect_true(all(!is.na(vals[inside, ])))    # inside polygon: retained
+  expect_true(all(is.na(vals[!inside, ])))    # outside polygon: NA
 })
 
 # Network end-to-end against the Planetary Computer. Opt-in only (env var), so
@@ -103,6 +130,10 @@ test_that("dft_stac_cube fetches an index stack end-to-end", {
   expect_s4_class(cube, "SpatRaster")
   expect_equal(terra::nlyr(cube), 3)                 # 3 monthly layers
   expect_false(anyNA(terra::time(cube)))             # time set per layer
+  # default clip = TRUE clips to the AOI polygon: for this thin reach
+  # (area / bbox ~= 0.105) most bbox cells are fully NA across all layers
+  fully_na <- mean(rowSums(!is.na(terra::values(cube))) == 0)
+  expect_gt(fully_na, 0.5)
   # second call hits the cache (one cube_<key>.tif under the source dir)
   expect_length(list.files(file.path(cache, "sentinel-2-l2a"),
                            pattern = "^cube_.*\\.tif$"), 1)
