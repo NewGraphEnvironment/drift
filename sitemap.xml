@@ -5,6 +5,7 @@
 <url><loc>https://newgraphenvironment.github.io/drift/LICENSE.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/articles/index.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/articles/land-cover-change.html</loc></url>
+<url><loc>https://newgraphenvironment.github.io/drift/articles/trajectory-break-detection.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/authors.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/index.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/news/index.html</loc></url>
@@ -12,13 +13,18 @@
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_cache_info.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_cache_path.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_class_table.html</loc></url>
+<url><loc>https://newgraphenvironment.github.io/drift/reference/dft_index_expr.html</loc></url>
+<url><loc>https://newgraphenvironment.github.io/drift/reference/dft_index_table.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.html</loc></url>
+<url><loc>https://newgraphenvironment.github.io/drift/reference/dft_rast_break.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.html</loc></url>
+<url><loc>https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_stac_config.html</loc></url>
+<url><loc>https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.html</loc></url>
 <url><loc>https://newgraphenvironment.github.io/drift/reference/drift-package.html</loc></url>

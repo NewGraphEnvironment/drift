@@ -1,9 +1,10 @@
 pandoc: 3.8.3
-pkgdown: 2.2.0
+pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   land-cover-change: land-cover-change.html
-last_built: 2026-07-07T16:52Z
+  trajectory-break-detection: trajectory-break-detection.html
+last_built: 2026-07-09T16:33Z
 urls:
   reference: https://newgraphenvironment.github.io/drift/reference
   article: https://newgraphenvironment.github.io/drift/articles

@@ -1,5 +1,54 @@
 # Changelog
 
+## drift 0.3.0
+
+- Continuous index-trajectory change detection for floodplain reaches
+  ([\#30](https://github.com/NewGraphEnvironment/drift/issues/30)). A
+  new fetch-and-reduce pipeline complements the categorical
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  path.
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  builds a cloud-masked monthly spectral-index stack from Sentinel-2
+  (via a new `"sentinel-2-l2a"` source);
+  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+  reduces it per pixel with
+  [`bfast::bfastmonitor()`](https://rdrr.io/pkg/bfast/man/bfastmonitor.html)
+  into a two-band raster of *abrupt* break date and magnitude; and
+  [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  reduces it to a per-pixel *gradual* trend — a robust Theil-Sen slope
+  (index change per year) with Mann-Kendall significance — for
+  degradation/recovery monitoring the annual labels cannot show.
+  Together they let a continuous trajectory validate categorical
+  land-cover transitions (confirming which mapped losses carry a real
+  spectral decline) and detect gradual change. See the “Trajectories as
+  a Check on Land-Cover Change” vignette.
+- [`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md)
+  and
+  [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
+  add a table-driven spectral-index registry (NDVI, kNDVI, NDMI) whose
+  formulas are written over band *roles*, so one index resolves against
+  any reflectance source; the reflectance scale/offset is folded into
+  each expression.
+- Sentinel-2 handling is correctness-focused:
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  masks cloud/shadow/cirrus/snow, restricts to caller-chosen calendar
+  `months` (e.g. the growing season) to sharpen the signal and cut
+  scenes streamed, and — because the +1000 DN reflectance offset only
+  applies from processing baseline 04.00 (2022-01-25) — splits items at
+  that boundary and corrects each side, so a multi-year series carries
+  no artificial index step at 2022.
+- [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+  gains a role-based schema for reflectance cube sources (band roles,
+  mask classes, scale/offset, offset boundary), leaving the categorical
+  `io-lulc`/`esa-worldcover` sources unchanged. `bfast` added to
+  Suggests.
+- Known limitation tracked as a follow-up: the cube spans the AOI
+  bounding box rather than the polygon (a gdalcubes `filter_geom`
+  limitation,
+  [\#32](https://github.com/NewGraphEnvironment/drift/issues/32));
+  labelling breaks with from/to land-cover classes is
+  [\#31](https://github.com/NewGraphEnvironment/drift/issues/31).
+
 ## drift 0.2.4
 
 - [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
