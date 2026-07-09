@@ -21,10 +21,12 @@ Fetch-time streaming stays bbox-bound (documented residual).
 - [x] confirm the new tests FAIL against current code (FAIL 6 | SKIP 2 | PASS 1)
 
 ## Phase 2: Implement clip
-- [ ] `clip = TRUE` param + `stac_cube_clip()` helper + apply after stk assembly
-- [ ] `clip` threaded into `stac_cube_cache_key()` (hash) AND the call site
-- [ ] roxygen `@param clip` + `@return` rewrite + `filter_geom` comment updates
-- [ ] `devtools::document()`; `lintr::lint_package()` clean; `devtools::test()` green
+- [x] `clip = TRUE` param + `stac_cube_clip()` helper + apply after stk assembly
+- [x] `clip` threaded into `stac_cube_cache_key()` (hash) AND the call site
+- [x] roxygen `@param clip` + `@return` rewrite + `filter_geom` comment updates
+- [x] `devtools::document()`; `lintr::lint_package()` clean; `devtools::test()` green (319 pass)
+- [x] `/code-check`: normalize `clip <- isTRUE(as.logical(clip))` once so the mask gate
+      and cache key can't disagree for truthy-but-non-TRUE inputs (silent wrong-extent fix)
 
 ## Phase 3: Docs + gotchas note + NEWS + version
 - [ ] update `inst/notes/gdalcubes-pc-gotchas.md` filter_geom bullet (#32 resolved + residual)

@@ -14,6 +14,7 @@ dft_stac_cube(
   dt = "P1M",
   aggregation = "median",
   resampling = "bilinear",
+  clip = TRUE,
   cloud_cover_max = 60,
   months = NULL,
   mask_values = NULL,
@@ -48,6 +49,14 @@ must agree with.}
 
 \item{resampling}{Character. Spatial resampling (default \code{"bilinear"}).}
 
+\item{clip}{Logical. When \code{TRUE} (default), clip the returned stack to the AOI
+polygon with \code{terra::mask()} (cells outside → \code{NA} on every layer), so
+\code{\link[=dft_rast_break]{dft_rast_break()}} / \code{\link[=dft_rast_trend]{dft_rast_trend()}} reduce only in-polygon pixels. Set
+\code{FALSE} to keep the full bounding box (e.g. for surrounding context, or to
+mask later with a different polygon). Note this clips the \emph{output} only — the
+full bbox of COGs is still streamed either way (the AOI cannot be pushed into
+the read on the pinned gdalcubes build; see \code{inst/notes/gdalcubes-pc-gotchas.md}).}
+
 \item{cloud_cover_max}{Numeric. Scene-level \code{eo:cloud_cover} maximum percent
 for the STAC pre-filter (default 60).}
 
@@ -75,12 +84,13 @@ cloud / shadow / cirrus classes).}
 }
 \value{
 A \link[terra:SpatRaster-class]{terra::SpatRaster} index stack — one layer per time step, with a
-time value per layer — cached as a GeoTIFF. The stack spans the AOI
-\strong{bounding box} (cloud-masked but not clipped to the AOI polygon); clip the
-reduced raster from \code{\link[=dft_rast_break]{dft_rast_break()}} with \code{terra::mask()} if a tight AOI is
-needed. For sources with a reflectance-offset baseline boundary (Sentinel-2),
-items are split at the boundary and offset-corrected per side, so a series
-crossing it carries no artificial index step.
+time value per layer — cached as a GeoTIFF. By default (\code{clip = TRUE}) the
+stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
+\code{NA}), so the reduced raster from \code{\link[=dft_rast_break]{dft_rast_break()}} is already polygon-tight;
+pass \code{clip = FALSE} for the full AOI \strong{bounding box}. For sources with a
+reflectance-offset baseline boundary (Sentinel-2), items are split at the
+boundary and offset-corrected per side, so a series crossing it carries no
+artificial index step.
 }
 \description{
 Sibling of \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} for continuous change detection. Where

@@ -37,6 +37,13 @@
 #' @param aggregation Character. Temporal aggregation for multiple scenes in one
 #'   `dt` window (default `"median"`).
 #' @param resampling Character. Spatial resampling (default `"bilinear"`).
+#' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
+#'   polygon with `terra::mask()` (cells outside → `NA` on every layer), so
+#'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. Set
+#'   `FALSE` to keep the full bounding box (e.g. for surrounding context, or to
+#'   mask later with a different polygon). Note this clips the *output* only — the
+#'   full bbox of COGs is still streamed either way (the AOI cannot be pushed into
+#'   the read on the pinned gdalcubes build; see `inst/notes/gdalcubes-pc-gotchas.md`).
 #' @param cloud_cover_max Numeric. Scene-level `eo:cloud_cover` maximum percent
 #'   for the STAC pre-filter (default 60).
 #' @param months Integer vector of calendar months (1-12) to keep, or `NULL`
@@ -58,12 +65,13 @@
 #'   [rstac::sign_planetary_computer()].
 #'
 #' @return A [terra::SpatRaster] index stack — one layer per time step, with a
-#'   time value per layer — cached as a GeoTIFF. The stack spans the AOI
-#'   **bounding box** (cloud-masked but not clipped to the AOI polygon); clip the
-#'   reduced raster from [dft_rast_break()] with `terra::mask()` if a tight AOI is
-#'   needed. For sources with a reflectance-offset baseline boundary (Sentinel-2),
-#'   items are split at the boundary and offset-corrected per side, so a series
-#'   crossing it carries no artificial index step.
+#'   time value per layer — cached as a GeoTIFF. By default (`clip = TRUE`) the
+#'   stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
+#'   `NA`), so the reduced raster from [dft_rast_break()] is already polygon-tight;
+#'   pass `clip = FALSE` for the full AOI **bounding box**. For sources with a
+#'   reflectance-offset baseline boundary (Sentinel-2), items are split at the
+#'   boundary and offset-corrected per side, so a series crossing it carries no
+#'   artificial index step.
 #'
 #' @seealso [dft_rast_break()] (the reducer that consumes this cube),
 #'   [dft_index_expr()] (the index applied), [dft_stac_fetch()] (categorical
@@ -93,6 +101,7 @@ dft_stac_cube <- function(aoi,
                           dt = "P1M",
                           aggregation = "median",
                           resampling = "bilinear",
+                          clip = TRUE,
                           cloud_cover_max = 60,
                           months = NULL,
                           mask_values = NULL,
@@ -137,6 +146,10 @@ dft_stac_cube <- function(aoi,
   # each side, so a series crossing it has no artificial index step.
   offset_boundary <- cfg$offset_boundary
   offset_before <- cfg$offset_before %||% 0
+  # normalize clip to a single scalar so the mask gate and the cache key agree: a
+  # truthy-but-non-TRUE clip (e.g. 1 or "TRUE") must not skip the mask yet key as
+  # TRUE, which would let a later clip=TRUE read the unclipped cube (#32).
+  clip <- isTRUE(as.logical(clip))
 
   # Ensure aoi is sf
   if (inherits(aoi, "SpatVector")) aoi <- sf::st_as_sf(aoi)
@@ -168,7 +181,7 @@ dft_stac_cube <- function(aoi,
   cache_key <- stac_cube_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
     cfg$stac_url, cfg$collection, band_assets, datetime, index,
-    cloud_cover_max, mask_values, scale, offset, months, offset_before
+    cloud_cover_max, mask_values, scale, offset, months, offset_before, clip
   )
   cache_file <- file.path(cache_source_dir, paste0("cube_", cache_key, ".tif"))
 
@@ -190,8 +203,8 @@ dft_stac_cube <- function(aoi,
     rstac::stac_search(
       collections = cfg$collection,
       # union so a multi-feature AOI queries its whole footprint, matching the
-      # cube extent and filter_geom clip (a single first-feature geometry would
-      # leave silent NoData holes over the other features)
+      # cube extent and the terra::mask() clip (a single first-feature geometry
+      # would leave silent NoData holes over the other features)
       intersects = sf::st_geometry(sf::st_union(aoi_wgs84))[[1]],
       datetime = datetime,
       limit = 500
@@ -229,8 +242,9 @@ dft_stac_cube <- function(aoi,
   # Build the index cube for one item subset with one offset, materialize it, and
   # read it back as a terra stack. The cube spans the AOI bounding box:
   # gdalcubes::filter_geom() to clip to the polygon yields an all-NA cube (and can
-  # crash the compute worker) on the pinned build, so we mask clouds here and
-  # leave polygon clipping to the caller, as the sibling dft_stac_fetch() does.
+  # crash the compute worker) on the pinned build, so we mask clouds here and clip
+  # the assembled stack to the AOI polygon afterward with terra::mask() (see
+  # stac_cube_clip, #32), as the sibling dft_stac_fetch() does — never filter_geom().
   build_index_stack <- function(features, offset_use) {
     img_col <- gdalcubes::stac_image_collection(
       features, asset_names = c(band_assets, mask_asset)
@@ -268,10 +282,32 @@ dft_stac_cube <- function(aoi,
     stk <- build_index_stack(items$features, if (all(is_pre)) offset_before else offset)
   }
 
+  # Restore the AOI-polygon clip removed in #30: mask the assembled stack (never
+  # gdalcubes::filter_geom, which segfaults on the pinned build). Out-of-polygon
+  # cells become NA on every layer, so dft_rast_break()/dft_rast_trend() skip them
+  # via their `rowSums(!is.na) >= min_obs` gate. `mask` preserves nlyr and time is
+  # set below, so the cached tif — and the cache-read path — need no other change.
+  if (isTRUE(clip)) stk <- stac_cube_clip(stk, aoi_target)
+
   terra::time(stk) <- month_times(terra::nlyr(stk))
   names(stk) <- rep(index, terra::nlyr(stk))
   terra::writeRaster(stk, cache_file, overwrite = TRUE)
   stk
+}
+
+
+#' Clip an index stack to the AOI polygon (client-side terra mask)
+#'
+#' Restores AOI-polygon-tight output without `gdalcubes::filter_geom()`, which
+#' segfaults / returns an all-NA cube on the pinned build (see
+#' `inst/notes/gdalcubes-pc-gotchas.md`, drift#32). Cells whose centre falls
+#' outside the polygon become `NA` on every layer, so [dft_rast_break()] /
+#' [dft_rast_trend()] skip them via their `rowSums(!is.na) >= min_obs` gate. A
+#' multi-feature `aoi` masks to the union. Mirrors the post-read mask in
+#' [dft_stac_fetch()]; `aoi` is already in the stack's CRS.
+#' @noRd
+stac_cube_clip <- function(stk, aoi) {
+  terra::mask(stk, terra::vect(aoi))
 }
 
 
@@ -281,13 +317,15 @@ dft_stac_cube <- function(aoi,
 #' stays byte-for-byte stable). Hashes the AOI geometry as WKB plus every
 #' parameter that changes the written index cube. `res` is coerced to double so
 #' `10L` and `10` key alike; `mask_values` is sorted so order does not matter.
-#' `scale`/`offset` are included because they change pixel values.
+#' `scale`/`offset` are included because they change pixel values. `clip` is
+#' included because it changes the written extent (polygon vs bbox), so a
+#' `clip = FALSE` request must not read a clipped cube (or vice versa).
 #' @noRd
 stac_cube_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
                                 resampling, stac_url, collection, band_assets,
                                 datetime, index, cloud_cover_max, mask_values,
                                 scale, offset, months = NULL,
-                                offset_before = 0) {
+                                offset_before = 0, clip = TRUE) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
   substr(
     rlang::hash(list(
@@ -295,7 +333,7 @@ stac_cube_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
       stac_url, collection, band_assets, datetime, index,
       as.numeric(cloud_cover_max), sort(as.numeric(mask_values)),
       as.numeric(scale), as.numeric(offset), sort(as.numeric(months)),
-      as.numeric(offset_before)
+      as.numeric(offset_before), as.logical(clip)
     )),
     1, 12
   )

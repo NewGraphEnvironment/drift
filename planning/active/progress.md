@@ -20,4 +20,11 @@
   PASS 1): 5 cache-key tests error on `unused argument (clip)`, offline test on
   `object 'stac_cube_clip' not found`. `/code-check` deferred to the Phase 2 impl diff
   (Phase 1 is test-only, self-reviewed).
-- Next: Phase 2 — implement `clip` param + helper + cache-key wiring.
+- Phase 2 (commit pending): confirmed `dft_stac_fetch` normalizes `aoi` identically and
+  `terra::vect()` accepts `sfc` → bare `terra::vect(aoi_target)` matches the sibling.
+  Added `clip = TRUE` param, `stac_cube_clip()` `@noRd` helper, the mask step after stk
+  assembly, `clip` in `stac_cube_cache_key` (hash) + call site, roxygen + `filter_geom`
+  comment updates. `/code-check` (1 fresh-eyes round) found a fragile mismatch — `isTRUE`
+  gate vs `as.logical` key disagree for `clip = 1`/`"TRUE"`; fixed by normalizing
+  `clip <- isTRUE(as.logical(clip))` once up front. Full suite 319 pass, lint clean.
+- Next: Phase 3 — gotchas note + NEWS 0.5.0 + DESCRIPTION bump.
