@@ -33,4 +33,8 @@
   untiled, resampled onto the untiled grid). Roxygen `@param tile_size` + cache
   doc. 352 pass / 5 skip; document + lint + code-check clean. Code-check flagged
   the network test's sub-pixel-offset fragility → hardened via near-resample.
-- Next: Phase 5 (gotchas note + NEWS 0.6.0 + DESCRIPTION bump).
+- Phase 5 done: gotchas-note tiling entry (download-side workaround for the
+  blocked filter_geom; .tif mosaic; cross-ref #38), NEWS 0.6.0 entry, DESCRIPTION
+  0.5.0 → 0.6.0. `devtools::check()` clean: 0 errors / 0 warnings / 0 notes,
+  vignettes rebuild OK.
+- Next: Phase 6 (/planning-archive → /gh-pr-push → /gh-pr-merge release v0.6.0).

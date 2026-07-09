@@ -17,6 +17,19 @@ bfast 1.7.2.
   `cube_view(extent = bbox)` still streams the full bbox of COGs, so fetch time is
   unchanged; pushing the AOI into the read would need a working `filter_geom` or
   server-side windowing. `clip = FALSE` keeps the full bbox.
+- **Download-side workaround without `filter_geom`: tile the `cube_view` (#36).**
+  Since `filter_geom` can't push the AOI into the read, the categorical
+  `dft_stac_fetch(tile_size = <metres>)` splits the AOI bbox into a `res`-aligned
+  grid and streams only tiles that intersect the AOI polygon (skipping the empty
+  bbox corners), then mosaics with `terra::merge()`. For a thin, diagonal
+  floodplain corridor (measured ~10% of the bbox inside the polygon) this fetches
+  near the AOI footprint instead of the full bbox. Tiles must be snapped to a
+  multiple of `res` and anchored at the bbox lower-left so their pixel grids are
+  co-lattice — otherwise the merge seams. The tiled mosaic is written with
+  `terra::writeRaster()` to a **`.tif`** (terra's NetCDF *write* is fragile — see
+  the round-trip bullet below), so tiled and untiled fetches cache under different
+  extensions and keys. The same read residual on the continuous `dft_stac_cube()`
+  path (its `cube_view` still streams the full bbox) is tracked as **#38**.
 - **`reduce_time()` R-callback runs in spawned worker processes at EVERY parallel
   setting** (incl. `parallel = 1`). A closure over enclosing locals fails there
   (`object 'band' not found`). Options: build a self-contained callback (inline

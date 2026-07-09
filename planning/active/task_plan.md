@@ -35,12 +35,12 @@ tracked separately as #38 (out of scope).
 - [x] `devtools::document()`; `lint` clean; `devtools::test()` 352 pass / 5 skip / 0 fail; code-check clean
 
 ## Phase 5: docs + gotchas note + NEWS + version
-- [ ] `inst/notes/gdalcubes-pc-gotchas.md`: tiling entry (fetch download bounded by tiling the cube_view; tiled mosaic cached as `.tif` via terra; #36)
-- [ ] `NEWS.md` `# drift 0.6.0` — `tile_size` (opt-in, default `NULL` = unchanged; bounds download for sparse AOIs; tiled fetches cache as `.tif`); Closes #36
-- [ ] `DESCRIPTION` `0.5.0 → 0.6.0` + `Date` (final commit)
+- [x] `inst/notes/gdalcubes-pc-gotchas.md`: tiling entry (fetch download bounded by tiling the cube_view; tiled mosaic cached as `.tif` via terra; #36)
+- [x] `NEWS.md` `# drift 0.6.0` — `tile_size` (opt-in, default `NULL` = unchanged; bounds download for sparse AOIs; tiled fetches cache as `.tif`); Closes #36
+- [x] `DESCRIPTION` `0.5.0 → 0.6.0` + `Date` (final commit)
 
 ## Phase 6: validate, archive, PR, release
-- [ ] `devtools::test()` / `lint` / `document` / `check` clean (network tests skip)
+- [x] `devtools::test()` / `lint` / `document` / `check` clean (network tests skip) — check: 0 errors / 0 warnings / 0 notes
 - [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #36`, `Relates to NewGraphEnvironment/sred-2025-2026#16`)
 - [ ] `/gh-pr-merge` → release v0.6.0
 
