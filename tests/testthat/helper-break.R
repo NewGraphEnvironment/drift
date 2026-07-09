@@ -1,10 +1,9 @@
-# Build a tiny synthetic monthly index cube for dft_rast_break() tests, with no
-# network. 2x2 px over 2018-01..2023-12 (72 monthly steps), band "kndvi":
+# Build a tiny synthetic monthly index STACK for dft_rast_break() tests, no
+# network, no gdalcubes. 3x3 px, 72 monthly layers 2018-2023, time set:
 #   pixel 1 = seasonal series with a -0.3 step drop at 2022-06 (a real break)
-#   pixel 2, 3 = stable seasonal series (no break)
-#   pixel 4 = all NA (degenerate pixel)
-# Returns list(cube, cache_dir). Only called under skip_if_not_installed guards.
-synthetic_break_cube <- function() {
+#   pixels 2-8 = stable seasonal series (no break)
+#   pixel 9 = all NA (degenerate pixel)
+synthetic_break_stack <- function() {
   n <- 72
   tt <- seq_len(n)
   seasonal <- 0.15 * sin(2 * pi * tt / 12)
@@ -12,28 +11,17 @@ synthetic_break_cube <- function() {
   drop[54:n] <- drop[54:n] - 0.3
   stable <- 0.6 + seasonal
 
-  scratch <- tempfile("drift_break_cube_")
-  dir.create(scratch)
-  dates <- format(seq(as.Date("2018-01-01"), by = "month", length.out = n),
-                  "%Y-%m-%d")
-  files <- character(n)
-  for (i in seq_len(n)) {
-    r <- terra::rast(nrows = 2, ncols = 2, xmin = 0, xmax = 20,
-                     ymin = 0, ymax = 20, crs = "EPSG:32609")
-    terra::values(r) <- c(drop[i], stable[i], stable[i], NA_real_)
-    names(r) <- "kndvi"
-    files[i] <- file.path(scratch, sprintf("kndvi_%03d.tif", i))
-    terra::writeRaster(r, files[i], overwrite = TRUE)
-  }
-  col <- gdalcubes::create_image_collection(
-    files, date_time = dates, band_names = "kndvi", quiet = TRUE
-  )
-  v <- gdalcubes::cube_view(
-    srs = "EPSG:32609",
-    extent = list(left = 0, right = 20, bottom = 0, top = 20,
-                  t0 = "2018-01", t1 = "2023-12"),
-    dx = 10, dy = 10, dt = "P1M", aggregation = "median", resampling = "near"
-  )
-  list(cube = gdalcubes::raster_cube(col, v),
-       cache_dir = file.path(scratch, "cache"))
+  lays <- lapply(seq_len(n), function(i) {
+    r <- terra::rast(nrows = 3, ncols = 3, xmin = 0, xmax = 30,
+                     ymin = 0, ymax = 30, crs = "EPSG:32609")
+    vv <- rep(stable[i], 9)
+    vv[1] <- drop[i]
+    vv[9] <- NA_real_
+    terra::values(r) <- vv
+    r
+  })
+  stk <- terra::rast(lays)
+  terra::time(stk) <- seq(as.Date("2018-01-01"), by = "month", length.out = n)
+  names(stk) <- rep("kndvi", n)
+  stk
 }

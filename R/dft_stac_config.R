@@ -64,9 +64,14 @@ dft_stac_config <- function(source = c("io-lulc", "esa-worldcover",
       # (snow is masked by default: it is never a vegetation signal and otherwise
       # dominates the winter trajectory at high latitudes)
       mask_values = c(3L, 8L, 9L, 10L, 11L),
-      # DN -> reflectance: baseline 04.00 (+1000 DN) => DN * 1e-4 - 0.1
+      # DN -> reflectance. The +1000 DN offset only applies from processing
+      # baseline 04.00 (2022-01-25 on); earlier scenes have no offset. dft_stac_cube
+      # splits items at the boundary and applies `offset` after it, `offset_before`
+      # before it, so a multi-year series has no artificial step at 2022.
       scale = 1e-4,
       offset = -0.1,
+      offset_boundary = "2022-01-25",
+      offset_before = 0,
       available_datetime = "2017-01-01/2024-12-31"
     )
     # "landsat-c2-l2" drops in with the same cube shape, no API change:

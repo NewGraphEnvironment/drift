@@ -6,34 +6,29 @@
 \usage{
 dft_rast_break(
   cube,
-  band = NULL,
   history = "all",
   start = c(2022, 1),
   frequency = NULL,
   order = 3,
   level = 0.01,
   min_obs = 6,
-  cache_dir = NULL,
-  force = FALSE
+  cores = NULL
 )
 }
 \arguments{
-\item{cube}{A \code{gdalcubes} index cube whose single band is a spectral index
-time series (the return value of \code{\link[=dft_stac_cube]{dft_stac_cube()}}).}
-
-\item{band}{Character. Band to reduce. When \code{NULL}, the cube's first band.}
+\item{cube}{A monthly index \code{SpatRaster} (the return value of
+\code{\link[=dft_stac_cube]{dft_stac_cube()}}): one layer per time step, with a time value per layer.}
 
 \item{history}{Character. \code{bfastmonitor} history-selection method: \code{"all"}
 (default), \code{"ROC"}, or \code{"BP"}.}
 
 \item{start}{Numeric \code{c(year, period)}. Start of the monitoring period, in the
-cube's temporal frequency (e.g. \code{c(2022, 1)} = Jan 2022 for a monthly cube).
-Everything before it is the stable history.}
+stack's temporal frequency (e.g. \code{c(2022, 1)} = Jan 2022 for a monthly
+stack). Everything before it is the stable history.}
 
 \item{frequency}{Numeric or \code{NULL}. Seasonal frequency of the time series
-(12 for monthly, 1 for annual). When \code{NULL}, derived from the cube's
-temporal cadence; when supplied, it must agree with that cadence or the
-call errors.}
+(12 for monthly, 1 for annual). When \code{NULL}, derived from the layer time
+spacing; when supplied, it must agree with that spacing or the call errors.}
 
 \item{order}{Integer. Harmonic order of the season-trend model passed to
 \code{\link[bfast:bfastmonitor]{bfast::bfastmonitor()}} (default 3). Lower it (1-2) when the series samples
@@ -47,16 +42,15 @@ coverage.}
 \item{min_obs}{Integer. Minimum non-\code{NA} observations required to attempt a
 fit; pixels with fewer return \code{NA} (default 6).}
 
-\item{cache_dir}{Character. Cache directory. When \code{NULL}, \code{\link[=dft_cache_path]{dft_cache_path()}}.}
-
-\item{force}{Logical. Recompute even if cached (default \code{FALSE}).}
+\item{cores}{Integer or \code{NULL}. Forked workers for the per-pixel reduction.
+When \code{NULL}, uses one fewer than the detected cores.}
 }
 \value{
 A two-band \link[terra:SpatRaster-class]{terra::SpatRaster} with layers \code{break_date} (decimal year
 or \code{NA}) and \code{break_mag} (signed index change; negative = index drop).
 }
 \description{
-Reduce an index cube (from \code{\link[=dft_stac_cube]{dft_stac_cube()}}) over time with
+Reduce a monthly index stack (from \code{\link[=dft_stac_cube]{dft_stac_cube()}}) over time with
 \code{\link[bfast:bfastmonitor]{bfast::bfastmonitor()}}, returning a two-band \code{SpatRaster} of the break date
 and magnitude for every pixel. Where categorical differencing compares two
 land-cover labels, this asks a stronger question of a continuous index
@@ -70,11 +64,9 @@ means the index dropped} (e.g. vegetation loss / channel scour), positive
 means it rose (establishment). \code{break_date} is a decimal year (e.g.
 \code{2022.42}) or \code{NA} where no break was detected.
 
-The reducer runs as a per-pixel R callback. gdalcubes evaluates that callback
-in spawned worker processes, so the function is built self-contained (its
-parameters are baked in as literals) and \code{bfast} is loaded in each worker —
-making the result independent of the \code{gdalcubes::gdalcubes_options(parallel=)}
-setting.
+Pixels are reduced in parallel with \code{parallel::mclapply()} (forked workers, so
+the per-pixel logic and its parameters are inherited directly). Pixels with
+fewer than \code{min_obs} valid observations short-circuit to \code{NA}.
 }
 \examples{
 \dontrun{
@@ -87,5 +79,5 @@ terra::plot(breaks[["break_mag"]])  # negative (blue) = scour / veg loss
 
 }
 \seealso{
-\code{\link[=dft_stac_cube]{dft_stac_cube()}} (builds the input cube), \code{\link[=dft_index_expr]{dft_index_expr()}}.
+\code{\link[=dft_stac_cube]{dft_stac_cube()}} (builds the input stack), \code{\link[=dft_index_expr]{dft_index_expr()}}.
 }

@@ -67,32 +67,35 @@ cloud / shadow / cirrus classes).}
 \item{cache_dir}{Character. Cache directory. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
 
-\item{force}{Logical. Re-fetch even if cached, overwriting the cached \code{.nc}
+\item{force}{Logical. Re-fetch even if cached, overwriting the cached raster
 (default \code{FALSE}).}
 
 \item{sign_fn}{A signing function for STAC assets. Default is
 \code{\link[rstac:items_sign_planetary_computer]{rstac::sign_planetary_computer()}}.}
 }
 \value{
-A \code{gdalcubes} data cube with a single band named \code{index}, backed by
-the cached NetCDF file. The cube spans the AOI \strong{bounding box} (cloud-masked
-but not clipped to the AOI polygon); clip the reduced raster from
-\code{\link[=dft_rast_break]{dft_rast_break()}} with \code{terra::mask()} if a tight AOI is needed.
+A \link[terra:SpatRaster-class]{terra::SpatRaster} index stack — one layer per time step, with a
+time value per layer — cached as a GeoTIFF. The stack spans the AOI
+\strong{bounding box} (cloud-masked but not clipped to the AOI polygon); clip the
+reduced raster from \code{\link[=dft_rast_break]{dft_rast_break()}} with \code{terra::mask()} if a tight AOI is
+needed. For sources with a reflectance-offset baseline boundary (Sentinel-2),
+items are split at the boundary and offset-corrected per side, so a series
+crossing it carries no artificial index step.
 }
 \description{
 Sibling of \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} for continuous change detection. Where
 \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} materializes one categorical raster per year, this builds
-a multi-band, sub-annual reflectance cube, masks clouds, computes a spectral
-index over band roles, and returns the lazy single-band index cube — the
-input to \code{\link[=dft_rast_break]{dft_rast_break()}} for per-pixel trajectory breakpoint detection.
+a sub-annual reflectance cube, masks clouds, computes a spectral index over
+band roles, and returns the index time series as a \code{SpatRaster} (one layer
+per time step) — the input to \code{\link[=dft_rast_break]{dft_rast_break()}} for per-pixel trajectory
+breakpoint detection.
 }
 \details{
-The index cube is materialized once to a NetCDF file under \code{\link[=dft_cache_path]{dft_cache_path()}}
-as \verb{<source>/cube_<key>.nc} (the full time axis, one band), keyed by a hash of
-the AOI geometry and every cube-affecting parameter. Because the cube is
-invariant to \code{\link[=dft_rast_break]{dft_rast_break()}}'s parameters (\code{history}/\code{start}/\code{level}),
-caching it here makes bfast parameter sweeps cheap — they re-read the local
-\code{.nc} instead of re-streaming COGs.
+The index stack is materialized once to a GeoTIFF under \code{\link[=dft_cache_path]{dft_cache_path()}}
+as \verb{<source>/cube_<key>.tif}, keyed by a hash of the AOI geometry and every
+cube-affecting parameter. Because it is invariant to \code{\link[=dft_rast_break]{dft_rast_break()}}'s
+parameters, caching it here makes bfast parameter sweeps cheap — they re-read
+the local raster instead of re-streaming COGs.
 
 Three STAC-query specifics distinguish cube mode from \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}:
 pagination via \code{\link[rstac:items_functions]{rstac::items_fetch()}} is mandatory (a monthly multi-year query

@@ -47,4 +47,9 @@ test_that("dft_stac_config returns role-based cube config for sentinel-2-l2a", {
   expect_equal(cfg$scale, 1e-4)
   expect_equal(cfg$offset, -0.1)
   expect_match(cfg$available_datetime, "^\\d{4}-\\d{2}-\\d{2}/\\d{4}-\\d{2}-\\d{2}$")
+
+  # baseline offset boundary: +1000 DN only from 2022-01-25, so pre-boundary
+  # scenes carry offset 0 and the fetch splits at the boundary
+  expect_equal(cfg$offset_boundary, "2022-01-25")
+  expect_equal(cfg$offset_before, 0)
 })

@@ -41,5 +41,21 @@
   /vsicurl config (on.exit restore); `dft_rast_break(order=)` harmonic knob. Growing-
   season E2E (months=6:9, 2018-2023): cube in 12 min (vs 30), 24 clean summer obs/pixel,
   breaks dated to summer months (2022.42-2023.67). 294 unit tests pass, lint clean.
-- Next: commit growing-season enhancement + regenerate artifact + Phase 5 (vignette
-  render + NEWS + 0.3.0 release + archive + PR).
+- Committed growing-season enhancement (61eaa5d); code-check Clean.
+- **Peer session + my E2E stats surfaced a real offset bug.** PC's uniform offset=-0.1
+  is wrong for pre-2022-01-25 scenes (the +1000 DN baseline offset flips there). A
+  series crossing the boundary shows a false whole-AOI break: my own growing-season
+  E2E had 90903/91467 (99%) negative breaks all at 2022.42 — the offset boundary, not
+  vegetation. User chose to fix it PROPERLY now (baseline-conditional split).
+- **Re-architecture (terra route).** gdalcubes can't read a terra-written NetCDF
+  (round-trip fails), so coalescing pre/post cubes at the gdalcubes level is out.
+  Pivoted the reduction to terra: dft_stac_cube now returns a terra SpatRaster stack
+  (materialized GeoTIFF, time set), splitting items at the offset boundary and
+  correcting each side with its own offset (terra::cover coalesce). dft_rast_break
+  reduces the stack via parallel::mclapply (fork -> closures + package internals work,
+  no gdalcubes-worker serialization; validated 102400 px in 8.3 s). Dropped
+  build_break_reducer/break_cache_key/gdalcubes reduce_time; .dft_break_pixel unchanged.
+  Config: sentinel-2-l2a gains offset_boundary="2022-01-25" + offset_before=0. Full
+  suite 286 pass, lint clean.
+- Next: confirm the split kills the fake 2022 step (per-year kNDVI aligns; breaks
+  sparse), regenerate artifact, Phase 5 (vignette + NEWS + 0.3.0 + archive + PR).

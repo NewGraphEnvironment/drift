@@ -118,6 +118,38 @@ monitoring-period residual (neg = index drop = scour; ~0 = stable). `ts_start`
 and `frequency` come from `gdalcubes::dimension_values(cube, "M")$t` in the main
 process; `stop()` if a caller `frequency` disagrees with the dt cadence.
 
+## Sentinel-2 baseline offset — the correctness catch (2026-07-08)
+
+A peer validation session + my own growing-season E2E stats surfaced that PC's
+`sentinel-2-l2a` +1000 DN reflectance offset only applies from processing
+baseline 04.00 (2022-01-25 on); earlier scenes have offset 0. A **uniform**
+`offset = -0.1` is therefore wrong pre-2022 and creates a false whole-AOI index
+step at the boundary. kNDVI's `tanh` hid it (bounded 0-1) so the cube looked
+valid, but my E2E had **90903/91467 (99%) negative breaks all at 2022.42** — the
+boundary, not vegetation. User chose to fix it properly (baseline-conditional
+split), not defer.
+
+**terra re-architecture (validated):**
+- gdalcubes CANNOT read a terra-written NetCDF (dim-name mismatch), so coalescing
+  pre/post cubes at the gdalcubes level is impossible. Pivoted to terra.
+- `dft_stac_cube()` returns a **terra SpatRaster stack** (materialized GeoTIFF,
+  `terra::time` set). If the source has `offset_boundary` and items straddle it,
+  it builds a pre cube (offset `offset_before`) and post cube (offset) over the
+  SAME full `cube_view`, and coalesces with `terra::cover(pre, post)`.
+- `dft_rast_break()` reduces the stack via `parallel::mclapply` (fork -> closures
+  and package internals inherited, no gdalcubes-worker serialization). Validated:
+  102400 px in 8.3 s. `.dft_break_pixel` unchanged. Dropped build_break_reducer,
+  break_cache_key, gdalcubes reduce_time.
+- `cadence_frequency()` now derives frequency from the median day-spacing of the
+  layer times (26-32d -> 12, 85-95d -> 4, 360-370d -> 1).
+
+**Split validation E2E (2018-2023, months=6:9):** split fired 75 pre / 85 post;
+per-year growing-season mean kNDVI now ALIGNS across the boundary
+(2021=0.524 -> 2022=0.529, all years 0.41-0.53, no jump); finite breaks dropped
+from 99% to **25% of usable pixels**, spread across 2022-2024. Offset artifact
+gone. Config: `sentinel-2-l2a` gains `offset_boundary="2022-01-25"`,
+`offset_before=0`.
+
 ## Reuse map
 - `stac_cache_key()` / `auto_utm_epsg()` / sf-coercion / `write_ncdf→terra→mask`
   idiom in `R/dft_stac_fetch.R` — reuse for `dft_stac_cube()`.

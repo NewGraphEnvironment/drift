@@ -2,16 +2,16 @@
 #'
 #' Sibling of [dft_stac_fetch()] for continuous change detection. Where
 #' [dft_stac_fetch()] materializes one categorical raster per year, this builds
-#' a multi-band, sub-annual reflectance cube, masks clouds, computes a spectral
-#' index over band roles, and returns the lazy single-band index cube — the
-#' input to [dft_rast_break()] for per-pixel trajectory breakpoint detection.
+#' a sub-annual reflectance cube, masks clouds, computes a spectral index over
+#' band roles, and returns the index time series as a `SpatRaster` (one layer
+#' per time step) — the input to [dft_rast_break()] for per-pixel trajectory
+#' breakpoint detection.
 #'
-#' The index cube is materialized once to a NetCDF file under [dft_cache_path()]
-#' as `<source>/cube_<key>.nc` (the full time axis, one band), keyed by a hash of
-#' the AOI geometry and every cube-affecting parameter. Because the cube is
-#' invariant to [dft_rast_break()]'s parameters (`history`/`start`/`level`),
-#' caching it here makes bfast parameter sweeps cheap — they re-read the local
-#' `.nc` instead of re-streaming COGs.
+#' The index stack is materialized once to a GeoTIFF under [dft_cache_path()]
+#' as `<source>/cube_<key>.tif`, keyed by a hash of the AOI geometry and every
+#' cube-affecting parameter. Because it is invariant to [dft_rast_break()]'s
+#' parameters, caching it here makes bfast parameter sweeps cheap — they re-read
+#' the local raster instead of re-streaming COGs.
 #'
 #' Three STAC-query specifics distinguish cube mode from [dft_stac_fetch()]:
 #' pagination via [rstac::items_fetch()] is mandatory (a monthly multi-year query
@@ -52,15 +52,18 @@
 #'   cloud / shadow / cirrus classes).
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
 #'   [dft_cache_path()].
-#' @param force Logical. Re-fetch even if cached, overwriting the cached `.nc`
+#' @param force Logical. Re-fetch even if cached, overwriting the cached raster
 #'   (default `FALSE`).
 #' @param sign_fn A signing function for STAC assets. Default is
 #'   [rstac::sign_planetary_computer()].
 #'
-#' @return A `gdalcubes` data cube with a single band named `index`, backed by
-#'   the cached NetCDF file. The cube spans the AOI **bounding box** (cloud-masked
-#'   but not clipped to the AOI polygon); clip the reduced raster from
-#'   [dft_rast_break()] with `terra::mask()` if a tight AOI is needed.
+#' @return A [terra::SpatRaster] index stack — one layer per time step, with a
+#'   time value per layer — cached as a GeoTIFF. The stack spans the AOI
+#'   **bounding box** (cloud-masked but not clipped to the AOI polygon); clip the
+#'   reduced raster from [dft_rast_break()] with `terra::mask()` if a tight AOI is
+#'   needed. For sources with a reflectance-offset baseline boundary (Sentinel-2),
+#'   items are split at the boundary and offset-corrected per side, so a series
+#'   crossing it carries no artificial index step.
 #'
 #' @seealso [dft_rast_break()] (the reducer that consumes this cube),
 #'   [dft_index_expr()] (the index applied), [dft_stac_fetch()] (categorical
@@ -128,6 +131,12 @@ dft_stac_cube <- function(aoi,
   mask_values <- mask_values %||% cfg$mask_values
   scale <- cfg$scale %||% 1
   offset <- cfg$offset %||% 0
+  # sources whose reflectance offset changes at a processing-baseline boundary
+  # (e.g. Sentinel-2 +1000 DN from 2022-01-25) carry the boundary date and the
+  # pre-boundary offset; the fetch splits items at the boundary and corrects
+  # each side, so a series crossing it has no artificial index step.
+  offset_boundary <- cfg$offset_boundary
+  offset_before <- cfg$offset_before %||% 0
 
   # Ensure aoi is sf
   if (inherits(aoi, "SpatVector")) aoi <- sf::st_as_sf(aoi)
@@ -159,13 +168,20 @@ dft_stac_cube <- function(aoi,
   cache_key <- stac_cube_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
     cfg$stac_url, cfg$collection, band_assets, datetime, index,
-    cloud_cover_max, mask_values, scale, offset, months
+    cloud_cover_max, mask_values, scale, offset, months, offset_before
   )
-  cache_file <- file.path(cache_source_dir, paste0("cube_", cache_key, ".nc"))
+  cache_file <- file.path(cache_source_dir, paste0("cube_", cache_key, ".tif"))
+
+  # monthly layer times, derived from the datetime window start
+  month_times <- function(n) {
+    seq(as.Date(paste0(substr(dr[1], 1, 7), "-01")), by = "month", length.out = n)
+  }
 
   if (!force && file.exists(cache_file)) {
     message("  cube: cached")
-    return(gdalcubes::ncdf_cube(cache_file))
+    r <- terra::rast(cache_file)
+    terra::time(r) <- month_times(terra::nlyr(r))
+    return(r)
   }
 
   # STAC query: intersects (not bbox) + scene cloud pre-filter + pagination
@@ -199,12 +215,6 @@ dft_stac_cube <- function(aoi,
   message("  ", n_items, " items returned")
   if (n_items == 0) stop("No STAC items found for ", cfg$collection)
 
-  # image_mask masks the categorical mask band at read time, before the
-  # cube_view resampling touches reflectance bands
-  col <- gdalcubes::stac_image_collection(
-    items$features, asset_names = c(band_assets, mask_asset)
-  )
-
   v <- gdalcubes::cube_view(
     srs = target_crs,
     extent = list(
@@ -216,27 +226,58 @@ dft_stac_cube <- function(aoi,
     aggregation = aggregation, resampling = resampling
   )
 
-  # The cube spans the AOI bounding box. Clipping to the AOI polygon with
-  # gdalcubes::filter_geom() inside the pipeline yields an all-NA cube (and can
-  # crash the compute worker) on the pinned gdalcubes build, so we mask clouds
-  # here and leave polygon clipping to the caller (terra::mask() on the reduced
-  # raster), matching how the categorical sibling dft_stac_fetch() masks.
-  cube <- gdalcubes::raster_cube(
-    col, v,
-    mask = gdalcubes::image_mask(mask_asset, values = mask_values)
-  )
+  # Build the index cube for one item subset with one offset, materialize it, and
+  # read it back as a terra stack. The cube spans the AOI bounding box:
+  # gdalcubes::filter_geom() to clip to the polygon yields an all-NA cube (and can
+  # crash the compute worker) on the pinned build, so we mask clouds here and
+  # leave polygon clipping to the caller, as the sibling dft_stac_fetch() does.
+  build_index_stack <- function(features, offset_use) {
+    img_col <- gdalcubes::stac_image_collection(
+      features, asset_names = c(band_assets, mask_asset)
+    )
+    cube <- gdalcubes::raster_cube(
+      img_col, v, mask = gdalcubes::image_mask(mask_asset, values = mask_values)
+    )
+    idx <- dft_index_expr(cube, index = index, source = source,
+                          roles = cfg$roles, scale = scale, offset = offset_use)
+    tmp <- tempfile(fileext = ".nc")
+    gdalcubes::write_ncdf(idx, tmp, overwrite = TRUE)
+    terra::rast(tmp)
+  }
 
-  idx <- dft_index_expr(cube, index = index, source = source,
-                        roles = cfg$roles, scale = scale, offset = offset)
+  # Baseline-conditional offset: split items at the boundary and correct each
+  # side with its own offset, then coalesce onto the shared monthly grid. Both
+  # subcubes are built over the full view so their layers align for terra::cover.
+  is_pre <- rep(FALSE, length(items$features))
+  if (!is.null(offset_boundary)) {
+    item_date <- as.Date(substr(
+      vapply(items$features, function(f) f$properties$datetime %||% NA_character_, ""),
+      1, 10
+    ))
+    is_pre <- !is.na(item_date) & item_date < as.Date(offset_boundary)
+  }
 
-  gdalcubes::write_ncdf(idx, cache_file, overwrite = TRUE)
-  gdalcubes::ncdf_cube(cache_file)
+  if (any(is_pre) && !all(is_pre)) {
+    message("  offset split at ", offset_boundary, ": ",
+            sum(is_pre), " pre / ", sum(!is_pre), " post")
+    stk <- terra::cover(
+      build_index_stack(items$features[is_pre], offset_before),
+      build_index_stack(items$features[!is_pre], offset)
+    )
+  } else {
+    stk <- build_index_stack(items$features, if (all(is_pre)) offset_before else offset)
+  }
+
+  terra::time(stk) <- month_times(terra::nlyr(stk))
+  names(stk) <- rep(index, terra::nlyr(stk))
+  terra::writeRaster(stk, cache_file, overwrite = TRUE)
+  stk
 }
 
 
 #' Cache key for one STAC index-cube parameter set
 #'
-#' Cube-mode analogue of [stac_cache_key()] (kept separate so the fetch key
+#' Cube-mode analogue of `stac_cache_key()` (kept separate so the fetch key
 #' stays byte-for-byte stable). Hashes the AOI geometry as WKB plus every
 #' parameter that changes the written index cube. `res` is coerced to double so
 #' `10L` and `10` key alike; `mask_values` is sorted so order does not matter.
@@ -245,14 +286,16 @@ dft_stac_cube <- function(aoi,
 stac_cube_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
                                 resampling, stac_url, collection, band_assets,
                                 datetime, index, cloud_cover_max, mask_values,
-                                scale, offset, months = NULL) {
+                                scale, offset, months = NULL,
+                                offset_before = 0) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
   substr(
     rlang::hash(list(
       geom_wkb, as.numeric(res), target_crs, dt, aggregation, resampling,
       stac_url, collection, band_assets, datetime, index,
       as.numeric(cloud_cover_max), sort(as.numeric(mask_values)),
-      as.numeric(scale), as.numeric(offset), sort(as.numeric(months))
+      as.numeric(scale), as.numeric(offset), sort(as.numeric(months)),
+      as.numeric(offset_before)
     )),
     1, 12
   )

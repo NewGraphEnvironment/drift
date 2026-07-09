@@ -1,26 +1,33 @@
-# ---- guards (run without gdalcubes/bfast) ----------------------------------
-
-test_that("dft_rast_break requires gdalcubes", {
-  skip_if(requireNamespace("gdalcubes", quietly = TRUE),
-          "gdalcubes is installed, can't test missing-package path")
-  expect_error(dft_rast_break(NULL), "gdalcubes")
-})
+# ---- guards ----------------------------------------------------------------
 
 test_that("dft_rast_break requires bfast", {
   skip_if(requireNamespace("bfast", quietly = TRUE),
           "bfast is installed, can't test missing-package path")
-  skip_if_not_installed("gdalcubes")
-  expect_error(dft_rast_break(NULL), "bfast")
+  expect_error(dft_rast_break(terra::rast(nrows = 1, ncols = 1)), "bfast")
+})
+
+test_that("dft_rast_break errors on non-SpatRaster input", {
+  skip_if_not_installed("bfast")
+  expect_error(dft_rast_break(list()), "SpatRaster")
+})
+
+test_that("dft_rast_break errors when layers lack times", {
+  skip_if_not_installed("bfast")
+  r <- terra::rast(nrows = 2, ncols = 2, nlyrs = 3)
+  terra::values(r) <- 1
+  expect_error(dft_rast_break(r), "time")
 })
 
 # ---- cadence -> frequency (pure) -------------------------------------------
 
-test_that("cadence_frequency maps ISO durations to seasonal frequency", {
-  expect_equal(drift:::cadence_frequency("P1M"), 12)
-  expect_equal(drift:::cadence_frequency("P3M"), 4)
-  expect_equal(drift:::cadence_frequency("P1Y"), 1)
-  expect_true(is.na(drift:::cadence_frequency("P16D")))
-  expect_true(is.na(drift:::cadence_frequency("garbage")))
+test_that("cadence_frequency maps layer times to seasonal frequency", {
+  monthly   <- seq(as.Date("2020-01-01"), by = "month", length.out = 12)
+  quarterly <- seq(as.Date("2020-01-01"), by = "3 months", length.out = 8)
+  annual    <- seq(as.Date("2018-01-01"), by = "year", length.out = 5)
+  expect_equal(drift:::cadence_frequency(monthly), 12)
+  expect_equal(drift:::cadence_frequency(quarterly), 4)
+  expect_equal(drift:::cadence_frequency(annual), 1)
+  expect_true(is.na(drift:::cadence_frequency(as.Date("2020-01-01"))))  # length 1
 })
 
 # ---- .dft_break_pixel degenerate paths (no bfast needed) -------------------
@@ -41,41 +48,6 @@ test_that(".dft_break_pixel returns c(NA, NA) when fewer than min_obs", {
   )
 })
 
-# ---- reducer is self-contained (worker-safe) -------------------------------
-
-test_that("build_break_reducer yields a callback with no free variables", {
-  f <- drift:::build_break_reducer("kndvi", c(2018, 1), 12, c(2022, 1),
-                                   "all", 3, 0.01, 6)
-  # environment detached to baseenv and all params inlined as literals, so the
-  # only globals referenced are base/pkg functions -> safe to serialize to a
-  # gdalcubes worker (see findings.md: closures fail in workers)
-  expect_identical(environment(f), baseenv())
-  globals <- codetools::findGlobals(f, merge = FALSE)$variables
-  expect_false("band" %in% globals)
-  expect_false("ts_start" %in% globals)
-})
-
-# ---- break cache key -------------------------------------------------------
-
-test_that("break_cache_key changes with each reducer parameter", {
-  skip_if_not_installed("gdalcubes")
-  skip_if_not_installed("bfast")
-  cube <- synthetic_break_cube()$cube
-  k <- function(history = "all", start = c(2022, 1), frequency = 12, order = 3,
-                level = 0.01, min_obs = 6) {
-    drift:::break_cache_key(cube, "kndvi", history, start, frequency, order,
-                            level, min_obs)
-  }
-  base <- k()
-  expect_match(base, "^[0-9a-f]{12}$")
-  expect_false(k(history = "ROC") == base)
-  expect_false(k(start = c(2021, 1)) == base)
-  expect_false(k(frequency = 1) == base)
-  expect_false(k(order = 1) == base)
-  expect_false(k(level = 0.05) == base)
-  expect_false(k(min_obs = 8) == base)
-})
-
 # ---- bfast-gated per-pixel behavior ----------------------------------------
 
 test_that(".dft_break_pixel detects an injected step drop (negative magnitude)", {
@@ -83,7 +55,7 @@ test_that(".dft_break_pixel detects an injected step drop (negative magnitude)",
   tt <- seq_len(72)
   v <- 0.6 + 0.15 * sin(2 * pi * tt / 12)
   v[54:72] <- v[54:72] - 0.3  # step drop at 2022-06 (monitoring period)
-  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 3, 0.01, 6)
+  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 1, 0.01, 6)
   expect_true(is.finite(out[1]))
   expect_gt(out[1], 2022)
   expect_lt(out[1], 2022.9)
@@ -94,23 +66,20 @@ test_that(".dft_break_pixel returns NA break on a stable series (non-error)", {
   skip_if_not_installed("bfast")
   tt <- seq_len(72)
   v <- 0.6 + 0.15 * sin(2 * pi * tt / 12)
-  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 3, 0.01, 6)
+  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 1, 0.01, 6)
   expect_true(is.na(out[1]))
 })
 
-# ---- gdalcubes + bfast integration (synthetic cube, no network) ------------
+# ---- reduction over a stack (terra + bfast, no network) --------------------
 
-test_that("dft_rast_break reduces a synthetic cube to a 2-band raster", {
-  skip_if_not_installed("gdalcubes")
+test_that("dft_rast_break reduces a synthetic stack to a 2-band raster", {
   skip_if_not_installed("bfast")
-  sc <- synthetic_break_cube()
-  breaks <- dft_rast_break(sc$cube, start = c(2022, 1),
-                           cache_dir = sc$cache_dir)
+  stk <- synthetic_break_stack()
+  breaks <- dft_rast_break(stk, start = c(2022, 1), order = 1, cores = 2)
 
   expect_s4_class(breaks, "SpatRaster")
   expect_equal(terra::nlyr(breaks), 2)
   expect_equal(names(breaks), c("break_date", "break_mag"))
-  expect_equal(terra::crs(breaks, describe = TRUE)$code, "32609")
 
   bd <- terra::values(breaks[["break_date"]])[, 1]
   bm <- terra::values(breaks[["break_mag"]])[, 1]
@@ -119,11 +88,10 @@ test_that("dft_rast_break reduces a synthetic cube to a 2-band raster", {
   expect_true(any(is.finite(bd)))
   expect_true(any(is.na(bd)))
   expect_true(any(is.finite(bd) & bm < 0))
+})
 
-  # second call hits the cache (one break_<key>.nc)
-  breaks2 <- dft_rast_break(sc$cube, start = c(2022, 1),
-                            cache_dir = sc$cache_dir)
-  expect_equal(terra::values(breaks2[["break_date"]])[, 1], bd)
-  expect_length(list.files(file.path(sc$cache_dir, "break"),
-                           pattern = "^break_.*\\.nc$"), 1)
+test_that("dft_rast_break errors when frequency disagrees with the cadence", {
+  skip_if_not_installed("bfast")
+  stk <- synthetic_break_stack()  # monthly -> cadence 12
+  expect_error(dft_rast_break(stk, frequency = 1), "frequency")
 })
