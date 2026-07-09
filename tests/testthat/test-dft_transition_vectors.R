@@ -191,3 +191,70 @@ test_that("fixture decomposition is stable (regression guard)", {
   expect_equal(nrow(dft_transition_vectors(result$raster, patch_area_min = 1000)),
                57L)
 })
+
+# changes_only drops stable (from == to) patches before polygonizing. Dropping
+# stable cells to NA cannot merge or split any change patch (stable neighbours
+# were already different-valued boundaries), so the result must equal the default
+# result filtered to non-stable rows -- same change patches, same area_ha.
+test_that("changes_only == default filtered to non-stable rows", {
+  r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
+  r20 <- terra::rast(system.file("extdata", "example_2020.tif", package = "drift"))
+  classified <- dft_rast_classify(list("2017" = r17, "2020" = r20), source = "io-lulc")
+  result <- dft_rast_transition(classified, from = "2017", to = "2020")
+
+  is_stable <- function(labels) {
+    vapply(strsplit(labels, " -> ", fixed = TRUE),
+           function(p) identical(p[1], p[2]), logical(1))
+  }
+
+  all_p <- dft_transition_vectors(result$raster)
+  chg_p <- dft_transition_vectors(result$raster, changes_only = TRUE)
+
+  # no stable rows survive
+  expect_false(any(is_stable(chg_p$transition)))
+  expect_gt(nrow(chg_p), 0)
+
+  # same set of change patches as the default result filtered to non-stable
+  all_chg <- all_p[!is_stable(all_p$transition), ]
+  expect_equal(nrow(chg_p), nrow(all_chg))
+  expect_equal(sort(round(chg_p$area_ha, 6)), sort(round(all_chg$area_ha, 6)))
+  expect_setequal(unique(chg_p$transition), unique(all_chg$transition))
+})
+
+test_that("changes_only composes with patch_area_min and validates input", {
+  r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
+  r20 <- terra::rast(system.file("extdata", "example_2020.tif", package = "drift"))
+  classified <- dft_rast_classify(list("2017" = r17, "2020" = r20), source = "io-lulc")
+  result <- dft_rast_transition(classified, from = "2017", to = "2020")
+
+  # changes_only + area filter: still change-only, all areas >= threshold
+  chg_big <- dft_transition_vectors(result$raster, changes_only = TRUE,
+                                    patch_area_min = 500)
+  expect_true(all(chg_big$area_ha >= 500 / 1e4))
+  expect_true(nrow(chg_big) <= nrow(dft_transition_vectors(result$raster,
+                                                           changes_only = TRUE)))
+
+  # validation
+  expect_error(dft_transition_vectors(result$raster, changes_only = "yes"),
+               "logical")
+  expect_error(dft_transition_vectors(result$raster, changes_only = c(TRUE, FALSE)),
+               "logical")
+})
+
+test_that("empty result carries the zone column so per-zone results bind", {
+  r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
+  r20 <- terra::rast(system.file("extdata", "example_2020.tif", package = "drift"))
+  classified <- dft_rast_classify(list("2017" = r17, "2020" = r20), source = "io-lulc")
+  result <- dft_rast_transition(classified, from = "2017", to = "2020")
+
+  zv <- terra::as.polygons(terra::ext(result$raster))
+  terra::crs(zv) <- terra::crs(result$raster)
+  zones <- sf::st_as_sf(zv)
+  zones$zone_name <- "z1"
+
+  # patch_area_min above any real patch -> empty early return (path 1)
+  empty <- dft_transition_vectors(result$raster, zones = zones,
+                                  zone_col = "zone_name", patch_area_min = 1e12)
+  expect_equal(nrow(empty), 0)
+  expect_true("zone_name" %in% names(empty))
+})

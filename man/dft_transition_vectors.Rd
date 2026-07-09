@@ -4,7 +4,13 @@
 \alias{dft_transition_vectors}
 \title{Vectorize transition raster into individual change patches}
 \usage{
-dft_transition_vectors(x, zones = NULL, zone_col = NULL, patch_area_min = NULL)
+dft_transition_vectors(
+  x,
+  zones = NULL,
+  zone_col = NULL,
+  patch_area_min = NULL,
+  changes_only = FALSE
+)
 }
 \arguments{
 \item{x}{A factor \code{SpatRaster} from \code{\link[=dft_rast_transition]{dft_rast_transition()}} (the \verb{$raster}
@@ -18,16 +24,25 @@ Required when \code{zones} is supplied.}
 
 \item{patch_area_min}{Numeric or \code{NULL}. Minimum patch area in m². Patches
 smaller than this are dropped before returning. \code{NULL} (default) keeps all.}
+
+\item{changes_only}{Logical. When \code{TRUE}, drop stable (\code{from == to})
+transitions before polygonizing, so only actual change patches are
+vectorized. On a floodplain the stable mosaic is most of the grid, so this
+is the main memory lever for large AOIs. Default \code{FALSE} keeps every patch
+(including stable ones).}
 }
 \value{
 An \code{sf} data frame (polygon geometry) with columns:
 \itemize{
 \item \code{patch_id} (integer) — connected component ID, numbered in raster
-scan order
+scan order over the returned patches
 \item \code{transition} (character) — transition label (e.g. "Trees -> Rangeland")
 \item \code{area_ha} (numeric) — patch area in hectares
 \item Zone column (if \code{zones} supplied) — from spatial intersection
 }
+
+When \code{patch_area_min} or \code{changes_only} drop patches, \code{patch_id} is numbered
+over the surviving patches (dense \verb{1..n}), not the pre-filter grid.
 }
 \description{
 Convert a transition \code{SpatRaster} (from \code{\link[=dft_rast_transition]{dft_rast_transition()}}) into \code{sf}
@@ -53,4 +68,8 @@ head(patches)
 # Filter to large patches only
 patches_large <- dft_transition_vectors(result$raster, patch_area_min = 1000)
 head(patches_large)
+
+# Only actual changes (drop stable from == to patches before polygonizing)
+changes <- dft_transition_vectors(result$raster, changes_only = TRUE)
+head(changes)
 }

@@ -60,6 +60,12 @@ encoding as \code{raster}.
 Compare two classified rasters cell-by-cell and return a transition raster
 and summary table. Each pixel is encoded with its from→to class pair.
 }
+\details{
+The transition raster, filters, and patch removal are computed with streamed
+\code{terra} operations (\code{ifel}, \code{patches}, \code{freq}) on the underlying class codes —
+no full-grid vectors are pulled into R — so peak memory scales with the number
+of distinct transitions and patches, not the grid size.
+}
 \examples{
 r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
 r20 <- terra::rast(system.file("extdata", "example_2020.tif", package = "drift"))
