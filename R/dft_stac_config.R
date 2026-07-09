@@ -49,6 +49,8 @@ dft_stac_config <- function(source = c("io-lulc", "esa-worldcover",
       available_years = c(2020L, 2021L)
     ),
     "sentinel-2-l2a" = list(
+      # Cost: free — Microsoft Planetary Computer (Azure Open Data), no egress
+      # charge. Check egress terms before adding a requester-pays source.
       stac_url = "https://planetarycomputer.microsoft.com/api/stac/v1",
       collection = "sentinel-2-l2a",
       cube = TRUE,
@@ -76,6 +78,7 @@ dft_stac_config <- function(source = c("io-lulc", "esa-worldcover",
     )
     # "landsat-c2-l2" drops in with the same cube shape, no API change:
     #   list(
+    #     # Cost: free — Planetary Computer (Azure Open Data), no egress charge.
     #     stac_url = "https://planetarycomputer.microsoft.com/api/stac/v1",
     #     collection = "landsat-c2-l2",
     #     cube = TRUE,
