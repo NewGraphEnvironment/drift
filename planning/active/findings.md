@@ -113,6 +113,24 @@ After the drift 0.4.0 release, wire the field caller:
 `dft_transition_vectors()` (`:107`) and drop the post-hoc `from_class != to_class`
 filter (`:115`). Only then does NECR complete end-to-end. Separate floodplains PR/issue.
 
+## Phase 1 results (2026-07-09, `data-raw/benchmark_transition_oom.R`)
+
+- **Semantics gate: ALL PASS** on terra 1.9.11 — all 7 op-groups the rewrite rests on
+  hold (`*1L` factor-strip + no-mutation + NA-preserve; NA propagation through
+  `*/+/!=/&/ifel/%in%`; `%in%` FALSE-at-NA; `freq(int)` value==code / NA-excluded /
+  `sum(count)==n_nonNA`; empty-RHS `%in%` errors → guard confirmed; `classify`/`subst`
+  NA-out; `set.cats` on double-arith raster → factor). Ops used predate the 1.8-10
+  floor (stable terra features) → floor NOT bumped.
+- **Profiling (synthetic 2000×2000 = 4.0M cells, coherent 20-cell blocks, change_frac
+  0.05):** the transition raster has **4200 patches, of which 3748 (89%) are stable
+  `X -> X`** and only 452 are real changes. The current `dft_transition_vectors`
+  polygonizes ALL 4200; the field caller then discards the 3748 stable. → `changes_only`
+  cuts the `as.polygons` working set ~9× on this shape (and more as floodplain area
+  grows). Whole-process peak RSS ≈ 1.24 GB at 4M cells (current code); the R-side
+  full-grid vectors + stable-mosaic polygonize are what scale to NECR's OOM.
+- Confirms the two-driver diagnosis and the fix targets. Semantics-gate assertions are
+  the pre-implementation gate for Phase 3; they passed, so the rewrite proceeds.
+
 ## Git base note
 
 Branch `34-lulc-transition-classify-ooms-on-large-f` is off `origin/main` (6ba10bb), NOT

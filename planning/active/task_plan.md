@@ -12,7 +12,7 @@ documented follow-up.
 Full design + verified terra semantics in `findings.md`.
 
 ## Phase 1: Empirical gate + profiling harness (data-raw/, zero DESCRIPTION footprint)
-- [ ] `data-raw/benchmark_transition_oom.R`: (a) semantics smoke — assert `*1L`
+- [x] `data-raw/benchmark_transition_oom.R`: (a) semantics smoke — assert `*1L`
   factor-strip/NA/no-mutation, NA propagation through `*/+/!=/&/ifel/%in%`,
   `freq(integer)` value==code + NA-excluded + `sum(count)==n_nonNA`, empty-RHS
   `%in%`/`classify`/`subst` guarded, `p %in% small_ids` FALSE at `p==NA`, `set.cats`

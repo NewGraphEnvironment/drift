@@ -14,5 +14,10 @@
 - Created branch `34-lulc-transition-classify-ooms-on-large-f` off `origin/main`
   (6ba10bb), keeping `a5ef052` on local main only.
 - Scaffolded PWF baseline with approved phases.
-- Next: Phase 1 — `data-raw/benchmark_transition_oom.R` (terra semantics gate at the
-  1.8-10 floor + synthetic profiling attributing the two drivers).
+- **Phase 1 done** (commit pending): `data-raw/benchmark_transition_oom.R`. Semantics
+  gate ALL PASS on terra 1.9.11 (floor not bumped — ops predate 1.8-10). Profiling on a
+  4.0M-cell coherent synthetic: 4200 transition patches, **89% stable** (discarded by
+  the caller) → `changes_only` ~9× working-set cut; ~1.24 GB peak RSS (current code).
+  Two-driver diagnosis confirmed; rewrite cleared to proceed.
+- Next: Phase 2 — golden-output correctness harness (capture current
+  `dft_rast_transition` outputs across the param matrix before the rewrite).
