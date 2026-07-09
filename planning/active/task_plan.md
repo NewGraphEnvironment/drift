@@ -12,11 +12,11 @@ single-cube behavior, existing caches preserved. Sibling cube-path residual is
 tracked separately as #38 (out of scope).
 
 ## Phase 1: `tile_grid()` + `tile_size` normalization (offline, tests first)
-- [ ] validation aborts: `NA`, `0`, negative, `Inf`, `c(1,2)`, `"500"`, snapped `< res`
-- [ ] snapping: non-multiple snaps to nearest multiple of `res`, messages, snapped value used
-- [ ] intersecting subset: a diagonal/L-shaped AOI in a known bbox keeps exactly the expected tiles, drops empty ones, kept-count ≪ full grid (the efficiency mechanism, offline)
-- [ ] res-alignment: every extent's `left-xmin`, width, height are exact multiples of `res`; first tile lower-left `== (xmin, ymin)`; single-tile when `tile_size ≥ bbox`; empty/degenerate AOI aborts
-- [ ] implement `tile_grid()` + normalization; new tests green
+- [x] validation aborts: `NA`, `0`, negative, `Inf`, `c(1,2)`, `"500"`, snapped `< res`
+- [x] snapping: non-multiple snaps to nearest multiple of `res`, messages, snapped value used
+- [x] intersecting subset: a diagonal/L-shaped AOI in a known bbox keeps exactly the expected tiles, drops empty ones, kept-count ≪ full grid (the efficiency mechanism, offline)
+- [x] res-alignment: every extent's `left-xmin`, width, height are exact multiples of `res`; first tile lower-left `== (xmin, ymin)`; single-tile when `tile_size ≥ bbox`; empty/degenerate AOI aborts
+- [x] implement `tile_grid()` + normalization; new tests green
 
 ## Phase 2: cache key — conditional `tile_size` append (offline)
 - [ ] golden regression: `cache_key(tile_size = NULL)` == frozen current 12-char hash for fixed inputs (guards legacy-cache preservation)

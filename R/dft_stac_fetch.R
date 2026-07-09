@@ -179,6 +179,73 @@ stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
 }
 
 
+#' Validate and snap a download `tile_size` to the pixel grid
+#'
+#' `tile_size` (CRS units) controls the download-tiling grid (#36). It is
+#' snapped to a multiple of `res` so every tile's pixel grid aligns to the same
+#' `res`-lattice — a prerequisite for a seam-free `terra::merge()` of the tiles.
+#' Caller only invokes this for a non-NULL `tile_size`; `NULL` gates the whole
+#' tiled path upstream. Returns the snapped size (a single positive numeric).
+#' @noRd
+tile_size_check <- function(tile_size, res) {
+  if (!is.numeric(tile_size) || length(tile_size) != 1L ||
+        !is.finite(tile_size) || tile_size <= 0) {
+    cli::cli_abort(c(
+      "{.arg tile_size} must be a single positive finite number (CRS units) \\
+       or {.code NULL}.",
+      "x" = "Got {.obj_type_friendly {tile_size}}."
+    ))
+  }
+  snapped <- round(tile_size / res) * res
+  if (snapped < res) {
+    cli::cli_abort(c(
+      "{.arg tile_size} ({tile_size}) snaps to {snapped}, smaller than \\
+       {.arg res} ({res}).",
+      "i" = "Choose a {.arg tile_size} at least as large as {.arg res}."
+    ))
+  }
+  if (!isTRUE(all.equal(snapped, tile_size))) {
+    cli::cli_inform(
+      "{.arg tile_size} snapped from {tile_size} to {snapped} \\
+       (a multiple of {.arg res} = {res})."
+    )
+  }
+  snapped
+}
+
+
+#' Build the res-aligned download tiles that intersect the AOI
+#'
+#' Splits the AOI bounding box into a grid of `tile_size`-square cells anchored
+#' at the bbox lower-left (the same origin as the single-cube extent), and keeps
+#' only cells that intersect the AOI polygon — so a thin corridor fetches near
+#' its footprint, not its full bbox (#36). Boundary cells are left un-trimmed
+#' past the bbox: trimming the max edge would break `res`-alignment, and the
+#' `< tile_size` overhang is dropped by the final `terra::mask()` anyway.
+#' `tile_size` must already be snapped (see [tile_size_check()]).
+#' @return A list of `list(left, right, bottom, top)` extents for [gdalcubes::cube_view()].
+#' @noRd
+tile_grid <- function(aoi_target, tile_size, res) {
+  bbox <- sf::st_bbox(aoi_target)
+  grid <- sf::st_make_grid(
+    sf::st_as_sfc(bbox),
+    cellsize = tile_size,
+    offset = c(bbox[["xmin"]], bbox[["ymin"]])
+  )
+  aoi_union <- sf::st_union(sf::st_geometry(aoi_target))
+  grid <- grid[lengths(sf::st_intersects(grid, aoi_union)) > 0]
+  if (length(grid) == 0) {
+    cli::cli_abort("No download tiles intersect the AOI \\
+                    (is the AOI geometry valid and non-empty?).")
+  }
+  lapply(grid, function(cell) {
+    b <- sf::st_bbox(cell)
+    list(left = b[["xmin"]], right = b[["xmax"]],
+         bottom = b[["ymin"]], top = b[["ymax"]])
+  })
+}
+
+
 #' Auto-detect UTM EPSG code from sf geometry
 #' @noRd
 auto_utm_epsg <- function(x) {
