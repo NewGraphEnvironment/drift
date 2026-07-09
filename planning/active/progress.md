@@ -19,5 +19,10 @@
   4.0M-cell coherent synthetic: 4200 transition patches, **89% stable** (discarded by
   the caller) → `changes_only` ~9× working-set cut; ~1.24 GB peak RSS (current code).
   Two-driver diagnosis confirmed; rewrite cleared to proceed.
-- Next: Phase 2 — golden-output correctness harness (capture current
-  `dft_rast_transition` outputs across the param matrix before the rewrite).
+- **Phase 2 done** (commit pending): added a golden-snapshot test to
+  `test-dft_rast_transition.R` capturing summary + raster cats/freq + removed across
+  8 param combos (default, from_class, both filters, patch_area_min ∈ {0,500,1000,1e9},
+  impossible). Canonicalized (sorted) digest → content-strict, order-independent.
+  `expect_snapshot_value(style="serialize")` golden at `_snaps/dft_rast_transition.md`.
+  Fixed empty-case handling (cats()[[1]] NULL + freq() errors on all-NA). 44 pass, 0 skip.
+- Next: Phase 3 — terra-native rewrite of `dft_rast_transition`; the golden must stay green.

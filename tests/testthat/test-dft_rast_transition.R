@@ -331,3 +331,69 @@ test_that("removed + raster account for all transition pixels", {
 
   expect_equal(n_kept + n_removed, n_changed_unfiltered)
 })
+
+# Golden-output contract for the #34 terra-native rewrite. Captures the full
+# behavior (summary tibble + raster factor levels/frequencies + removed raster)
+# across the parameter matrix as a snapshot, so the memory rewrite can be proven
+# byte-identical. Digest is canonicalized (sorted) so it pins content, not the
+# internal cell/tie order.
+test_that("dft_rast_transition output is stable across the terra-native rewrite (#34)", {
+  r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
+  r20 <- terra::rast(system.file("extdata", "example_2020.tif", package = "drift"))
+  classified <- dft_rast_classify(list("2017" = r17, "2020" = r20), source = "io-lulc")
+
+  # both helpers normalize the empty/all-NA raster (cats()[[1]] is NULL and
+  # freq() errors there) to a canonical empty frame so old and new agree.
+  freq_df <- function(r) {
+    f <- tryCatch(terra::freq(r), error = function(e) NULL)
+    if (is.null(f) || nrow(f) == 0) {
+      return(data.frame(value = character(0), count = integer(0)))
+    }
+    f <- f[!is.na(f$value), c("value", "count"), drop = FALSE]
+    f <- f[order(as.character(f$value)), , drop = FALSE]
+    rownames(f) <- NULL
+    f
+  }
+  cats_df <- function(r) {
+    ct <- terra::cats(r)[[1]]
+    if (is.null(ct) || nrow(ct) == 0) {
+      return(data.frame(id = integer(0), transition = character(0)))
+    }
+    ct <- ct[order(ct$id), , drop = FALSE]
+    rownames(ct) <- NULL
+    ct
+  }
+  digest <- function(res) {
+    summ <- as.data.frame(
+      res$summary[order(res$summary$from_class, res$summary$to_class), , drop = FALSE]
+    )
+    rownames(summ) <- NULL
+    list(
+      summary     = summ,
+      raster_cats = cats_df(res$raster),
+      raster_freq = freq_df(res$raster),
+      removed     = if (is.null(res$removed)) "NULL"
+                    else list(cats = cats_df(res$removed), freq = freq_df(res$removed))
+    )
+  }
+
+  cases <- list(
+    default      = list(),
+    from_trees   = list(from_class = "Trees"),
+    both_filters = list(from_class = "Trees",
+                        to_class = c("Crops", "Rangeland", "Bare Ground")),
+    pmin_0       = list(patch_area_min = 0),
+    pmin_500     = list(patch_area_min = 500),
+    pmin_1000    = list(patch_area_min = 1000),
+    pmin_huge    = list(patch_area_min = 1e9),
+    impossible   = list(from_class = "NoSuchClass")
+  )
+
+  digests <- lapply(cases, function(args) {
+    res <- do.call(dft_rast_transition,
+                   c(list(classified, from = "2017", to = "2020"), args))
+    digest(res)
+  })
+
+  expect_snapshot_value(digests, style = "serialize", tolerance = 1e-8)
+})

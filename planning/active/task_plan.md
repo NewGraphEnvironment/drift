@@ -23,7 +23,7 @@ Full design + verified terra semantics in `findings.md`.
   attributing the two drivers. Proceed only if semantics gates pass.
 
 ## Phase 2: Golden-output correctness harness (capture current behavior first)
-- [ ] Extend `tests/testthat/test-dft_rast_transition.R` with a byte-identical golden
+- [x] Extend `tests/testthat/test-dft_rast_transition.R` with a byte-identical golden
   capture on the packaged fixture across: default; `from_class="Trees"`; both filters;
   `patch_area_min ∈ {NULL,0,500,1000,1e9}`; impossible-filter. Snapshot `summary`,
   `raster` cats + `freq(value,count)`, `removed` cats. This is the rewrite's contract.
