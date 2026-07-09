@@ -147,9 +147,9 @@ mk_synthetic_pair <- function(ncol, nrow, change_frac = 0.05, block = 20L) {
   list("2017" = mk(coarse_from), "2023" = mk(coarse_to))
 }
 
-run_profile <- function(ncol, nrow, change_frac) {
+run_profile <- function(ncol, nrow, change_frac, block = 20L) {
   devtools::load_all(quiet = TRUE)
-  pair <- mk_synthetic_pair(ncol, nrow, change_frac)
+  pair <- mk_synthetic_pair(ncol, nrow, change_frac, block = block)
   cat(sprintf("Synthetic %d x %d = %.1fM cells, change_frac=%.3f\n",
               terra::ncol(pair[[1]]), terra::nrow(pair[[1]]),
               terra::ncell(pair[[1]]) / 1e6, change_frac))
@@ -159,12 +159,19 @@ run_profile <- function(ncol, nrow, change_frac) {
   # the stable ones. Report both so before/after (this branch) is comparable.
   trans <- drift::dft_rast_transition(pair, from = "2017", to = "2023",
                                       patch_area_min = 500)
-  v_all <- drift::dft_transition_vectors(trans$raster)   # current behavior (all)
-  n_stable <- sum(vapply(strsplit(v_all$transition, " -> ", fixed = TRUE),
-                         function(p) identical(p[1], p[2]), logical(1)))
-  cat(sprintf("dft_transition_vectors (current): %d patches total, %d stable (%.0f%%), %d change\n",
-              nrow(v_all), n_stable, 100 * n_stable / nrow(v_all),
-              nrow(v_all) - n_stable))
+  mode <- if (length(commandArgs(TRUE)) >= 5) commandArgs(TRUE)[5] else "all"
+  if (identical(mode, "changes")) {
+    v <- drift::dft_transition_vectors(trans$raster, changes_only = TRUE)
+    cat(sprintf("dft_transition_vectors(changes_only=TRUE): %d patches polygonized\n",
+                nrow(v)))
+  } else {
+    v_all <- drift::dft_transition_vectors(trans$raster)   # default (all patches)
+    n_stable <- sum(vapply(strsplit(v_all$transition, " -> ", fixed = TRUE),
+                           function(p) identical(p[1], p[2]), logical(1)))
+    cat(sprintf("dft_transition_vectors(default): %d patches total, %d stable (%.0f%%), %d change\n",
+                nrow(v_all), n_stable, 100 * n_stable / nrow(v_all),
+                nrow(v_all) - n_stable))
+  }
 }
 
 # ---- dispatch ---------------------------------------------------------------
@@ -177,7 +184,8 @@ if (length(args) == 0 || args[1] == "semantics") {
 } else if (args[1] == "profile") {
   run_profile(as.integer(arg_or(args[2], 3000)),
               as.integer(arg_or(args[3], 3000)),
-              as.numeric(arg_or(args[4], 0.05)))
+              as.numeric(arg_or(args[4], 0.05)),
+              block = as.integer(arg_or(args[6], 20)))
 } else {
   stop("unknown mode: ", args[1])
 }

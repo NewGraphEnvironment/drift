@@ -150,6 +150,34 @@ filter (`:115`). Only then does NECR complete end-to-end. Separate floodplains P
   ESA WorldCover 3-digit codes). Producer-only peak RSS at 16M cells (patch_area_min=500):
   **2.66 GB (old) → 1.63 GB (new)**, gap widening with grid size.
 
+## Phase 4 result (2026-07-09)
+
+- Added `changes_only = FALSE` to `dft_transition_vectors`: derive stable ids from
+  `cats(x)` (`id %/% 1000 == id %% 1000`), `subst`+`mask` to NA them before
+  `patches`/`as.polygons`. **Correctness property (proven):** NA-ing stable cells
+  cannot merge/split any change patch (stable neighbours were already different-valued
+  boundaries; 8-diagonal adjacency is direct regardless of the two orthogonal corners),
+  so `changes_only=TRUE` == the default result filtered to non-stable rows — same change
+  patches, same `area_ha`. Unit-tested.
+- Small-patch raster pre-filter: `freq(p)` → `subst` small pids → NA before
+  `as.polygons`; trailing `st_area` filter kept → byte-identical (pre-filter's
+  `count*cell_area < min` drops are a strict subset; at 10 m cells the threshold lands
+  on multiples of 100, no float boundary flip). Pinned 185/123.11/57 unchanged.
+- **The blocky-vs-fragmented lesson:** on a blocky synthetic (20-cell coherent blocks,
+  9M cells) `changes_only` cuts patches 89% but peak RSS barely moves (1.71 vs 1.73 GB)
+  because `as.polygons` isn't the peak there — the raster ops are. On a **fragmented**
+  synthetic (block=3, 9M cells, 415k patches — NECR-like braided floodplain geometry
+  where `as.polygons` DOES dominate): default 415,705 patches / **3.83 GB** →
+  `changes_only=TRUE` 44,537 patches / **1.71 GB** — a **55% peak cut**. So the field
+  OOM lever is realized precisely when the floodplain is fragmented, matching the NECR
+  report.
+- `/code-check` round 1: additions correct; found a pre-existing fragility that
+  `changes_only` amplifies — the empty-return early exit dropped the zone column, so an
+  all-stable (under `changes_only`) sub-basin returned a 0-row sf without `zone_col` →
+  downstream `bind_rows` schema mismatch in the per-sub-basin field loop. Fixed
+  (empty return now carries `zone_col`); verified rbind + bind_rows across empty +
+  non-empty per-zone results.
+
 ## Git base note
 
 Branch `34-lulc-transition-classify-ooms-on-large-f` is off `origin/main` (6ba10bb), NOT

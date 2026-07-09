@@ -29,4 +29,10 @@
   byte-identical; 303 pass / 4 skip; lint clean; /code-check round 1 Clean. Hit the
   imported-terra `%in%` non-dispatch gotcha (→ `subst`) and the freq-on-all-NA error
   (→ tryCatch). Producer peak RSS at 16M cells: 2.66 → 1.63 GB.
-- Next: Phase 4 — vectorizer `changes_only` + small-patch raster pre-filter.
+- **Phase 4 done** (commit pending): `dft_transition_vectors` gained `changes_only`
+  (raster-level stable drop before as.polygons) + small-patch pre-filter. Proven
+  equivalence (changes_only == default-filtered-to-non-stable); 185/123.11/57 green;
+  314 pass. /code-check round 1 found + I fixed a pre-existing empty-return zone-col gap.
+  Fragmented 9M-cell benchmark (NECR-like): 3.83 GB → 1.71 GB (55% cut) with changes_only.
+- Next: Phase 5 — docs/NEWS/version bump 0.3.0→0.4.0, floodplains follow-up note,
+  close #34 + #28.

@@ -41,13 +41,16 @@ Full design + verified terra semantics in `findings.md`.
   16M cells: 2.66 GB (old) → 1.63 GB (new).
 
 ## Phase 4: Vectorizer working-set cap (#34 core)
-- [ ] `R/dft_transition_vectors.R`: add `changes_only = FALSE` (raster-level stable
-  drop before `as.polygons`); add small-patch raster pre-filter (keep trailing
-  `st_area` filter). Roxygen: document `changes_only`; note `patch_id` densening
-  under filtering.
-- [ ] New tests: `changes_only=TRUE` drops stable / keeps changes / survivor `area_ha`
-  unchanged; existing 185/123.11/57 stay green on the default path; `as.polygons`
-  peak drops on the Phase-1 synthetic high-patch grid.
+- [x] `R/dft_transition_vectors.R`: added `changes_only = FALSE` (raster-level stable
+  drop via `subst`+`mask` before `as.polygons`); small-patch raster pre-filter (keep
+  trailing `st_area` filter). Roxygen documents `changes_only` + `patch_id` densening.
+  Also fixed a pre-existing empty-return schema gap (zone col dropped) that
+  `changes_only` amplifies — /code-check round-1 finding.
+- [x] New tests: `changes_only=TRUE` == default filtered to non-stable (same change
+  patches + `area_ha`); composes with `patch_area_min`; validates input; empty result
+  carries the zone col (binds cleanly). 185/123.11/57 stay green. Full suite 314 pass.
+  Fragmented 9M-cell benchmark (as.polygons-dominated, NECR-like): 415k patches / 3.83 GB
+  (default) → 44k / 1.71 GB (`changes_only`) — 55% peak cut.
 
 ## Phase 5: Docs, NEWS, release, close #34 + #28
 - [ ] `devtools::document()`; `lintr::lint_package()` clean; full `devtools::test()`.
