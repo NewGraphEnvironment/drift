@@ -36,14 +36,15 @@ network-decoupled vignette. **Whole pipeline on one branch, single 0.3.0 release
 - [x] `tests/testthat/test-dft_rast_break.R` + `helper-break.R`: gdalcubes/bfast-missing guards; `cadence_frequency` mapping; `.dft_break_pixel` NA/short-input no-skip; `build_break_reducer` no-free-vars (codetools); `break_cache_key` per-param; bfast-gated step-drop (finite date, mag<0) + stable-series (NA); gdalcubes+bfast synthetic-cube integration. 30 assertions green. **Code-check Clean** (serialization verified in a fresh process)
 
 ## Phase 5: Vignette + docs + release
-- [ ] `data-raw/vignette_data_break.R` (network + bfast + `spacehakr` — **data-raw only, zero DESCRIPTION footprint**): `dft_stac_cube()` → `dft_rast_break()` on `example_aoi.gpkg`; optional QA chips via `spacehakr::spk_stac_calc()`; save `terra::wrap()`ed break raster (+ chips) to `inst/testdata/`; header notes network+bfast requirement
-- [ ] `vignettes/trajectory-break-detection.Rmd` (`bookdown::html_document2`, matches existing): load committed artifact (`terra::unwrap`/`rast`) — no STAC/bfast at build; break_date + break_mag maps (diverging palette, neg=scour), AOI outline, sample pixel kNDVI trajectories with detected breakpoint marked
-- [ ] `devtools::document()`; `lintr::lint_package()` clean; full `devtools::test()` passes (network/bfast-gated tests skip appropriately)
-- [ ] File follow-up issue(s): optional bolt-on (label breaks → from-to via `dft_rast_transition()` + IO LULC sampling; #19-dependent, out of scope here); per-scene S2 baseline-04.00 offset harmonization (accepted-bias documented for now, kNDVI robust)
-- [ ] NEWS.md `0.3.0` section; bump DESCRIPTION `0.2.4 → 0.3.0` as the **final** commit
+- [x] `data-raw/vignette_data_break.R`: `dft_stac_cube()` (growing-season, offset-split) → `dft_rast_break()` on `example_aoi.gpkg`; clip to AOI polygon; save `terra::wrap()`ed break raster + a few pixel trajectories to `inst/testdata/neexdzii_break.rds` (132 KB). Header notes network+bfast requirement. (spacehakr QA chips deferred — not needed; the trajectory panels come from the cube itself)
+- [x] `vignettes/trajectory-break-detection.Rmd` (`bookdown::html_document2`): loads the committed artifact — no STAC/bfast at build; break_mag map (diverging palette, neg=scour), break_date map, AOI outline, scour-vs-stable kNDVI trajectories with the detected break marked. **Renders clean.**
+- [x] `devtools::document()`; `lintr::lint_package()` clean; full `devtools::test()` passes (286 pass, network/bfast-gated tests skip)
+- [x] File follow-up issues: #31 (bolt-on labels), #32 (AOI-polygon clip). The S2 offset was NOT deferred — implemented via the baseline-conditional split (offset half of #32 closed)
+- [x] NEWS.md `0.3.0` section
+- [ ] Bump DESCRIPTION `0.2.4 → 0.3.0` as the **final** commit
 
 ## Validation
-- [ ] Tests pass (`devtools::test()`), network/bfast tests skip cleanly
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass (`devtools::test()`), network/bfast tests skip cleanly (286 pass)
+- [x] `/code-check` clean on each commit (6 fresh-eyes reviews; all real issues fixed)
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
