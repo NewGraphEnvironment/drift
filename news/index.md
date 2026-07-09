@@ -1,5 +1,43 @@
 # Changelog
 
+## drift 0.4.0
+
+- Categorical land-cover change detection no longer exhausts memory on
+  large-floodplain AOIs
+  ([\#34](https://github.com/NewGraphEnvironment/drift/issues/34),
+  [\#28](https://github.com/NewGraphEnvironment/drift/issues/28)).
+  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  was rewritten to stream entirely through `terra` — transitions are
+  encoded and filtered with raster arithmetic,
+  [`terra::subst()`](https://rspatial.github.io/terra/reference/subst.html),
+  [`patches()`](https://rspatial.github.io/terra/reference/patches.html),
+  and a single
+  [`terra::freq()`](https://rspatial.github.io/terra/reference/freq.html),
+  with no
+  [`terra::values()`](https://rspatial.github.io/terra/reference/values.html)
+  pull and no full-grid R vectors — so peak memory scales with the
+  number of distinct transitions and patches, not the grid size
+  (producer-only peak at 16M cells dropped from 2.66 GB to 1.63 GB).
+  Output is byte-identical to the previous version, verified by a golden
+  snapshot across the full parameter matrix.
+- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  gains `changes_only` (default `FALSE`): when `TRUE`, stable
+  (`from == to`) transitions are dropped at the raster level before
+  polygonizing, so
+  [`terra::as.polygons()`](https://rspatial.github.io/terra/reference/as.polygons.html)
+  only builds geometry for actual change patches. On a fragmented
+  floodplain — where the stable mosaic is most of the grid and
+  polygonization dominates memory — this roughly halves peak use (a
+  9M-cell, 415k-patch benchmark went from 3.83 GB to 1.71 GB). The
+  result equals the default output filtered to change patches. When
+  `patch_area_min` is set, small patches are also dropped before
+  polygonizing, with identical output.
+- `patch_id` in
+  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  is numbered over the surviving patches when filtering drops any, and
+  an empty result now carries the zone column so per-zone results bind
+  cleanly.
+
 ## drift 0.3.0
 
 - Continuous index-trajectory change detection for floodplain reaches

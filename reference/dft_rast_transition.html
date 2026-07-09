@@ -9,7 +9,7 @@ and summary table. Each pixel is encoded with its from→to class pair."><meta p
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.4.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,6 +118,13 @@ filtering.</p></dd>
 filtering, or <code>NULL</code> when no filtering is applied. Same factor
 encoding as <code>raster</code>.</p></li>
 </ul></div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The transition raster, filters, and patch removal are computed with streamed
+<code>terra</code> operations (<code>ifel</code>, <code>patches</code>, <code>freq</code>) on the underlying class codes —
+no full-grid vectors are pulled into R — so peak memory scales with the number
+of distinct transitions and patches, not the grid size.</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

@@ -83,6 +83,14 @@ A list with three elements:
   filtering, or `NULL` when no filtering is applied. Same factor
   encoding as `raster`.
 
+## Details
+
+The transition raster, filters, and patch removal are computed with
+streamed `terra` operations (`ifel`, `patches`, `freq`) on the
+underlying class codes — no full-grid vectors are pulled into R — so
+peak memory scales with the number of distinct transitions and patches,
+not the grid size.
+
 ## Examples
 
 ``` r
