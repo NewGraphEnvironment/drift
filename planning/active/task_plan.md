@@ -48,8 +48,18 @@ approved the reframe.
 - [x] Generator precomputes break + trend + LULC-QA table + grouped trajectory (AOI-restricted groups) → artifact
 - [x] Render + `R CMD check` (0/0/1 spurious-timestamp) + `lintr` clean + `/code-check` (stats verified correct; added nlyr>=2 + min_obs>=2 guards for clean failure); commit on PR #33
 
+## Phase 7: Interactive map + patch-level reframe (user-driven)
+
+Reconciling with the user's own imagery: 2 real cutblocks in the floodplain align with red
+patches in the trend/break maps → the tools DO catch real harvest in spots; some red outside the
+LULC polygons = removal LULC missed → complementary. User steered: drop whole-floodplain averaging,
+add an interactive map (as close to the LULC vignette's as possible), scientific (non-advocacy) tone.
+
+- [x] Generator: LULC Trees→Rangeland transition polygons via `dft_rast_transition` + `dft_transition_vectors` (filtered to the actual loss transition, NOT stable "Trees→Trees" which looked like the whole AOI); dropped the aggregate QA table + 3-group averaged trajectory + an auto cut-patch trajectory (couldn't reliably auto-pick a clean cutblock — interactive map is the honest verifier)
+- [x] Vignette: rebuilt around patchy/complementary framing (red in/out/absent vs LULC outline); interactive leaflet mirroring `dft_map_interactive` basemaps (Light/Esri/Google/OpenTopoMap) + centering, with break/trend rasters + beige (#e3e2c3) Trees→Rangeland polygons + AOI, toggleable/fullscreen; trend relabeled "per year 2017-2023"; opening paragraph reworded to a neutral methods-first tone
+- [x] `/code-check` Clean (contract/CRS/leaflet verified; removed an unused `aoi_v`) + `R CMD check` 0/0/1-spurious + lint clean + commit on PR #33
+
 ## Validation
 - [x] Tests pass (302); check clean (0 err / 0 warn / 1 spurious NOTE)
-- [x] PWF checkboxes match landed work
 - [x] Commits on PR #33, not a new branch
 - [ ] `/planning-archive` on completion
