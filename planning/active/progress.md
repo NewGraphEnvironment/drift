@@ -20,5 +20,9 @@
   distinctly. Test helper snaps via `tile_size_check` to mirror production
   (504≡500). 45 pass / 1 skip; lint + code-check clean. Call-site wiring
   deferred to Phase 4 (arrives with the fetch param).
-- Next: Phase 3 (extract `fetch_extent_to()`; refactor untiled path, no
-  behavior change).
+- Phase 3 done: extracted `fetch_extent_to()` (cube_view + raster_cube +
+  write_ncdf); untiled path routes through it writing straight to the existing
+  `<yr>_<key>.nc` — faithful code-motion, cube_view built identically, 45 pass /
+  1 skip, lint clean. Shared primitive de-risks Phase 4 (tiles reuse it).
+- Next: Phase 4 (tiled branch — per-tile fetch → terra::merge → .tif → mask;
+  wire `tile_size` end-to-end; offline merge oracle + opt-in network e2e).

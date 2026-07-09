@@ -24,8 +24,8 @@ tracked separately as #38 (out of scope).
 - [x] `stac_cache_key()` gains `tile_size = NULL`; appends only when non-NULL (real call-site wiring lands in Phase 4 with the fetch param); tests green
 
 ## Phase 3: extract `fetch_extent_to()`, refactor untiled path (behavior-preserving)
-- [ ] extract helper; untiled path routes through it, writing straight to `<yr>_<key>.nc` — identical filename/format
-- [ ] existing tests + opt-in untiled network test still green (no observable change)
+- [x] extract helper; untiled path routes through it, writing straight to `<yr>_<key>.nc` — identical filename/format
+- [x] existing offline tests green (45/1 skip); faithful code-motion (cube_view built identically); the Phase 4 network e2e exercises the shared primitive end-to-end
 
 ## Phase 4: tiled branch — mosaic assembly + wire `tile_size` end-to-end
 - [ ] offline merge oracle: reference SpatRaster split into res-lattice tiles → `terra::merge()` → `all.equal(values(merged), values(reference))`; masked mosaic == masked reference over AOI; `.tif` round-trip preserves single-layer integer codes

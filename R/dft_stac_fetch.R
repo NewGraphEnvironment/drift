@@ -127,23 +127,12 @@ dft_stac_fetch <- function(aoi,
       r <- terra::rast(cache_file)
     } else {
       message("  ", yr, ": fetching...")
-      v <- gdalcubes::cube_view(
-        srs = target_crs,
-        extent = list(
-          left   = bbox_target["xmin"],
-          right  = bbox_target["xmax"],
-          bottom = bbox_target["ymin"],
-          top    = bbox_target["ymax"],
-          t0 = paste0(yr, "-01-01"),
-          t1 = paste0(yr, "-12-31")
-        ),
-        dx = res, dy = res,
-        dt = dt,
-        aggregation = aggregation,
-        resampling = resampling
+      ext <- list(
+        left = bbox_target[["xmin"]], right = bbox_target[["xmax"]],
+        bottom = bbox_target[["ymin"]], top = bbox_target[["ymax"]]
       )
-      cube <- gdalcubes::raster_cube(col, v)
-      gdalcubes::write_ncdf(cube, cache_file, overwrite = TRUE)
+      fetch_extent_to(col, ext, paste0(yr, "-01-01"), paste0(yr, "-12-31"),
+                      target_crs, res, dt, aggregation, resampling, cache_file)
       r <- terra::rast(cache_file)
     }
 
@@ -248,6 +237,33 @@ tile_grid <- function(aoi_target, tile_size, res) {
     list(left = b[["xmin"]], right = b[["xmax"]],
          bottom = b[["ymin"]], top = b[["ymax"]])
   })
+}
+
+
+#' Fetch one gdalcubes cube over a single space+time extent to a NetCDF file
+#'
+#' The `cube_view` + `raster_cube` + `write_ncdf` block shared by the untiled
+#' fetch (one call over the AOI bbox) and the tiled fetch (one call per tile,
+#' #36). Sharing this primitive is what guarantees a tile fetches identically to
+#' the corresponding slice of the untiled cube. `ext` is a list with
+#' `left`/`right`/`bottom`/`top`; `t0`/`t1` bound the year. Writes to `out_nc`
+#' and returns it (the caller reads it back with [terra::rast()]).
+#' @noRd
+fetch_extent_to <- function(col, ext, t0, t1, target_crs, res, dt,
+                            aggregation, resampling, out_nc) {
+  v <- gdalcubes::cube_view(
+    srs = target_crs,
+    extent = list(
+      left = ext$left, right = ext$right,
+      bottom = ext$bottom, top = ext$top,
+      t0 = t0, t1 = t1
+    ),
+    dx = res, dy = res, dt = dt,
+    aggregation = aggregation, resampling = resampling
+  )
+  cube <- gdalcubes::raster_cube(col, v)
+  gdalcubes::write_ncdf(cube, out_nc, overwrite = TRUE)
+  out_nc
 }
 
 
