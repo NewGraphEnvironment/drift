@@ -15,10 +15,10 @@ into the read. Real wins: polygon-tight output by default + a modest reducer spe
 Fetch-time streaming stays bbox-bound (documented residual).
 
 ## Phase 1: Test contract (failing first)
-- [ ] `cube_key()` helper gains `clip`; `cube_key(clip = FALSE) != base` assertion added
-- [ ] `stac_cube_clip()` offline masking unit test (synthetic raster + polygon)
-- [ ] opt-in network e2e asserts a bbox-corner cell is all-`NA` under default clip
-- [ ] confirm the new tests FAIL against current code
+- [x] `cube_key()` helper gains `clip`; `cube_key(clip = FALSE) != base` assertion added
+- [x] `stac_cube_clip()` offline masking unit test (synthetic raster + polygon)
+- [x] opt-in network e2e asserts a bbox-corner cell is all-`NA` under default clip
+- [x] confirm the new tests FAIL against current code (FAIL 6 | SKIP 2 | PASS 1)
 
 ## Phase 2: Implement clip
 - [ ] `clip = TRUE` param + `stac_cube_clip()` helper + apply after stk assembly

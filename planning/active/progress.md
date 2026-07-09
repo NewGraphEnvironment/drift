@@ -13,4 +13,11 @@
   (user decision — it's redundant with the archived findings/task_plan).
 - Created branch `32-dft-stac-cube-restore-aoi-polygon-clip-f` off main.
 - Scaffolded PWF baseline with approved phases.
-- Next: Phase 1 — write the failing test contract.
+- Phase 1 (commit pending): wrote the test contract — `clip` threaded through the
+  `cube_key()` helper + `cube_key(clip = FALSE) != base`; offline `stac_cube_clip()`
+  masking test (synthetic raster + half-covering polygon); network e2e high-NA-fraction
+  assertion under default clip. Confirmed red against current code (FAIL 6 | SKIP 2 |
+  PASS 1): 5 cache-key tests error on `unused argument (clip)`, offline test on
+  `object 'stac_cube_clip' not found`. `/code-check` deferred to the Phase 2 impl diff
+  (Phase 1 is test-only, self-reviewed).
+- Next: Phase 2 — implement `clip` param + helper + cache-key wiring.
