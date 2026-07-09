@@ -65,7 +65,8 @@ Full design + verified terra semantics in `findings.md`.
   0 errors / 0 warnings / 0 notes.
 
 ## Validation
-- [ ] Tests pass (`devtools::test()`); network/bfast tests skip cleanly
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass (`devtools::test()` 314 pass / 4 skip); network/bfast tests skip cleanly
+- [x] `/code-check` clean on each commit (Phase 3 round-1 clean; Phase 4 round-1 found +
+  fixed one pre-existing empty-return zone-col gap)
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
