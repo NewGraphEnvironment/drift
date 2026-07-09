@@ -34,5 +34,11 @@
   equivalence (changes_only == default-filtered-to-non-stable); 185/123.11/57 green;
   314 pass. /code-check round 1 found + I fixed a pre-existing empty-return zone-col gap.
   Fragmented 9M-cell benchmark (NECR-like): 3.83 GB → 1.71 GB (55% cut) with changes_only.
-- Next: Phase 5 — docs/NEWS/version bump 0.3.0→0.4.0, floodplains follow-up note,
-  close #34 + #28.
+- **Phase 5 (docs) done** (commit pending): NEWS.md 0.4.0 section; floodplains
+  follow-up documented in findings.md. Version bump to follow as the final commit.
+- Floodplains follow-up (user to wire/file): in
+  `floodplains/scripts/floodplain_lcc/03_lulc_classify.R`, pass `changes_only = TRUE`
+  to `dft_transition_vectors()` (:107) and drop the post-hoc `from!=to` filter (:115).
+  Only then does NECR complete end-to-end. Separate floodplains PR/issue (drift-only
+  decision this branch).
+- Next: Release v0.4.0 (DESCRIPTION bump) → /planning-archive → /gh-pr-push.

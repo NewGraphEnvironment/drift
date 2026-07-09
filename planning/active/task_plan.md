@@ -53,14 +53,15 @@ Full design + verified terra semantics in `findings.md`.
   (default) → 44k / 1.71 GB (`changes_only`) — 55% peak cut.
 
 ## Phase 5: Docs, NEWS, release, close #34 + #28
-- [ ] `devtools::document()`; `lintr::lint_package()` clean; full `devtools::test()`.
-- [ ] `NEWS.md` 0.4.0: producer terra-native rewrite (no full-grid R vectors, OOM);
+- [x] `devtools::document()`; `lintr::lint_package()` clean; full `devtools::test()`
+  (314 pass / 4 skip).
+- [x] `NEWS.md` 0.4.0: producer terra-native rewrite (no full-grid R vectors, OOM);
   vectorizer `changes_only` + small-patch pre-filter; behavior-preserving defaults;
   `patch_id` densening note.
-- [ ] Document `floodplains` follow-up (caller passes `changes_only=TRUE`, drops the
-  `:115` `from!=to` post-filter) in progress.md / a floodplains issue.
-- [ ] Bump `DESCRIPTION` 0.3.0 → 0.4.0 as the **final** commit; terra floor bump only
-  if Phase 1 required it.
+- [x] Document `floodplains` follow-up (caller passes `changes_only=TRUE`, drops the
+  `:115` `from!=to` post-filter) — findings.md "Cross-repo follow-up"; user to file/wire.
+- [ ] Bump `DESCRIPTION` 0.3.0 → 0.4.0 as the **final** commit; terra floor unchanged
+  (1.8-10 sufficient — Phase 1 semantics gate passed).
 
 ## Validation
 - [ ] Tests pass (`devtools::test()`); network/bfast tests skip cleanly
