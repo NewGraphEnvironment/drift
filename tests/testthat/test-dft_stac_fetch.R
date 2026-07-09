@@ -183,3 +183,87 @@ test_that("tile_grid errors on a degenerate (empty) AOI", {
                       tile_size = 500, res = 10)
   )
 })
+
+# --- mosaic_tiles(): reassemble per-tile rasters into one cache raster --------
+# Offline oracle for the tiled fetch (#36): res-aligned tiles that partition a
+# reference grid must merge back into that grid, byte-for-byte.
+test_that("mosaic_tiles merges res-aligned tiles back into the reference raster", {
+  ref <- terra::rast(nrows = 20, ncols = 20, xmin = 0, xmax = 200,
+                     ymin = 0, ymax = 200, crs = "EPSG:32609")
+  terra::values(ref) <- seq_len(terra::ncell(ref))     # distinct code per cell
+  quads <- list(c(0, 100, 0, 100), c(100, 200, 0, 100),
+                c(0, 100, 100, 200), c(100, 200, 100, 200))
+  tile_files <- vapply(quads, function(e) {
+    f <- tempfile(fileext = ".tif")
+    terra::writeRaster(terra::crop(ref, terra::ext(e[1], e[2], e[3], e[4])), f)
+    f
+  }, character(1))
+  out <- tempfile(fileext = ".tif")
+
+  drift:::mosaic_tiles(tile_files, out)
+  merged <- terra::rast(out)
+
+  expect_equal(terra::nlyr(merged), 1L)
+  expect_equal(
+    c(terra::xmin(merged), terra::xmax(merged),
+      terra::ymin(merged), terra::ymax(merged)),
+    c(terra::xmin(ref), terra::xmax(ref), terra::ymin(ref), terra::ymax(ref))
+  )
+  expect_equal(terra::values(merged), terra::values(ref))   # exact reassembly
+  unlink(c(tile_files, out))
+})
+
+test_that("mosaic_tiles handles a single tile", {
+  ref <- terra::rast(nrows = 5, ncols = 5, xmin = 0, xmax = 50,
+                     ymin = 0, ymax = 50, crs = "EPSG:32609")
+  terra::values(ref) <- seq_len(25)
+  f <- tempfile(fileext = ".tif")
+  terra::writeRaster(ref, f)
+  out <- tempfile(fileext = ".tif")
+
+  drift:::mosaic_tiles(f, out)
+
+  expect_equal(terra::values(terra::rast(out)), terra::values(ref))
+  unlink(c(f, out))
+})
+
+# Network end-to-end against the Planetary Computer. Opt-in only (env var), so
+# the default `devtools::test()` stays network-free per the repo convention.
+test_that("dft_stac_fetch tiled result matches untiled over the AOI", {
+  skip_if(Sys.getenv("DRIFT_TEST_NETWORK") != "true",
+          "network test — set DRIFT_TEST_NETWORK=true to run")
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"),
+    quiet = TRUE
+  )
+  cache <- tempfile("drift_fetch_")
+  dir.create(cache)
+
+  untiled <- dft_stac_fetch(aoi, source = "io-lulc", years = 2020,
+                            cache_dir = cache)[["2020"]]
+  # small tile_size relative to the AOI bbox → several tiles, most bbox-only
+  # tiles dropped (the download-saving mechanism)
+  tiled_list <- dft_stac_fetch(aoi, source = "io-lulc", years = 2020,
+                               tile_size = 500, cache_dir = cache)
+  tiled <- tiled_list[["2020"]]
+
+  expect_false(is.null(attr(tiled_list, "stac_items")))
+  expect_s4_class(tiled, "SpatRaster")
+  expect_equal(terra::nlyr(tiled), 1L)
+  # extension routing: untiled caches a gdalcubes .nc, tiled a terra .tif
+  expect_length(list.files(file.path(cache, "io-lulc"),
+                           pattern = "^2020_.*\\.nc$"), 1)
+  expect_length(list.files(file.path(cache, "io-lulc"),
+                           pattern = "^2020_.*\\.tif$"), 1)
+  # tiled == untiled over their common in-AOI cells: tiling changes only which
+  # bbox pixels are streamed, not the classification. Put the tiled mosaic onto
+  # the untiled grid (nearest — a no-op where the lattices coincide, robust to
+  # any sub-pixel offset gdalcubes gives the non-divisible untiled bbox) and
+  # compare where both are non-NA (the in-AOI overlap).
+  a <- terra::values(terra::resample(tiled, untiled, method = "near"))
+  b <- terra::values(untiled)
+  both <- !is.na(a) & !is.na(b)
+  expect_gt(sum(both), 0)
+  expect_equal(a[both], b[both])
+})

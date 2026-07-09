@@ -24,5 +24,13 @@
   write_ncdf); untiled path routes through it writing straight to the existing
   `<yr>_<key>.nc` — faithful code-motion, cube_view built identically, 45 pass /
   1 skip, lint clean. Shared primitive de-risks Phase 4 (tiles reuse it).
-- Next: Phase 4 (tiled branch — per-tile fetch → terra::merge → .tif → mask;
-  wire `tile_size` end-to-end; offline merge oracle + opt-in network e2e).
+- Phase 4 done: `mosaic_tiles()` helper + `tile_size` wired end-to-end. Tiled
+  branch fetches each intersecting tile via the shared `fetch_extent_to()`,
+  `terra::merge(terra::sprc(...))`, writes a `.tif` mosaic (extension routed by
+  `is.null(tile_size)`), unlinks temps, then masks. GDAL `/vsicurl` config with
+  on.exit restore, scoped to the tiled path. Offline merge oracle (byte-for-byte
+  reassembly + single-tile + .tif round-trip) + opt-in network e2e (tiled ==
+  untiled, resampled onto the untiled grid). Roxygen `@param tile_size` + cache
+  doc. 352 pass / 5 skip; document + lint + code-check clean. Code-check flagged
+  the network test's sub-pixel-offset fragility → hardened via near-resample.
+- Next: Phase 5 (gotchas note + NEWS 0.6.0 + DESCRIPTION bump).

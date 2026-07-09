@@ -28,11 +28,11 @@ tracked separately as #38 (out of scope).
 - [x] existing offline tests green (45/1 skip); faithful code-motion (cube_view built identically); the Phase 4 network e2e exercises the shared primitive end-to-end
 
 ## Phase 4: tiled branch — mosaic assembly + wire `tile_size` end-to-end
-- [ ] offline merge oracle: reference SpatRaster split into res-lattice tiles → `terra::merge()` → `all.equal(values(merged), values(reference))`; masked mosaic == masked reference over AOI; `.tif` round-trip preserves single-layer integer codes
-- [ ] add `tile_size` to `dft_stac_fetch`; tiled branch (per-tile fetch → merge → `.tif` → read → mask); extension from `is.null(tile_size)`; GDAL config + `on.exit`; tempfile `unlink`
-- [ ] roxygen `@param tile_size` + `\dontrun` example + cache-doc `.tif` note
-- [ ] opt-in network e2e (`DRIFT_TEST_NETWORK`): fetch example AOI untiled and with a small `tile_size`; assert tiled is a per-year list of single-layer SpatRasters with `stac_items` attr, and **tiled == untiled over cropped common AOI cells** (not raw dimensions)
-- [ ] `devtools::document()`; `lintr::lint_package()` clean; `devtools::test()` green
+- [x] offline merge oracle: `mosaic_tiles()` reassembles res-lattice tiles into the reference grid byte-for-byte (`terra::merge(terra::sprc(...))`); single-tile case; `.tif` round-trip preserves single-layer integer codes
+- [x] add `tile_size` to `dft_stac_fetch`; tiled branch (per-tile fetch → merge → `.tif` → read → mask); extension from `is.null(tile_size)`; GDAL config + `on.exit`; tempfile `unlink`
+- [x] roxygen `@param tile_size` + cache-doc `.tif` note (no `@examples` — neither `dft_stac_fetch` nor the cube sibling carries one; both network-bound)
+- [x] opt-in network e2e (`DRIFT_TEST_NETWORK`): fetch example AOI untiled and with a small `tile_size`; assert per-year single-layer SpatRasters + `stac_items` attr + `.nc`/`.tif` extension routing, and **tiled == untiled** (tiled resampled onto the untiled grid, non-NA overlap)
+- [x] `devtools::document()`; `lint` clean; `devtools::test()` 352 pass / 5 skip / 0 fail; code-check clean
 
 ## Phase 5: docs + gotchas note + NEWS + version
 - [ ] `inst/notes/gdalcubes-pc-gotchas.md`: tiling entry (fetch download bounded by tiling the cube_view; tiled mosaic cached as `.tif` via terra; #36)
