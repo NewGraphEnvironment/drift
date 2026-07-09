@@ -61,6 +61,12 @@ dft_stac_fetch <- function(aoi,
   # Resolve config
   if (is.null(stac_url) || is.null(collection) || is.null(asset)) {
     cfg <- dft_stac_config(source)
+    if (isTRUE(cfg$cube)) {
+      cli::cli_abort(c(
+        "Source {.val {source}} is a cube source, not a categorical raster.",
+        "i" = "Use {.fn dft_stac_cube} for continuous index-trajectory sources."
+      ))
+    }
     stac_url <- stac_url %||% cfg$stac_url
     collection <- collection %||% cfg$collection
     asset <- asset %||% cfg$asset
