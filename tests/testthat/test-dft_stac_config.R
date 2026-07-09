@@ -42,8 +42,8 @@ test_that("dft_stac_config returns role-based cube config for sentinel-2-l2a", {
   expect_equal(cfg$roles$swir16, "B11")
   expect_equal(cfg$roles$mask, "SCL")
 
-  # mask values, reflectance affine transform, temporal extent
-  expect_equal(cfg$mask_values, c(3L, 8L, 9L, 10L))
+  # mask values (incl. 11 snow/ice), reflectance affine transform, temporal extent
+  expect_equal(cfg$mask_values, c(3L, 8L, 9L, 10L, 11L))
   expect_equal(cfg$scale, 1e-4)
   expect_equal(cfg$offset, -0.1)
   expect_match(cfg$available_datetime, "^\\d{4}-\\d{2}-\\d{2}/\\d{4}-\\d{2}-\\d{2}$")

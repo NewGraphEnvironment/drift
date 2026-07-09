@@ -10,6 +10,7 @@ dft_rast_break(
   history = "all",
   start = c(2022, 1),
   frequency = NULL,
+  order = 3,
   level = 0.01,
   min_obs = 6,
   cache_dir = NULL,
@@ -33,6 +34,12 @@ Everything before it is the stable history.}
 (12 for monthly, 1 for annual). When \code{NULL}, derived from the cube's
 temporal cadence; when supplied, it must agree with that cadence or the
 call errors.}
+
+\item{order}{Integer. Harmonic order of the season-trend model passed to
+\code{\link[bfast:bfastmonitor]{bfast::bfastmonitor()}} (default 3). Lower it (1-2) when the series samples
+only part of the year (e.g. a growing-season-only cube from
+\code{\link[=dft_stac_cube]{dft_stac_cube()}} \code{months}), where a high order overfits sparse seasonal
+coverage.}
 
 \item{level}{Numeric. Significance level passed to \code{\link[bfast:bfastmonitor]{bfast::bfastmonitor()}}
 (default 0.01).}

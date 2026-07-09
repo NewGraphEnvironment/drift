@@ -60,8 +60,10 @@ dft_stac_config <- function(source = c("io-lulc", "esa-worldcover",
         mask   = "SCL"
       ),
       # Scene Classification Layer classes to mask out:
-      # 3 cloud shadow, 8 cloud medium, 9 cloud high, 10 thin cirrus
-      mask_values = c(3L, 8L, 9L, 10L),
+      # 3 cloud shadow, 8 cloud medium, 9 cloud high, 10 thin cirrus, 11 snow/ice
+      # (snow is masked by default: it is never a vegetation signal and otherwise
+      # dominates the winter trajectory at high latitudes)
+      mask_values = c(3L, 8L, 9L, 10L, 11L),
       # DN -> reflectance: baseline 04.00 (+1000 DN) => DN * 1e-4 - 0.1
       scale = 1e-4,
       offset = -0.1,

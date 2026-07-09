@@ -15,6 +15,7 @@ dft_stac_cube(
   aggregation = "median",
   resampling = "bilinear",
   cloud_cover_max = 60,
+  months = NULL,
   mask_values = NULL,
   cache_dir = NULL,
   force = FALSE,
@@ -49,6 +50,15 @@ must agree with.}
 
 \item{cloud_cover_max}{Numeric. Scene-level \code{eo:cloud_cover} maximum percent
 for the STAC pre-filter (default 60).}
+
+\item{months}{Integer vector of calendar months (1-12) to keep, or \code{NULL}
+(default) for all. Restricting to the growing season (e.g. \code{6:9}) both
+sharpens the vegetation signal — snow and low-sun winter scenes carry no
+vegetation information — and cuts the number of scenes streamed. Months with
+no retained scenes become \code{NA} in the monthly cube, so the per-pixel series
+stays regular at \code{frequency = 12} for \code{\link[=dft_rast_break]{dft_rast_break()}}. Prefer a longer
+\code{datetime} window when using this, so enough growing-season history remains
+to fit a stable BFAST baseline.}
 
 \item{mask_values}{Integer vector of mask-band classes to exclude. When
 \code{NULL}, uses \code{mask_values} from \code{\link[=dft_stac_config]{dft_stac_config()}} (e.g. Sentinel-2 SCL

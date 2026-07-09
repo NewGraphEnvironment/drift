@@ -39,6 +39,14 @@
 #' @param resampling Character. Spatial resampling (default `"bilinear"`).
 #' @param cloud_cover_max Numeric. Scene-level `eo:cloud_cover` maximum percent
 #'   for the STAC pre-filter (default 60).
+#' @param months Integer vector of calendar months (1-12) to keep, or `NULL`
+#'   (default) for all. Restricting to the growing season (e.g. `6:9`) both
+#'   sharpens the vegetation signal — snow and low-sun winter scenes carry no
+#'   vegetation information — and cuts the number of scenes streamed. Months with
+#'   no retained scenes become `NA` in the monthly cube, so the per-pixel series
+#'   stays regular at `frequency = 12` for [dft_rast_break()]. Prefer a longer
+#'   `datetime` window when using this, so enough growing-season history remains
+#'   to fit a stable BFAST baseline.
 #' @param mask_values Integer vector of mask-band classes to exclude. When
 #'   `NULL`, uses `mask_values` from [dft_stac_config()] (e.g. Sentinel-2 SCL
 #'   cloud / shadow / cirrus classes).
@@ -83,11 +91,31 @@ dft_stac_cube <- function(aoi,
                           aggregation = "median",
                           resampling = "bilinear",
                           cloud_cover_max = 60,
+                          months = NULL,
                           mask_values = NULL,
                           cache_dir = NULL,
                           force = FALSE,
                           sign_fn = rstac::sign_planetary_computer()) {
   rlang::check_installed("gdalcubes", reason = "to fetch STAC cubes")
+
+  # GDAL cloud-read tuning for /vsicurl COG streaming (biggest win:
+  # DISABLE_READDIR_ON_OPEN avoids a remote directory listing on every open).
+  # Restored on exit so we don't mutate the caller's session.
+  gdal_cfg <- c(
+    GDAL_DISABLE_READDIR_ON_OPEN = "EMPTY_DIR",
+    GDAL_HTTP_MULTIPLEX = "YES",
+    GDAL_HTTP_VERSION = "2",
+    VSI_CACHE = "TRUE",
+    CPL_VSIL_CURL_ALLOWED_EXTENSIONS = ".tif"
+  )
+  old_cfg <- Sys.getenv(names(gdal_cfg), unset = NA)
+  do.call(Sys.setenv, as.list(gdal_cfg))
+  on.exit({
+    set_again <- old_cfg[!is.na(old_cfg)]
+    if (length(set_again)) do.call(Sys.setenv, as.list(set_again))
+    unset <- names(old_cfg)[is.na(old_cfg)]
+    if (length(unset)) Sys.unsetenv(unset)
+  }, add = TRUE)
 
   cfg <- dft_stac_config(source)
   if (!isTRUE(cfg$cube)) {
@@ -131,7 +159,7 @@ dft_stac_cube <- function(aoi,
   cache_key <- stac_cube_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
     cfg$stac_url, cfg$collection, band_assets, datetime, index,
-    cloud_cover_max, mask_values, scale, offset
+    cloud_cover_max, mask_values, scale, offset, months
   )
   cache_file <- file.path(cache_source_dir, paste0("cube_", cache_key, ".nc"))
 
@@ -156,6 +184,16 @@ dft_stac_cube <- function(aoi,
     rstac::post_request() |>
     rstac::items_fetch() |>
     rstac::items_sign(sign_fn = sign_fn)
+
+  # Restrict to growing-season (or any) calendar months. Fetching fewer, better
+  # months both sharpens the vegetation signal (drops snow/low-sun winter noise)
+  # and cuts the number of scenes streamed. Months with no scenes become NA in
+  # the monthly cube, so the ts() stays regular at frequency 12.
+  if (!is.null(months)) {
+    item_dt <- vapply(items$features, function(f) f$properties$datetime %||% NA_character_, "")
+    item_mo <- as.integer(format(as.Date(substr(item_dt, 1, 10)), "%m"))
+    items$features <- items$features[!is.na(item_mo) & item_mo %in% months]
+  }
 
   n_items <- length(items$features)
   message("  ", n_items, " items returned")
@@ -207,14 +245,14 @@ dft_stac_cube <- function(aoi,
 stac_cube_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
                                 resampling, stac_url, collection, band_assets,
                                 datetime, index, cloud_cover_max, mask_values,
-                                scale, offset) {
+                                scale, offset, months = NULL) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
   substr(
     rlang::hash(list(
       geom_wkb, as.numeric(res), target_crs, dt, aggregation, resampling,
       stac_url, collection, band_assets, datetime, index,
       as.numeric(cloud_cover_max), sort(as.numeric(mask_values)),
-      as.numeric(scale), as.numeric(offset)
+      as.numeric(scale), as.numeric(offset), sort(as.numeric(months))
     )),
     1, 12
   )

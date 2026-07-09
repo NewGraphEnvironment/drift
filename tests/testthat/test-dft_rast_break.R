@@ -28,7 +28,7 @@ test_that("cadence_frequency maps ISO durations to seasonal frequency", {
 test_that(".dft_break_pixel returns c(NA, NA) on all-NA input", {
   expect_equal(
     drift:::.dft_break_pixel(rep(NA_real_, 24), c(2018, 1), 12, c(2022, 1),
-                             "all", 0.01, 6),
+                             "all", 3, 0.01, 6),
     c(NA_real_, NA_real_)
   )
 })
@@ -36,7 +36,7 @@ test_that(".dft_break_pixel returns c(NA, NA) on all-NA input", {
 test_that(".dft_break_pixel returns c(NA, NA) when fewer than min_obs", {
   v <- c(0.5, 0.6, NA, NA, 0.55, rep(NA_real_, 19))  # 3 non-NA < min_obs 6
   expect_equal(
-    drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 0.01, 6),
+    drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 3, 0.01, 6),
     c(NA_real_, NA_real_)
   )
 })
@@ -45,7 +45,7 @@ test_that(".dft_break_pixel returns c(NA, NA) when fewer than min_obs", {
 
 test_that("build_break_reducer yields a callback with no free variables", {
   f <- drift:::build_break_reducer("kndvi", c(2018, 1), 12, c(2022, 1),
-                                   "all", 0.01, 6)
+                                   "all", 3, 0.01, 6)
   # environment detached to baseenv and all params inlined as literals, so the
   # only globals referenced are base/pkg functions -> safe to serialize to a
   # gdalcubes worker (see findings.md: closures fail in workers)
@@ -61,13 +61,19 @@ test_that("break_cache_key changes with each reducer parameter", {
   skip_if_not_installed("gdalcubes")
   skip_if_not_installed("bfast")
   cube <- synthetic_break_cube()$cube
-  base <- drift:::break_cache_key(cube, "kndvi", "all", c(2022, 1), 12, 0.01, 6)
+  k <- function(history = "all", start = c(2022, 1), frequency = 12, order = 3,
+                level = 0.01, min_obs = 6) {
+    drift:::break_cache_key(cube, "kndvi", history, start, frequency, order,
+                            level, min_obs)
+  }
+  base <- k()
   expect_match(base, "^[0-9a-f]{12}$")
-  expect_false(drift:::break_cache_key(cube, "kndvi", "ROC", c(2022, 1), 12, 0.01, 6) == base)
-  expect_false(drift:::break_cache_key(cube, "kndvi", "all", c(2021, 1), 12, 0.01, 6) == base)
-  expect_false(drift:::break_cache_key(cube, "kndvi", "all", c(2022, 1), 1, 0.01, 6) == base)
-  expect_false(drift:::break_cache_key(cube, "kndvi", "all", c(2022, 1), 12, 0.05, 6) == base)
-  expect_false(drift:::break_cache_key(cube, "kndvi", "all", c(2022, 1), 12, 0.01, 8) == base)
+  expect_false(k(history = "ROC") == base)
+  expect_false(k(start = c(2021, 1)) == base)
+  expect_false(k(frequency = 1) == base)
+  expect_false(k(order = 1) == base)
+  expect_false(k(level = 0.05) == base)
+  expect_false(k(min_obs = 8) == base)
 })
 
 # ---- bfast-gated per-pixel behavior ----------------------------------------
@@ -77,7 +83,7 @@ test_that(".dft_break_pixel detects an injected step drop (negative magnitude)",
   tt <- seq_len(72)
   v <- 0.6 + 0.15 * sin(2 * pi * tt / 12)
   v[54:72] <- v[54:72] - 0.3  # step drop at 2022-06 (monitoring period)
-  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 0.01, 6)
+  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 3, 0.01, 6)
   expect_true(is.finite(out[1]))
   expect_gt(out[1], 2022)
   expect_lt(out[1], 2022.9)
@@ -88,7 +94,7 @@ test_that(".dft_break_pixel returns NA break on a stable series (non-error)", {
   skip_if_not_installed("bfast")
   tt <- seq_len(72)
   v <- 0.6 + 0.15 * sin(2 * pi * tt / 12)
-  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 0.01, 6)
+  out <- drift:::.dft_break_pixel(v, c(2018, 1), 12, c(2022, 1), "all", 3, 0.01, 6)
   expect_true(is.na(out[1]))
 })
 

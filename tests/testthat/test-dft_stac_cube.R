@@ -34,11 +34,12 @@ cube_key <- function(aoi = square_aoi(), res = 10, target_crs = "EPSG:32609",
                      collection = "sentinel-2-l2a",
                      band_assets = c("B08", "B04"),
                      datetime = "2019-01-01/2023-12-31", index = "kndvi",
-                     cloud_cover_max = 60, mask_values = c(3, 8, 9, 10),
-                     scale = 1e-4, offset = -0.1) {
+                     cloud_cover_max = 60, mask_values = c(3, 8, 9, 10, 11),
+                     scale = 1e-4, offset = -0.1, months = NULL) {
   drift:::stac_cube_cache_key(
     aoi, res, target_crs, dt, aggregation, resampling, stac_url, collection,
-    band_assets, datetime, index, cloud_cover_max, mask_values, scale, offset
+    band_assets, datetime, index, cloud_cover_max, mask_values, scale, offset,
+    months
   )
 }
 
@@ -63,6 +64,11 @@ test_that("stac_cube_cache_key changes with each cube-affecting parameter", {
   expect_false(cube_key(mask_values = c(8, 9)) == base)
   expect_false(cube_key(scale = 2.75e-5) == base)
   expect_false(cube_key(offset = -0.2) == base)
+  expect_false(cube_key(months = 6:9) == base)
+})
+
+test_that("stac_cube_cache_key normalizes months order", {
+  expect_equal(cube_key(months = c(6, 7, 8, 9)), cube_key(months = c(9, 8, 7, 6)))
 })
 
 test_that("stac_cube_cache_key normalizes mask_values order and res type", {

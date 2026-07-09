@@ -31,6 +31,11 @@
 #'   (12 for monthly, 1 for annual). When `NULL`, derived from the cube's
 #'   temporal cadence; when supplied, it must agree with that cadence or the
 #'   call errors.
+#' @param order Integer. Harmonic order of the season-trend model passed to
+#'   [bfast::bfastmonitor()] (default 3). Lower it (1-2) when the series samples
+#'   only part of the year (e.g. a growing-season-only cube from
+#'   [dft_stac_cube()] `months`), where a high order overfits sparse seasonal
+#'   coverage.
 #' @param level Numeric. Significance level passed to [bfast::bfastmonitor()]
 #'   (default 0.01).
 #' @param min_obs Integer. Minimum non-`NA` observations required to attempt a
@@ -58,6 +63,7 @@ dft_rast_break <- function(cube,
                            history = "all",
                            start = c(2022, 1),
                            frequency = NULL,
+                           order = 3,
                            level = 0.01,
                            min_obs = 6,
                            cache_dir = NULL,
@@ -96,7 +102,8 @@ dft_rast_break <- function(cube,
   cache_base <- dft_cache_path(cache_dir)
   cache_break_dir <- file.path(cache_base, "break")
   dir.create(cache_break_dir, recursive = TRUE, showWarnings = FALSE)
-  key <- break_cache_key(cube, band, history, start, frequency, level, min_obs)
+  key <- break_cache_key(cube, band, history, start, frequency, order, level,
+                         min_obs)
   cache_file <- file.path(cache_break_dir, paste0("break_", key, ".nc"))
 
   if (!force && file.exists(cache_file)) {
@@ -104,8 +111,8 @@ dft_rast_break <- function(cube,
     return(terra::rast(cache_file))
   }
 
-  fun <- build_break_reducer(band, ts_start, frequency, start, history, level,
-                             min_obs)
+  fun <- build_break_reducer(band, ts_start, frequency, start, history, order,
+                             level, min_obs)
   reduced <- gdalcubes::reduce_time(
     cube, names = c("break_date", "break_mag"),
     load_pkgs = "bfast", FUN = fun
@@ -121,13 +128,13 @@ dft_rast_break <- function(cube,
 #' (all-`NA` or fewer than `min_obs` observations) return `c(NA, NA)` before any
 #' `bfast` symbol is touched, so they are testable without bfast installed.
 #' @noRd
-.dft_break_pixel <- function(v, ts_start, frequency, start, history, level,
-                             min_obs) {
+.dft_break_pixel <- function(v, ts_start, frequency, start, history, order,
+                             level, min_obs) {
   if (all(is.na(v)) || sum(!is.na(v)) < min_obs) return(c(NA_real_, NA_real_))
   ts_v <- stats::ts(v, start = ts_start, frequency = frequency)
   tryCatch({
     m <- bfast::bfastmonitor(ts_v, start = start, history = history,
-                             level = level)
+                             order = order, level = level)
     c(m$breakpoint, m$magnitude)
   }, error = function(e) c(NA_real_, NA_real_))
 }
@@ -158,14 +165,14 @@ cadence_frequency <- function(dt_iso) {
 #' with no free variables that runs correctly under any `parallel` setting.
 #' @noRd
 build_break_reducer <- function(band, ts_start, frequency, start, history,
-                                level, min_obs) {
+                                order, level, min_obs) {
   pixfun <- .dft_break_pixel
   environment(pixfun) <- baseenv()
   f <- function(x) NULL
   body(f) <- substitute(
-    PIX(x[BAND, ], TS, FRQ, ST, HI, LV, MN),
+    PIX(x[BAND, ], TS, FRQ, ST, HI, OR, LV, MN),
     list(PIX = pixfun, BAND = band, TS = ts_start, FRQ = frequency,
-         ST = start, HI = history, LV = level, MN = min_obs)
+         ST = start, HI = history, OR = order, LV = level, MN = min_obs)
   )
   environment(f) <- baseenv()
   f
@@ -177,12 +184,13 @@ build_break_reducer <- function(band, ts_start, frequency, start, history,
 #' Hashes the full cube definition (`gdalcubes::as_json`, which captures the
 #' source items, view, mask, and index) plus every reducer parameter.
 #' @noRd
-break_cache_key <- function(cube, band, history, start, frequency, level,
+break_cache_key <- function(cube, band, history, start, frequency, order, level,
                             min_obs) {
   substr(
     rlang::hash(list(
       gdalcubes::as_json(cube), band, history, as.numeric(start),
-      as.numeric(frequency), as.numeric(level), as.numeric(min_obs)
+      as.numeric(frequency), as.numeric(order), as.numeric(level),
+      as.numeric(min_obs)
     )),
     1, 12
   )

@@ -32,5 +32,14 @@
   build. Proven sibling `dft_stac_fetch` works on the same AOI, and the cube stages
   work WITHOUT filter_geom (valid kNDVI 0..1). Fix: drop filter_geom; the cube spans
   the AOI bbox (cloud-masked), callers clip the reduced raster with terra::mask()
-  (matches how dft_stac_fetch masks). Verifying the fixed E2E, then committing the
-  fix + Phase 5 (vignette + NEWS + 0.3.0).
+  (matches how dft_stac_fetch masks). Fixed E2E verified (48-mo cube valid, break
+  reduce 25 s, no segfault); committed (c6953a0).
+- **User steer — growing-season tuning.** All-months fetch was ~30 min for 100 ha
+  (the fetch, not the compute). User asked whether restricting to the growing season
+  sharpens the veg signal AND cuts data — yes on both. Added `dft_stac_cube(months=)`
+  calendar-month filter (default NULL); snow (SCL 11) now in the default S2 mask; GDAL
+  /vsicurl config (on.exit restore); `dft_rast_break(order=)` harmonic knob. Growing-
+  season E2E (months=6:9, 2018-2023): cube in 12 min (vs 30), 24 clean summer obs/pixel,
+  breaks dated to summer months (2022.42-2023.67). 294 unit tests pass, lint clean.
+- Next: commit growing-season enhancement + regenerate artifact + Phase 5 (vignette
+  render + NEWS + 0.3.0 release + archive + PR).
