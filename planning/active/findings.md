@@ -32,4 +32,29 @@ full empirical journey. Condensed carry-forward below, then this cycle's finding
 
 ## This cycle's findings
 
-(to be appended as the redo runs — cube stats, break-vs-LULC agreement, cut date, reducer choice)
+**2017–2023 fetch** (2026-07-09): offset split fired 87 pre / 85 post; 84 monthly layers;
+per-year gs kNDVI 2017=0.476 … 2021=0.524, 2022=0.529, 2023=0.429 (aligns across 2022, real 2023
+dip). Cube built in **11 min**, cached in `data-raw/.break_cache`. Breaks: 13,112 finite (vs 25,550
+on the 2018-start run — the longer 2017–2021 history is a more robust baseline, fewer false breaks),
+88% negative, dated 2022.42–2023.67.
+
+**LULC validation** (bfast break map vs IO LULC Trees→Rangeland/Bare, 2020→2023): tree-loss pixels
+(n=2132) break at **25% vs 13% background** (2×) and with **median mag −0.054 vs −0.020** (2.7×).
+So the trajectory method genuinely picks up LULC tree loss. Break dates on tree-loss pixels cluster
+at **median 2023.58 (91% in 2023)** — consistent with "cuts 2022–2023", and the value-add: annual
+LULC can only bracket "2020–2023", bfast dates it to summer 2023.
+
+**Caveats (honest):** the signal is statistical, not a dramatic clearcut. (a) LULC "tree-loss" pixels
+sit ~0.1 BELOW intact forest throughout 2017–2021 — IO LULC "Trees" at 10 m is generous (open /
+riparian / edge canopy), so they don't start from a high forest baseline; (b) they end ~0.35 in 2023
+(thinned / regrowth, not bare-soil ~0.15); (c) 75% of LULC tree-loss pixels register no bfast break
+(below significance in noisy monthly data, or cut pre-2022 = in history). Intact forest (n=4301) stays
+~0.5–0.6 and dips only slightly in 2023, so the tree-loss-below-intact divergence IS visible in 2023.
+
+**Verdict:** the 2017–2023 redo is clearly better than the shipped 2018-start example — more selective
+breaks, a real (if modest) LULC agreement, and honest timing. Recommended vignette framing: "the
+trajectory method flags the same stands LULC maps as lost, ~2× the rate and stronger, and dates it to
+summer 2023 — timing annual LULC cannot give," with the regional 2023 dip acknowledged, not hidden.
+
+**Reducer decision:** keep `bfastmonitor(start = c(2022,1))` — cuts are 2022–2023 (in-window), and the
+2017–2021 history is a strong baseline. Full `bfast()` not needed for this example.

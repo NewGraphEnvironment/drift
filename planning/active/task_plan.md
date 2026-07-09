@@ -12,24 +12,24 @@ with the existing LULC vignette (same Neexdzii Kwa reach, **2017–2023**) and a
 logging. Commits land on the **same branch / PR #33**.
 
 ## Phase 1: Re-fetch 2017–2023 growing-season cube
-- [ ] `dft_stac_cube(datetime = "2017-01-01/2023-12-31", months = 6:9)` — matches the LULC vignette window. Offset split fires (2017–2021 pre / 2022–2023 post). Confirm valid kNDVI, note 2017 S2 sparsity. Cache it (one-time ~20 min fetch; iterate freely after)
+- [x] `dft_stac_cube(datetime = "2017-01-01/2023-12-31", months = 6:9)` — offset split fired 87 pre / 85 post; 84 monthly layers; per-year kNDVI aligns across 2022. Built in **11 min**, cached
 
 ## Phase 2: Reduce + reducer decision
-- [ ] `dft_rast_break(start = c(2022, 1))` with 2017–2021 as history (longer, more robust baseline than the 2018 start). Cuts are 2022–2023 → inside the monitoring window, so `bfastmonitor` suffices
-- [ ] Decide `bfastmonitor` (keep) vs full `bfast()` (catches breaks anywhere 2017–2023). Default: keep `bfastmonitor` unless the LULC check shows pre-2022 change we need to date
+- [x] `dft_rast_break(start = c(2022, 1))`, 2017–2021 history → 13,112 finite breaks (vs 25,550 on the 2018 start — longer baseline halves false breaks)
+- [x] Kept `bfastmonitor` — cuts are 2022–2023 (in-window); full `bfast()` not needed
 
 ## Phase 3: Validate against LULC ground truth
-- [ ] Cross-check the bfast break map against the LULC **Trees → Rangeland** transition, focused on the north-confluence clearing the user flagged (visible 2020→2023 in the LULC vignette). Confirm negative `break_mag` + `break_date` in 2022–2023 land on the cut. Isolate the tree-corridor drop from the broad rangeland dip
-- [ ] If it lands: quantify (break date at the cut vs LULC's "sometime 2020–2023")
+- [x] LULC Trees→Rangeland/Bare vs bfast breaks: tree-loss pixels break **25% vs 13%** (2×), median mag **−0.054 vs −0.020** (2.7×), dated **median 2023.58** (91% in 2023). Real, modest signal
+- [x] Quantified: LULC brackets "2020–2023"; trajectory dates it to summer 2023. Caveats logged (IO LULC "Trees" generous; regional 2023 dip; 75% of tree-loss pixels no break)
 
 ## Phase 4: Rebuild the vignette honestly
-- [ ] `data-raw/vignette_data_break.R`: 2017–2023 window; save a genuinely divergent pixel pair (cut vs intact) for the trajectory panel if one exists
-- [ ] `vignettes/trajectory-break-detection.Rmd`: reframe as the complement to LULC — **LULC says *what* and roughly *when* (annual snapshots); trajectory says *exactly when* (monthly)**. Be honest that a regional 2023 dip is present; highlight the dated cut
-- [ ] Regenerate the committed artifact (`inst/testdata/neexdzii_break.rds`)
+- [x] `data-raw/vignette_data_break.R`: 2017–2023 window; precomputes break raster + LULC tree-loss mask + grouped trajectory (tree-loss/intact/background) + agreement stats → 140 KB artifact
+- [x] `vignettes/trajectory-break-detection.Rmd`: reframed as complement to LULC (what/roughly-when vs exactly-when); agreement table; break map w/ tree-loss outlined; grouped trajectory; regional-2023-dip acknowledged. **User agreed to framing + trajectory panel**
+- [x] Regenerated `inst/testdata/neexdzii_break.rds`
 
 ## Phase 5: Verify + land on PR #33
-- [ ] Re-render vignette clean; `devtools::test()`; `R CMD check` 0/0/0; `lintr` clean
-- [ ] `/code-check` on the diff; atomic commits on branch `30-continuous-index-trajectory-change-detec`
+- [x] Vignette renders + re-builds clean under `R CMD check` (only a spurious future-timestamp NOTE); `devtools::test()` 286 pass; `lintr` clean on the two new files
+- [x] Atomic commit on branch `30-continuous-index-trajectory-change-detec` (joins PR #33)
 - [ ] `/planning-archive` (append to / supersede the existing #30 archive)
 
 ## Validation
