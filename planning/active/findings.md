@@ -75,6 +75,49 @@ rstac 1.0.1, terra 1.9.11, zoo 1.8.15. `bfast` / `strucchangeRcpp` NOT installed
   residual is a small additive bias near the 2022 boundary). Ship documented
   accepted-bias; per-scene harmonization from item metadata is a follow-up.
 
+## Phase 4 empirical gate result (2026-07-08) — DESIGN CHANGE
+
+Ran the smoke test after installing bfast 1.7.2 / strucchangeRcpp 1.5.4. Findings:
+- **Leg (a) passed exactly**: a 72-pt monthly series with a −0.3 step at 2022-06
+  → `bfastmonitor(start=c(2022,1), level=0.01)` returns `breakpoint=2022.417`,
+  `magnitude=-0.300`. Scalar `level` is accepted (default is length-2). Stable
+  series → `breakpoint=NA` (no error). So `history="all"` + scalar `level` work.
+- **CLOSURE CAPTURE DOES NOT WORK.** The reducer FUN runs in a spawned worker for
+  the R-callback path **at every `parallel` setting, including `parallel=1`**.
+  A closure (even a `force()`d factory frame) fails in the worker with
+  `object 'band' not found` — gdalcubes does not restore the closure environment.
+  Both the issue-#30 sketch and the original agent-B design assumed closures work;
+  they don't. This is the gate's headline catch.
+- **SELF-CONTAINED FUN WORKS** at `parallel` 1 and 2. Two variants proven:
+  inline scalar literals via `substitute()`, or embed the per-pixel helper as a
+  literal function OBJECT (env detached to `baseenv()`) + inline scalar params.
+  Chosen: **embed-the-helper-object** — keeps a single logic source
+  (`.dft_break_pixel()`, directly unit-testable) AND a worker-safe FUN.
+  Result on the 2×2 synthetic cube: `nlyr=2`, names `break_date`/`break_mag`,
+  drop pixel `date=2022.42 mag=-0.3`, stable pixels `NA/0`, all-NA pixel `NA/NA`.
+- `load_pkgs = "bfast"` is required so the worker can resolve `bfast::bfastmonitor`.
+- Degenerate paths (`all(is.na(v))` / `sum(!is.na(v)) < min_obs`) return `c(NA,NA)`
+  **before any `bfast::` symbol** → unit-testable with no bfast dependency.
+
+Design for `R/dft_rast_break.R` (proven):
+```r
+.dft_break_pixel <- function(v, ts_start, frequency, start, history, level, min_obs) {
+  if (all(is.na(v)) || sum(!is.na(v)) < min_obs) return(c(NA_real_, NA_real_))
+  ts_v <- stats::ts(v, start = ts_start, frequency = frequency)
+  tryCatch({
+    m <- bfast::bfastmonitor(ts_v, start = start, history = history, level = level)
+    c(m$breakpoint, m$magnitude)
+  }, error = function(e) c(NA_real_, NA_real_))
+}
+# reducer FUN: embed .dft_break_pixel as a literal object (env=baseenv) + inline
+# band/ts_start/frequency/start/history/level/min_obs via substitute(); no free
+# vars; reduce_time(..., load_pkgs = "bfast").
+```
+`bfastmonitor` return: `$breakpoint` = decimal year or NA; `$magnitude` = median
+monitoring-period residual (neg = index drop = scour; ~0 = stable). `ts_start`
+and `frequency` come from `gdalcubes::dimension_values(cube, "M")$t` in the main
+process; `stop()` if a caller `frequency` disagrees with the dt cadence.
+
 ## Reuse map
 - `stac_cache_key()` / `auto_utm_epsg()` / sf-coercion / `write_ncdf→terra→mask`
   idiom in `R/dft_stac_fetch.R` — reuse for `dft_stac_cube()`.

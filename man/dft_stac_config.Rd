@@ -23,7 +23,7 @@ absent (not \code{FALSE}) for categorical sources; test with \code{isTRUE(cfg$cu
 \description{
 Returns connection details for pre-configured STAC collections.
 Used as a convenience wrapper around \code{\link[=dft_stac_fetch]{dft_stac_fetch()}} (categorical
-sources) and \code{dft_stac_cube()} (continuous index-trajectory sources) so
+sources) and \code{\link[=dft_stac_cube]{dft_stac_cube()}} (continuous index-trajectory sources) so
 users don't need to remember STAC URLs, collection IDs, and band names.
 }
 \details{
@@ -32,7 +32,7 @@ Sources are of two kinds. \strong{Categorical} sources (\code{"io-lulc"},
 \code{asset} name for \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}. \strong{Cube} sources (\code{"sentinel-2-l2a"})
 host multi-band reflectance imagery and instead carry a role-based band map
 (\code{red}/\code{nir}/\code{swir16}/\code{mask}), mask values, and reflectance scale/offset for
-\code{dft_stac_cube()}; they are marked with \code{cube = TRUE}. The role-based schema
+\code{\link[=dft_stac_cube]{dft_stac_cube()}}; they are marked with \code{cube = TRUE}. The role-based schema
 means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 change — only the role→asset map and scale/offset differ.
 }

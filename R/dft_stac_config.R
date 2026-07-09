@@ -2,7 +2,7 @@
 #'
 #' Returns connection details for pre-configured STAC collections.
 #' Used as a convenience wrapper around [dft_stac_fetch()] (categorical
-#' sources) and `dft_stac_cube()` (continuous index-trajectory sources) so
+#' sources) and [dft_stac_cube()] (continuous index-trajectory sources) so
 #' users don't need to remember STAC URLs, collection IDs, and band names.
 #'
 #' Sources are of two kinds. **Categorical** sources (`"io-lulc"`,
@@ -10,7 +10,7 @@
 #' `asset` name for [dft_stac_fetch()]. **Cube** sources (`"sentinel-2-l2a"`)
 #' host multi-band reflectance imagery and instead carry a role-based band map
 #' (`red`/`nir`/`swir16`/`mask`), mask values, and reflectance scale/offset for
-#' `dft_stac_cube()`; they are marked with `cube = TRUE`. The role-based schema
+#' [dft_stac_cube()]; they are marked with `cube = TRUE`. The role-based schema
 #' means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 #' change — only the role→asset map and scale/offset differ.
 #'
