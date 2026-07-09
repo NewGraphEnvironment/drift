@@ -11,3 +11,5 @@
 ^doc$
 ^Meta$
 ^CITATION\.cff$
+^planning$
+^\.claude$

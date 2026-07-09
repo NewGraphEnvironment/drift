@@ -1,5 +1,6 @@
 #' @keywords internal
 "_PACKAGE"
 
-# NSE symbol used in rstac::ext_filter() CQL2 expressions (dft_stac_cube)
-utils::globalVariables("eo:cloud_cover")
+# NSE symbols: `eo:cloud_cover` in rstac::ext_filter() CQL2 (dft_stac_cube);
+# `.data` is the rlang pronoun used in dplyr pipelines (dft_rast_classify)
+utils::globalVariables(c("eo:cloud_cover", ".data"))
