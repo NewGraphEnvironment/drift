@@ -8,7 +8,7 @@ message: 'To cite package "drift" in publications use:'
 type: software
 license: MIT
 title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
-version: 0.5.0
+version: 0.6.0
 abstract: Fetch STAC-hosted land cover rasters, classify and summarize change over
   time within user-provided AOI polygons, and produce standardized maps, plots, and
   tables for reporting. Generic STAC pipeline works with any classified raster (Esri
