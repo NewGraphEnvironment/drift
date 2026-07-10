@@ -16,6 +16,7 @@ dft_stac_fetch(
   dt = "P1Y",
   aggregation = "first",
   resampling = "near",
+  tile_size = NULL,
   cache_dir = NULL,
   force = FALSE,
   sign_fn = rstac::sign_planetary_computer()
@@ -50,6 +51,17 @@ When \code{NULL}, auto-detected from the AOI centroid's UTM zone.}
 \item{resampling}{Character. Spatial resampling method (default \code{"near"}
 for categorical data).}
 
+\item{tile_size}{Numeric or \code{NULL} (default). Edge length, in CRS units
+(metres for the default UTM CRS), of the download-tiling grid. When \code{NULL},
+one cube is streamed over the whole AOI bounding box (the download scales
+with the bbox, not the AOI). When set, the bbox is split into a grid of
+\code{tile_size}-square tiles and only tiles that intersect the AOI polygon are
+streamed, then mosaicked — so a thin, diagonal AOI (e.g. a floodplain
+corridor) fetches close to its footprint instead of its full bounding box.
+Snapped to a multiple of \code{res}. Smaller tiles waste less bbox but cost more
+per-tile round trips; there is no auto-tuning. Tiled fetches cache a terra
+GeoTIFF (\code{.tif}) rather than a gdalcubes NetCDF (\code{.nc}).}
+
 \item{cache_dir}{Character. Cache directory path. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
 
@@ -74,9 +86,9 @@ custom COGs).
 }
 \details{
 Fetched rasters are cached under \code{\link[=dft_cache_path]{dft_cache_path()}} as
-\verb{<source>/<year>_<key>.nc}, where \code{key} is a hash of the AOI geometry and
-every fetch parameter that affects the output (\code{res}, \code{crs}, \code{dt},
-\code{aggregation}, \code{resampling}, \code{stac_url}, \code{collection}, \code{asset}). Repeat
-calls with the same AOI and parameters reuse the cache; changing any of
-them re-fetches.
+\verb{<source>/<year>_<key>.nc} (or \code{.tif} when \code{tile_size} is set — see below),
+where \code{key} is a hash of the AOI geometry and every fetch parameter that
+affects the output (\code{res}, \code{crs}, \code{dt}, \code{aggregation}, \code{resampling},
+\code{stac_url}, \code{collection}, \code{asset}, and \code{tile_size}). Repeat calls with the
+same AOI and parameters reuse the cache; changing any of them re-fetches.
 }

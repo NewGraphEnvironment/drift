@@ -6,11 +6,11 @@
 #' custom COGs).
 #'
 #' Fetched rasters are cached under [dft_cache_path()] as
-#' `<source>/<year>_<key>.nc`, where `key` is a hash of the AOI geometry and
-#' every fetch parameter that affects the output (`res`, `crs`, `dt`,
-#' `aggregation`, `resampling`, `stac_url`, `collection`, `asset`). Repeat
-#' calls with the same AOI and parameters reuse the cache; changing any of
-#' them re-fetches.
+#' `<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set — see below),
+#' where `key` is a hash of the AOI geometry and every fetch parameter that
+#' affects the output (`res`, `crs`, `dt`, `aggregation`, `resampling`,
+#' `stac_url`, `collection`, `asset`, and `tile_size`). Repeat calls with the
+#' same AOI and parameters reuse the cache; changing any of them re-fetches.
 #'
 #' @param aoi An `sf` polygon defining the area of interest.
 #' @param source Character. A known source name passed to [dft_stac_config()].
@@ -29,6 +29,16 @@
 #'   `"first"`). Use `"median"` for multi-scene composites.
 #' @param resampling Character. Spatial resampling method (default `"near"`
 #'   for categorical data).
+#' @param tile_size Numeric or `NULL` (default). Edge length, in CRS units
+#'   (metres for the default UTM CRS), of the download-tiling grid. When `NULL`,
+#'   one cube is streamed over the whole AOI bounding box (the download scales
+#'   with the bbox, not the AOI). When set, the bbox is split into a grid of
+#'   `tile_size`-square tiles and only tiles that intersect the AOI polygon are
+#'   streamed, then mosaicked — so a thin, diagonal AOI (e.g. a floodplain
+#'   corridor) fetches close to its footprint instead of its full bounding box.
+#'   Snapped to a multiple of `res`. Smaller tiles waste less bbox but cost more
+#'   per-tile round trips; there is no auto-tuning. Tiled fetches cache a terra
+#'   GeoTIFF (`.tif`) rather than a gdalcubes NetCDF (`.nc`).
 #' @param cache_dir Character. Cache directory path. When `NULL`, uses
 #'   [dft_cache_path()].
 #' @param force Logical. Re-fetch even if cached, overwriting the cached file
@@ -53,10 +63,33 @@ dft_stac_fetch <- function(aoi,
                            dt = "P1Y",
                            aggregation = "first",
                            resampling = "near",
+                           tile_size = NULL,
                            cache_dir = NULL,
                            force = FALSE,
                            sign_fn = rstac::sign_planetary_computer()) {
   rlang::check_installed("gdalcubes", reason = "to fetch STAC rasters")
+
+  # Normalize tile_size ONCE so the path gate (is.null) and the cache key derive
+  # from the same snapped scalar. When tiling, tune GDAL for the many extra
+  # per-item COG opens (restored on exit so the caller's session is untouched).
+  if (!is.null(tile_size)) {
+    tile_size <- tile_size_check(tile_size, res)
+    gdal_cfg <- c(
+      GDAL_DISABLE_READDIR_ON_OPEN = "EMPTY_DIR",
+      GDAL_HTTP_MULTIPLEX = "YES",
+      GDAL_HTTP_VERSION = "2",
+      VSI_CACHE = "TRUE",
+      CPL_VSIL_CURL_ALLOWED_EXTENSIONS = ".tif"
+    )
+    old_cfg <- Sys.getenv(names(gdal_cfg), unset = NA)
+    do.call(Sys.setenv, as.list(gdal_cfg))
+    on.exit({
+      set_again <- old_cfg[!is.na(old_cfg)]
+      if (length(set_again)) do.call(Sys.setenv, as.list(set_again))
+      unset <- names(old_cfg)[is.na(old_cfg)]
+      if (length(unset)) Sys.unsetenv(unset)
+    }, add = TRUE)
+  }
 
   # Resolve config
   if (is.null(stac_url) || is.null(collection) || is.null(asset)) {
@@ -115,39 +148,44 @@ dft_stac_fetch <- function(aoi,
   dir.create(cache_source_dir, recursive = TRUE, showWarnings = FALSE)
   cache_key <- stac_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
-    stac_url, collection, asset
+    stac_url, collection, asset, tile_size = tile_size
   )
+
+  # A tiled fetch mosaics per-tile cubes with terra and caches a GeoTIFF; an
+  # untiled fetch writes a single gdalcubes NetCDF. The grid and full-bbox extent
+  # are constant across years, so build them once.
+  ext_out <- if (is.null(tile_size)) "nc" else "tif"
+  bbox_ext <- list(
+    left = bbox_target[["xmin"]], right = bbox_target[["xmax"]],
+    bottom = bbox_target[["ymin"]], top = bbox_target[["ymax"]]
+  )
+  tiles <- if (is.null(tile_size)) NULL else tile_grid(aoi_target, tile_size, res)
 
   # Fetch per year
   result <- lapply(years, function(yr) {
-    cache_file <- file.path(cache_source_dir, paste0(yr, "_", cache_key, ".nc"))
+    cache_file <- file.path(cache_source_dir,
+                            paste0(yr, "_", cache_key, ".", ext_out))
+    t0 <- paste0(yr, "-01-01")
+    t1 <- paste0(yr, "-12-31")
 
     if (!force && file.exists(cache_file)) {
       message("  ", yr, ": cached")
-      r <- terra::rast(cache_file)
-    } else {
+    } else if (is.null(tile_size)) {
       message("  ", yr, ": fetching...")
-      v <- gdalcubes::cube_view(
-        srs = target_crs,
-        extent = list(
-          left   = bbox_target["xmin"],
-          right  = bbox_target["xmax"],
-          bottom = bbox_target["ymin"],
-          top    = bbox_target["ymax"],
-          t0 = paste0(yr, "-01-01"),
-          t1 = paste0(yr, "-12-31")
-        ),
-        dx = res, dy = res,
-        dt = dt,
-        aggregation = aggregation,
-        resampling = resampling
-      )
-      cube <- gdalcubes::raster_cube(col, v)
-      gdalcubes::write_ncdf(cube, cache_file, overwrite = TRUE)
-      r <- terra::rast(cache_file)
+      fetch_extent_to(col, bbox_ext, t0, t1, target_crs, res, dt,
+                      aggregation, resampling, cache_file)
+    } else {
+      message("  ", yr, ": fetching ", length(tiles), " tile(s)...")
+      tile_files <- vapply(seq_along(tiles), function(i) {
+        fetch_extent_to(col, tiles[[i]], t0, t1, target_crs, res, dt,
+                        aggregation, resampling,
+                        tempfile(sprintf("drift_tile%d_", i), fileext = ".nc"))
+      }, character(1))
+      mosaic_tiles(tile_files, cache_file)
+      unlink(tile_files)
     }
 
-    terra::mask(r, terra::vect(aoi_target))
+    terra::mask(terra::rast(cache_file), terra::vect(aoi_target))
   })
 
   names(result) <- as.character(years)
@@ -164,18 +202,134 @@ dft_stac_fetch <- function(aoi,
 #' representation differences can't change the key; the CRS enters separately
 #' as `target_crs`. `res` is coerced to double so `10L` and `10` key alike.
 #' Callers must pass post-resolution `stac_url`/`collection`/`asset`, never
-#' the raw possibly-NULL arguments.
+#' the raw possibly-NULL arguments. `tile_size` (the download-tiling grid, #36)
+#' is appended to the hash ONLY when non-NULL, so an untiled fetch keeps the
+#' exact legacy 9-element hash (existing caches stay valid) while a tiled fetch
+#' keys distinctly. It must arrive already snapped by the caller.
 #' @noRd
 stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
-                           resampling, stac_url, collection, asset) {
+                           resampling, stac_url, collection, asset,
+                           tile_size = NULL) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
-  substr(
-    rlang::hash(list(
-      geom_wkb, as.numeric(res), target_crs, dt, aggregation,
-      resampling, stac_url, collection, asset
-    )),
-    1, 12
+  parts <- list(
+    geom_wkb, as.numeric(res), target_crs, dt, aggregation,
+    resampling, stac_url, collection, asset
   )
+  # A tiled fetch caches a terra .tif mosaic; an untiled fetch caches a
+  # gdalcubes .nc. Keying them apart stops one being served as the other.
+  if (!is.null(tile_size)) parts <- c(parts, list(as.numeric(tile_size)))
+  substr(rlang::hash(parts), 1, 12)
+}
+
+
+#' Validate and snap a download `tile_size` to the pixel grid
+#'
+#' `tile_size` (CRS units) controls the download-tiling grid (#36). It is
+#' snapped to a multiple of `res` so every tile's pixel grid aligns to the same
+#' `res`-lattice — a prerequisite for a seam-free `terra::merge()` of the tiles.
+#' Caller only invokes this for a non-NULL `tile_size`; `NULL` gates the whole
+#' tiled path upstream. Returns the snapped size (a single positive numeric).
+#' @noRd
+tile_size_check <- function(tile_size, res) {
+  if (!is.numeric(tile_size) || length(tile_size) != 1L ||
+        !is.finite(tile_size) || tile_size <= 0) {
+    cli::cli_abort(c(
+      "{.arg tile_size} must be a single positive finite number (CRS units) \\
+       or {.code NULL}.",
+      "x" = "Got {.obj_type_friendly {tile_size}}."
+    ))
+  }
+  snapped <- round(tile_size / res) * res
+  if (snapped < res) {
+    cli::cli_abort(c(
+      "{.arg tile_size} ({tile_size}) snaps to {snapped}, smaller than \\
+       {.arg res} ({res}).",
+      "i" = "Choose a {.arg tile_size} at least as large as {.arg res}."
+    ))
+  }
+  if (!isTRUE(all.equal(snapped, tile_size))) {
+    cli::cli_inform(
+      "{.arg tile_size} snapped from {tile_size} to {snapped} \\
+       (a multiple of {.arg res} = {res})."
+    )
+  }
+  snapped
+}
+
+
+#' Build the res-aligned download tiles that intersect the AOI
+#'
+#' Splits the AOI bounding box into a grid of `tile_size`-square cells anchored
+#' at the bbox lower-left (the same origin as the single-cube extent), and keeps
+#' only cells that intersect the AOI polygon — so a thin corridor fetches near
+#' its footprint, not its full bbox (#36). Boundary cells are left un-trimmed
+#' past the bbox: trimming the max edge would break `res`-alignment, and the
+#' `< tile_size` overhang is dropped by the final `terra::mask()` anyway.
+#' `tile_size` must already be snapped (see `tile_size_check()`).
+#' @return A list of `list(left, right, bottom, top)` extents for [gdalcubes::cube_view()].
+#' @noRd
+tile_grid <- function(aoi_target, tile_size, res) {
+  bbox <- sf::st_bbox(aoi_target)
+  grid <- sf::st_make_grid(
+    sf::st_as_sfc(bbox),
+    cellsize = tile_size,
+    offset = c(bbox[["xmin"]], bbox[["ymin"]])
+  )
+  aoi_union <- sf::st_union(sf::st_geometry(aoi_target))
+  grid <- grid[lengths(sf::st_intersects(grid, aoi_union)) > 0]
+  if (length(grid) == 0) {
+    cli::cli_abort("No download tiles intersect the AOI \\
+                    (is the AOI geometry valid and non-empty?).")
+  }
+  lapply(grid, function(cell) {
+    b <- sf::st_bbox(cell)
+    list(left = b[["xmin"]], right = b[["xmax"]],
+         bottom = b[["ymin"]], top = b[["ymax"]])
+  })
+}
+
+
+#' Fetch one gdalcubes cube over a single space+time extent to a NetCDF file
+#'
+#' The `cube_view` + `raster_cube` + `write_ncdf` block shared by the untiled
+#' fetch (one call over the AOI bbox) and the tiled fetch (one call per tile,
+#' #36). Sharing this primitive is what guarantees a tile fetches identically to
+#' the corresponding slice of the untiled cube. `ext` is a list with
+#' `left`/`right`/`bottom`/`top`; `t0`/`t1` bound the year. Writes to `out_nc`
+#' and returns it (the caller reads it back with [terra::rast()]).
+#' @noRd
+fetch_extent_to <- function(col, ext, t0, t1, target_crs, res, dt,
+                            aggregation, resampling, out_nc) {
+  v <- gdalcubes::cube_view(
+    srs = target_crs,
+    extent = list(
+      left = ext$left, right = ext$right,
+      bottom = ext$bottom, top = ext$top,
+      t0 = t0, t1 = t1
+    ),
+    dx = res, dy = res, dt = dt,
+    aggregation = aggregation, resampling = resampling
+  )
+  cube <- gdalcubes::raster_cube(col, v)
+  gdalcubes::write_ncdf(cube, out_nc, overwrite = TRUE)
+  out_nc
+}
+
+
+#' Mosaic per-tile fetch outputs into one cache raster
+#'
+#' Reads each per-tile NetCDF, merges them (tiles are res-aligned and
+#' non-overlapping, so `terra::merge()` reassembles without resampling), and
+#' writes the mosaic to `out_file`. Written with `terra::writeRaster()` to a
+#' GeoTIFF — not `gdalcubes::write_ncdf()` — because terra's own NetCDF *write*
+#' is fragile on the pinned stack (see inst/notes/gdalcubes-pc-gotchas.md); this
+#' mirrors the `dft_stac_cube()` cache. Returns `out_file`.
+#' @noRd
+mosaic_tiles <- function(tile_files, out_file) {
+  rasters <- lapply(tile_files, terra::rast)
+  merged <- terra::merge(terra::sprc(rasters))
+  terra::writeRaster(merged, out_file, overwrite = TRUE)
+  out_file
 }
 
 
