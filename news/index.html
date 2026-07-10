@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,11 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.6.0" id="drift-060">drift 0.6.0<a class="anchor" aria-label="anchor" href="#drift-060"></a></h2>
+<ul><li>
+<code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> gains <code>tile_size</code> (default <code>NULL</code>), an opt-in that bounds the STAC download to the AOI footprint (<a href="https://github.com/NewGraphEnvironment/drift/issues/36" class="external-link">#36</a>). By default a single cube is streamed over the whole AOI bounding box, so for a thin, diagonal floodplain corridor (measured ~10% of the bbox inside the polygon) roughly 10× more pixels are downloaded than the AOI needs. When <code>tile_size</code> (CRS units — metres for the default UTM CRS) is set, the bbox is split into a <code>res</code>-aligned grid and only tiles that intersect the AOI polygon are streamed, then mosaicked with <code><a href="https://rspatial.github.io/terra/reference/merge.html" class="external-link">terra::merge()</a></code> — so a corridor fetches close to its footprint. Smaller tiles waste less bbox but cost more per-tile round trips (no auto-tuning). This is the <code>filter_geom</code>-independent path (the polygon-clip that would do this in the cube pipeline segfaults on the pinned gdalcubes build). Tiled fetches cache a terra GeoTIFF (<code>.tif</code>) rather than a gdalcubes NetCDF (<code>.nc</code>) and key distinctly, so existing untiled caches are untouched; <code>tile_size = NULL</code> is byte-for-byte the previous behavior. The same read residual on the continuous <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> path is tracked as <a href="https://github.com/NewGraphEnvironment/drift/issues/38" class="external-link">#38</a>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0" id="drift-050">drift 0.5.0<a class="anchor" aria-label="anchor" href="#drift-050"></a></h2>
 <ul><li>

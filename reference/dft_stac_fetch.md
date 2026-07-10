@@ -20,6 +20,7 @@ dft_stac_fetch(
   dt = "P1Y",
   aggregation = "first",
   resampling = "near",
+  tile_size = NULL,
   cache_dir = NULL,
   force = FALSE,
   sign_fn = rstac::sign_planetary_computer()
@@ -80,6 +81,20 @@ dft_stac_fetch(
   Character. Spatial resampling method (default `"near"` for categorical
   data).
 
+- tile_size:
+
+  Numeric or `NULL` (default). Edge length, in CRS units (metres for the
+  default UTM CRS), of the download-tiling grid. When `NULL`, one cube
+  is streamed over the whole AOI bounding box (the download scales with
+  the bbox, not the AOI). When set, the bbox is split into a grid of
+  `tile_size`-square tiles and only tiles that intersect the AOI polygon
+  are streamed, then mosaicked — so a thin, diagonal AOI (e.g. a
+  floodplain corridor) fetches close to its footprint instead of its
+  full bounding box. Snapped to a multiple of `res`. Smaller tiles waste
+  less bbox but cost more per-tile round trips; there is no auto-tuning.
+  Tiled fetches cache a terra GeoTIFF (`.tif`) rather than a gdalcubes
+  NetCDF (`.nc`).
+
 - cache_dir:
 
   Character. Cache directory path. When `NULL`, uses
@@ -109,8 +124,9 @@ objects, one per year. The STAC items are attached as
 
 Fetched rasters are cached under
 [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
-as `<source>/<year>_<key>.nc`, where `key` is a hash of the AOI geometry
-and every fetch parameter that affects the output (`res`, `crs`, `dt`,
-`aggregation`, `resampling`, `stac_url`, `collection`, `asset`). Repeat
-calls with the same AOI and parameters reuse the cache; changing any of
-them re-fetches.
+as `<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set — see
+below), where `key` is a hash of the AOI geometry and every fetch
+parameter that affects the output (`res`, `crs`, `dt`, `aggregation`,
+`resampling`, `stac_url`, `collection`, `asset`, and `tile_size`).
+Repeat calls with the same AOI and parameters reuse the cache; changing
+any of them re-fetches.

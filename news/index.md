@@ -1,5 +1,30 @@
 # Changelog
 
+## drift 0.6.0
+
+- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  gains `tile_size` (default `NULL`), an opt-in that bounds the STAC
+  download to the AOI footprint
+  ([\#36](https://github.com/NewGraphEnvironment/drift/issues/36)). By
+  default a single cube is streamed over the whole AOI bounding box, so
+  for a thin, diagonal floodplain corridor (measured ~10% of the bbox
+  inside the polygon) roughly 10× more pixels are downloaded than the
+  AOI needs. When `tile_size` (CRS units — metres for the default UTM
+  CRS) is set, the bbox is split into a `res`-aligned grid and only
+  tiles that intersect the AOI polygon are streamed, then mosaicked with
+  [`terra::merge()`](https://rspatial.github.io/terra/reference/merge.html)
+  — so a corridor fetches close to its footprint. Smaller tiles waste
+  less bbox but cost more per-tile round trips (no auto-tuning). This is
+  the `filter_geom`-independent path (the polygon-clip that would do
+  this in the cube pipeline segfaults on the pinned gdalcubes build).
+  Tiled fetches cache a terra GeoTIFF (`.tif`) rather than a gdalcubes
+  NetCDF (`.nc`) and key distinctly, so existing untiled caches are
+  untouched; `tile_size = NULL` is byte-for-byte the previous behavior.
+  The same read residual on the continuous
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  path is tracked as
+  [\#38](https://github.com/NewGraphEnvironment/drift/issues/38).
+
 ## drift 0.5.0
 
 - [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
