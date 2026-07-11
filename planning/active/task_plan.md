@@ -16,11 +16,10 @@ multi-layer stacks) but simpler in caching (always `.tif`; GDAL config already
 unconditional — no `.nc`/`.tif` routing).
 
 ## Phase 1: cube cache key — golden guardian first, then conditional `tile_size` (offline, tests-first)
-- [ ] compute the current untiled `stac_cube_cache_key()` for `cube_key()`'s fixed inputs; freeze as `expect_equal(cube_key(), "<frozen 12-char>")` — authored **before** touching the function
-- [ ] extend the `cube_key()` helper with `tile_size = NULL` (pass through to `stac_cube_cache_key`)
-- [ ] distinctness: `cube_key(tile_size = 500) != cube_key()`; distinct sizes → distinct keys; snap-before-key (`504` and `500` at res 10 → same key)
-- [ ] refactor `stac_cube_cache_key` to the append-only shape; append `tile_size` only when non-NULL; **confirm the frozen literal is unchanged** (byte-preserving)
-- [ ] call site passes `tile_size = tile_size`; normalize `tile_size` once via `tile_size_check` at the top of `dft_stac_cube`
+- [x] compute the current untiled `stac_cube_cache_key()` for `cube_key()`'s fixed inputs; freeze as `expect_equal(cube_key(), "638a2be11fdf")` — authored **before** touching the function
+- [x] extend the `cube_key()` helper with `tile_size = NULL` (pass through to `stac_cube_cache_key`)
+- [x] distinctness: `cube_key(tile_size = 500) != cube_key()`; distinct sizes → distinct keys; snap-before-key (`504` and `500` at res 10 → same key)
+- [x] refactor `stac_cube_cache_key` to the append-only shape (add trailing `tile_size = NULL`); append only when non-NULL; **confirm the frozen literal is unchanged** (byte-preserving). Existing 18-arg call site keeps working via the default — the `tile_size` param + normalize + call-site pass land in Phase 3 alongside the tiled read (so no distinct-key-but-bbox-read window)
 
 ## Phase 2: `mosaic_stacks` + multi-layer merge / commutativity / extent oracles (offline, tests-first)
 - [ ] multi-layer merge oracle: reference multi-layer SpatRaster → split into res-aligned non-overlapping tiles → `mosaic_stacks` → `all.equal` per layer; nlyr + layer order preserved
@@ -29,6 +28,7 @@ unconditional — no `.nc`/`.tif` routing).
 - [ ] implement `mosaic_stacks()` `@noRd`; tests green
 
 ## Phase 3: tile the cube read — refactor + wire `tile_size` end-to-end
+- [ ] add `tile_size = NULL` param to `dft_stac_cube`; normalize once via `tile_size_check` at the top; call site passes `tile_size = tile_size`
 - [ ] `build_index_stack` gains `v`; add local closure `assemble_index_stack(extent)` (moves cube_view + offset-split + cover inside); untiled routes through it over `bbox_ext` — identical output
 - [ ] tiled branch: `tile_grid` → per-tile `assemble_index_stack` → uniform-nlyr `stopifnot` → `mosaic_stacks`; unified clip/time/names/`.tif` tail; reuse #36 helpers in place (comment)
 - [ ] roxygen `@param tile_size` + amended clip/read caveat (`clip=FALSE`+`tile_size` = tile-union extent) + cache-doc `tile_size` note

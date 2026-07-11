@@ -320,21 +320,28 @@ stac_cube_clip <- function(stk, aoi) {
 #' `scale`/`offset` are included because they change pixel values. `clip` is
 #' included because it changes the written extent (polygon vs bbox), so a
 #' `clip = FALSE` request must not read a clipped cube (or vice versa).
+#' `tile_size` (the download-tiling grid, #38) is appended to the hash ONLY when
+#' non-NULL, so an untiled cube keeps the exact legacy 18-element hash (existing
+#' `cube_<key>.tif` stay valid) while a tiled read keys distinctly. It must
+#' arrive already snapped by the caller (see `tile_size_check()`).
 #' @noRd
 stac_cube_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
                                 resampling, stac_url, collection, band_assets,
                                 datetime, index, cloud_cover_max, mask_values,
                                 scale, offset, months = NULL,
-                                offset_before = 0, clip = TRUE) {
+                                offset_before = 0, clip = TRUE,
+                                tile_size = NULL) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
-  substr(
-    rlang::hash(list(
-      geom_wkb, as.numeric(res), target_crs, dt, aggregation, resampling,
-      stac_url, collection, band_assets, datetime, index,
-      as.numeric(cloud_cover_max), sort(as.numeric(mask_values)),
-      as.numeric(scale), as.numeric(offset), sort(as.numeric(months)),
-      as.numeric(offset_before), as.logical(clip)
-    )),
-    1, 12
+  parts <- list(
+    geom_wkb, as.numeric(res), target_crs, dt, aggregation, resampling,
+    stac_url, collection, band_assets, datetime, index,
+    as.numeric(cloud_cover_max), sort(as.numeric(mask_values)),
+    as.numeric(scale), as.numeric(offset), sort(as.numeric(months)),
+    as.numeric(offset_before), as.logical(clip)
   )
+  # A tiled read caches the same .tif shape but over the AOI-intersecting tile
+  # union; keying it apart stops a tiled cube being served for an untiled request
+  # (or vice versa). Appending only when non-NULL preserves the legacy key.
+  if (!is.null(tile_size)) parts <- c(parts, list(as.numeric(tile_size)))
+  substr(rlang::hash(parts), 1, 12)
 }

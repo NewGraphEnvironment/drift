@@ -36,17 +36,39 @@ cube_key <- function(aoi = square_aoi(), res = 10, target_crs = "EPSG:32609",
                      datetime = "2019-01-01/2023-12-31", index = "kndvi",
                      cloud_cover_max = 60, mask_values = c(3, 8, 9, 10, 11),
                      scale = 1e-4, offset = -0.1, months = NULL,
-                     offset_before = 0, clip = TRUE) {
+                     offset_before = 0, clip = TRUE, tile_size = NULL) {
+  # dft_stac_cube snaps tile_size to the pixel grid before it reaches the key;
+  # mirror that here so the snap-before-key test reflects real behavior (#38)
+  if (!is.null(tile_size)) {
+    tile_size <- suppressMessages(drift:::tile_size_check(tile_size, res))
+  }
   drift:::stac_cube_cache_key(
     aoi, res, target_crs, dt, aggregation, resampling, stac_url, collection,
     band_assets, datetime, index, cloud_cover_max, mask_values, scale, offset,
-    months, offset_before, clip
+    months, offset_before, clip, tile_size
   )
 }
 
 test_that("stac_cube_cache_key is deterministic and 12-char hex", {
   expect_equal(cube_key(), cube_key())
   expect_match(cube_key(), "^[0-9a-f]{12}$")
+})
+
+test_that("stac_cube_cache_key untiled key is frozen (legacy-cache guardian)", {
+  # Freezes the exact 12-char hash for cube_key()'s fixed inputs so the
+  # tile_size append can't silently perturb the untiled key and orphan every
+  # existing cube_<key>.tif (10-30 min to re-stream). Mirrors the fetch golden
+  # 79f67b7b9dae (#36). If this ever changes, existing cube caches are invalid.
+  expect_equal(cube_key(), "638a2be11fdf")
+})
+
+test_that("stac_cube_cache_key keys tile_size distinctly and after snapping", {
+  base <- cube_key()                                     # tile_size = NULL
+  expect_false(cube_key(tile_size = 500) == base)        # tiled keys apart from untiled
+  expect_false(cube_key(tile_size = 500) ==
+                 cube_key(tile_size = 250))              # distinct sizes -> distinct keys
+  # snapped to the res-lattice before the key: 504 -> 500 (res 10), same key
+  expect_equal(cube_key(tile_size = 504), cube_key(tile_size = 500))
 })
 
 test_that("stac_cube_cache_key changes with each cube-affecting parameter", {
