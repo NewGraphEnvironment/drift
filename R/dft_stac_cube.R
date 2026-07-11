@@ -311,6 +311,24 @@ stac_cube_clip <- function(stk, aoi) {
 }
 
 
+#' Mosaic per-tile index stacks into one raster (in-memory, multi-layer)
+#'
+#' The reassembly step of the tiled read path (#38): each AOI-intersecting tile
+#' is streamed and reduced to its own multi-layer monthly index stack, and this
+#' merges them into one. Tiles are `res`-aligned and non-overlapping (see
+#' `tile_grid()`), so `terra::merge()` reassembles without resampling; it merges
+#' layer-by-layer positionally, so all `nlyr` layers are preserved in order
+#' (layer names/time are set by the caller after the merge). Unlike the fetch
+#' sibling's file-based `mosaic_tiles()`, this takes in-memory `SpatRaster`
+#' stacks (a tile may be the `terra::cover()` of a pre/post offset split) and
+#' returns the merged stack for the caller to clip and write. Skipped-tile gaps
+#' become `NA`, so the mosaic is the tile union, not a gap-free bounding box.
+#' @noRd
+mosaic_stacks <- function(stacks) {
+  terra::merge(terra::sprc(stacks))
+}
+
+
 #' Cache key for one STAC index-cube parameter set
 #'
 #' Cube-mode analogue of `stac_cache_key()` (kept separate so the fetch key

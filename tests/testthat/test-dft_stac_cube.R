@@ -134,6 +134,86 @@ test_that("stac_cube_clip masks cells outside the AOI polygon on every layer", {
   expect_true(all(is.na(vals[!inside, ])))    # outside polygon: NA
 })
 
+# mosaic_stacks(): the in-memory, multi-layer merge that reassembles per-tile
+# index stacks into one raster on the tiled read path (#38). Network-free —
+# synthetic multi-layer rasters split into res-aligned, non-overlapping tiles.
+
+test_that("mosaic_stacks reassembles res-aligned tiles losslessly across layers", {
+  # 3-layer reference on a known lattice; distinct values per cell AND per layer
+  # (values fill layer-major: L1 = 1:64, L2 = 65:128, L3 = 129:192), so a layer
+  # swap or a spatial mis-merge would change the compared values
+  ref <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 80,
+                     ymin = 0, ymax = 80, crs = "EPSG:32609", nlyrs = 3)
+  terra::values(ref) <- seq_len(terra::ncell(ref) * terra::nlyr(ref))
+  # split into 4 quadrant tiles (40x40), res-aligned, non-overlapping, tiling ref
+  exts <- list(terra::ext(0, 40, 0, 40), terra::ext(40, 80, 0, 40),
+               terra::ext(0, 40, 40, 80), terra::ext(40, 80, 40, 80))
+  merged <- drift:::mosaic_stacks(lapply(exts, function(e) terra::crop(ref, e)))
+
+  expect_s4_class(merged, "SpatRaster")
+  expect_equal(terra::nlyr(merged), 3L)                       # all layers kept
+  expect_true(terra::compareGeom(merged, ref, stopOnError = FALSE))
+  expect_equal(terra::values(merged), terra::values(ref))     # exact, per layer
+})
+
+test_that("tiling commutes with the offset-split cover (per-tile cover + merge == global cover)", {
+  # Mimics the 2022 offset split: pre/post subcubes with complementary NA
+  # patterns, coalesced by terra::cover. Under tiling the cover runs per tile,
+  # then the tiles are merged; that must equal covering the full extent once.
+  base <- function() {
+    terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 80,
+                ymin = 0, ymax = 80, crs = "EPSG:32609", nlyrs = 2)
+  }
+  pre <- base()
+  post <- base()
+  n <- terra::ncell(pre)                         # 64
+  odd <- seq_len(n) %% 2 == 1
+  # layer 1: pre holds odd cells (NA on even), post holds even; layer 2 reversed
+  # -> cover must pick pre-then-post per cell, per layer, and tiles partition space
+  terra::values(pre)  <- c(ifelse(odd, seq_len(n), NA),
+                           ifelse(odd, NA, seq_len(n) + 200))
+  terra::values(post) <- c(ifelse(odd, NA, seq_len(n) + 100),
+                           ifelse(odd, seq_len(n) + 300, NA))
+  ref <- terra::cover(pre, post)
+  expect_false(anyNA(terra::values(ref)))        # complementary -> fully coalesced
+
+  exts <- list(terra::ext(0, 40, 0, 40), terra::ext(40, 80, 0, 40),
+               terra::ext(0, 40, 40, 80), terra::ext(40, 80, 40, 80))
+  tiled <- drift:::mosaic_stacks(lapply(exts, function(e) {
+    terra::cover(terra::crop(pre, e), terra::crop(post, e))
+  }))
+
+  expect_true(terra::compareGeom(tiled, ref, stopOnError = FALSE))
+  expect_equal(terra::values(tiled), terra::values(ref))
+})
+
+test_that("mosaic_stacks over tile_grid tiles leaves NA gaps where empty tiles were skipped", {
+  # Documents the clip = FALSE + tile_size contract: the mosaic is the union of
+  # AOI-intersecting tiles, with NA where empty tiles were dropped — NOT a
+  # gap-free bounding box. Uses the packaged diagonal reach (area/bbox ~ 0.105).
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"), quiet = TRUE
+  )
+  target_crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", target_crs)))
+  res <- 10
+  tile_size <- suppressMessages(drift:::tile_size_check(500, res))
+  tiles <- drift:::tile_grid(aoi_t, tile_size, res)
+
+  be <- sf::st_bbox(aoi_t)
+  n_full <- ceiling((be[["xmax"]] - be[["xmin"]]) / tile_size) *
+    ceiling((be[["ymax"]] - be[["ymin"]]) / tile_size)
+  expect_lt(length(tiles), n_full)               # empty tiles dropped (the mechanism)
+
+  # each kept tile filled with 1; merge -> rectangular bbox of kept tiles with
+  # NA in the skipped-tile gaps
+  merged <- drift:::mosaic_stacks(lapply(tiles, function(ext) {
+    terra::rast(xmin = ext$left, xmax = ext$right, ymin = ext$bottom,
+                ymax = ext$top, resolution = res, crs = target_crs, vals = 1)
+  }))
+  expect_true(anyNA(terra::values(merged)))      # gaps -> not a gap-free bbox
+})
+
 # Network end-to-end against the Planetary Computer. Opt-in only (env var), so
 # the default `devtools::test()` stays network-free per the repo convention.
 test_that("dft_stac_cube fetches an index stack end-to-end", {

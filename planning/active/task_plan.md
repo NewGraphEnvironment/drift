@@ -22,10 +22,10 @@ unconditional — no `.nc`/`.tif` routing).
 - [x] refactor `stac_cube_cache_key` to the append-only shape (add trailing `tile_size = NULL`); append only when non-NULL; **confirm the frozen literal is unchanged** (byte-preserving). Existing 18-arg call site keeps working via the default — the `tile_size` param + normalize + call-site pass land in Phase 3 alongside the tiled read (so no distinct-key-but-bbox-read window)
 
 ## Phase 2: `mosaic_stacks` + multi-layer merge / commutativity / extent oracles (offline, tests-first)
-- [ ] multi-layer merge oracle: reference multi-layer SpatRaster → split into res-aligned non-overlapping tiles → `mosaic_stacks` → `all.equal` per layer; nlyr + layer order preserved
-- [ ] **commutativity:** synthetic multi-layer `pre`/`post` stacks with a known NA pattern → `mosaic_stacks(lapply(tiles, \(t) terra::cover(terra::crop(pre,t), terra::crop(post,t))))` equals `terra::cover(pre, post)` cell-for-cell (cover-then-merge == merge-then-cover, in CI)
-- [ ] **extent semantics:** `mosaic_stacks` over `tile_grid`-derived synthetic tiles for the example AOI yields the tile-union extent (⊇ polygon, generally ⊊ full bbox) — documents the `clip = FALSE` + `tile_size` narrowing
-- [ ] implement `mosaic_stacks()` `@noRd`; tests green
+- [x] multi-layer merge oracle: reference multi-layer SpatRaster → split into res-aligned non-overlapping tiles → `mosaic_stacks` → exact values per layer; nlyr + layer order preserved
+- [x] **commutativity:** synthetic multi-layer `pre`/`post` stacks with a known NA pattern → `mosaic_stacks(lapply(tiles, \(t) terra::cover(terra::crop(pre,t), terra::crop(post,t))))` equals `terra::cover(pre, post)` cell-for-cell (cover-then-merge == merge-then-cover, in CI)
+- [x] **extent semantics:** `mosaic_stacks` over `tile_grid`-derived synthetic tiles for the example AOI leaves NA gaps where empty tiles were skipped (n_kept 31 < n_full 49) — documents the `clip = FALSE` + `tile_size` narrowing
+- [x] implement `mosaic_stacks()` `@noRd`; tests green (41 pass, 0 fail; lint-clean)
 
 ## Phase 3: tile the cube read — refactor + wire `tile_size` end-to-end
 - [ ] add `tile_size = NULL` param to `dft_stac_cube`; normalize once via `tile_size_check` at the top; call site passes `tile_size = tile_size`
