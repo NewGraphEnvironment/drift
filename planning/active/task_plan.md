@@ -28,11 +28,11 @@ unconditional — no `.nc`/`.tif` routing).
 - [x] implement `mosaic_stacks()` `@noRd`; tests green (41 pass, 0 fail; lint-clean)
 
 ## Phase 3: tile the cube read — refactor + wire `tile_size` end-to-end
-- [ ] add `tile_size = NULL` param to `dft_stac_cube`; normalize once via `tile_size_check` at the top; call site passes `tile_size = tile_size`
-- [ ] `build_index_stack` gains `v`; add local closure `assemble_index_stack(extent)` (moves cube_view + offset-split + cover inside); untiled routes through it over `bbox_ext` — identical output
-- [ ] tiled branch: `tile_grid` → per-tile `assemble_index_stack` → uniform-nlyr `stopifnot` → `mosaic_stacks`; unified clip/time/names/`.tif` tail; reuse #36 helpers in place (comment)
-- [ ] roxygen `@param tile_size` + amended clip/read caveat (`clip=FALSE`+`tile_size` = tile-union extent) + cache-doc `tile_size` note
-- [ ] `devtools::document()`; `lintr::lint_package()` clean; `devtools::test()` green (offline)
+- [x] add `tile_size = NULL` param to `dft_stac_cube`; normalize once via `tile_size_check` at the top; call site passes `tile_size = tile_size`
+- [x] `build_index_stack` gains `v`; add local closure `assemble_index_stack(extent)` (moves cube_view + offset-split + cover inside); untiled routes through it over `bbox_ext` — identical output
+- [x] tiled branch: `tile_grid` → per-tile `assemble_index_stack` → uniform-nlyr `stopifnot` → `mosaic_stacks`; unified clip/time/names/`.tif` tail; reuse #36 helpers in place (comment)
+- [x] roxygen `@param tile_size` + amended clip/read caveat (`clip=FALSE`+`tile_size` = tile-union extent) + cache-doc `tile_size` note
+- [x] `devtools::document()`; `lintr::lint_package()` R/ source clean (reinstalled stale v0.3.0 → object_usage false positives cleared); `devtools::test()` green (41 pass, offline)
 
 ## Phase 4: opt-in network e2e (`DRIFT_TEST_NETWORK`)
 - [ ] window **straddling 2022-01-25** (e.g. `2021-10-01/2022-04-30`, `dt = "P1M"`) so the offset-split-under-tiling path runs on the tiled side

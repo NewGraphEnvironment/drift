@@ -9,7 +9,8 @@
 #'
 #' The index stack is materialized once to a GeoTIFF under [dft_cache_path()]
 #' as `<source>/cube_<key>.tif`, keyed by a hash of the AOI geometry and every
-#' cube-affecting parameter. Because it is invariant to [dft_rast_break()]'s
+#' cube-affecting parameter (including `clip` and `tile_size`, so a tiled read
+#' keys apart from an untiled one). Because it is invariant to [dft_rast_break()]'s
 #' parameters, caching it here makes bfast parameter sweeps cheap — they re-read
 #' the local raster instead of re-streaming COGs.
 #'
@@ -40,10 +41,13 @@
 #' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
 #'   polygon with `terra::mask()` (cells outside → `NA` on every layer), so
 #'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. Set
-#'   `FALSE` to keep the full bounding box (e.g. for surrounding context, or to
-#'   mask later with a different polygon). Note this clips the *output* only — the
-#'   full bbox of COGs is still streamed either way (the AOI cannot be pushed into
-#'   the read on the pinned gdalcubes build; see `inst/notes/gdalcubes-pc-gotchas.md`).
+#'   `FALSE` to keep the wider extent (e.g. for surrounding context, or to mask
+#'   later with a different polygon). This clips the *output* — with the default
+#'   `tile_size = NULL` the full bbox of COGs is still streamed either way, so
+#'   `clip = FALSE` returns the full bounding box. When `tile_size` is set the read
+#'   is tiled, so `clip = FALSE` returns the **AOI-intersecting tile union** (a
+#'   stair-stepped superset of the polygon with `NA` where empty tiles were
+#'   skipped), not a gap-free bounding box.
 #' @param cloud_cover_max Numeric. Scene-level `eo:cloud_cover` maximum percent
 #'   for the STAC pre-filter (default 60).
 #' @param months Integer vector of calendar months (1-12) to keep, or `NULL`
@@ -57,6 +61,18 @@
 #' @param mask_values Integer vector of mask-band classes to exclude. When
 #'   `NULL`, uses `mask_values` from [dft_stac_config()] (e.g. Sentinel-2 SCL
 #'   cloud / shadow / cirrus classes).
+#' @param tile_size Numeric or `NULL` (default). Edge length, in CRS units
+#'   (metres for the default UTM CRS), of the read-tiling grid (#38). When `NULL`,
+#'   one cube is streamed over the whole AOI bounding box (the read scales with the
+#'   bbox, not the AOI). When set, the bbox is split into a grid of `tile_size`-square
+#'   tiles and only tiles that intersect the AOI polygon are streamed, then mosaicked
+#'   — so a thin, diagonal AOI (e.g. a floodplain corridor) reads close to its
+#'   footprint. Snapped to a multiple of `res`. Smaller tiles waste less bbox but
+#'   cost more per-tile round trips; there is no auto-tuning. The cube always caches
+#'   a `.tif` either way; a tiled read keys distinctly (see the caching note above),
+#'   so untiled caches are untouched and `tile_size = NULL` is byte-for-byte the
+#'   previous behavior. This is the continuous-path twin of [dft_stac_fetch()]'s
+#'   `tile_size` — the `filter_geom`-independent way to bound the read.
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
 #'   [dft_cache_path()].
 #' @param force Logical. Re-fetch even if cached, overwriting the cached raster
@@ -68,7 +84,8 @@
 #'   time value per layer — cached as a GeoTIFF. By default (`clip = TRUE`) the
 #'   stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
 #'   `NA`), so the reduced raster from [dft_rast_break()] is already polygon-tight;
-#'   pass `clip = FALSE` for the full AOI **bounding box**. For sources with a
+#'   pass `clip = FALSE` for the full AOI **bounding box** (or, with `tile_size`
+#'   set, the AOI-intersecting tile union). For sources with a
 #'   reflectance-offset baseline boundary (Sentinel-2), items are split at the
 #'   boundary and offset-corrected per side, so a series crossing it carries no
 #'   artificial index step.
@@ -105,6 +122,7 @@ dft_stac_cube <- function(aoi,
                           cloud_cover_max = 60,
                           months = NULL,
                           mask_values = NULL,
+                          tile_size = NULL,
                           cache_dir = NULL,
                           force = FALSE,
                           sign_fn = rstac::sign_planetary_computer()) {
@@ -150,6 +168,10 @@ dft_stac_cube <- function(aoi,
   # truthy-but-non-TRUE clip (e.g. 1 or "TRUE") must not skip the mask yet key as
   # TRUE, which would let a later clip=TRUE read the unclipped cube (#32).
   clip <- isTRUE(as.logical(clip))
+  # normalize tile_size ONCE (snap to a multiple of res) so the path gate
+  # (is.null) and the cache-key append derive from the same scalar (#36/#38).
+  # tile_size_check() is the shared download-tiling helper from #36.
+  if (!is.null(tile_size)) tile_size <- tile_size_check(tile_size, res)
 
   # Ensure aoi is sf
   if (inherits(aoi, "SpatVector")) aoi <- sf::st_as_sf(aoi)
@@ -181,7 +203,8 @@ dft_stac_cube <- function(aoi,
   cache_key <- stac_cube_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
     cfg$stac_url, cfg$collection, band_assets, datetime, index,
-    cloud_cover_max, mask_values, scale, offset, months, offset_before, clip
+    cloud_cover_max, mask_values, scale, offset, months, offset_before, clip,
+    tile_size
   )
   cache_file <- file.path(cache_source_dir, paste0("cube_", cache_key, ".tif"))
 
@@ -228,24 +251,31 @@ dft_stac_cube <- function(aoi,
   message("  ", n_items, " items returned")
   if (n_items == 0) stop("No STAC items found for ", cfg$collection)
 
-  v <- gdalcubes::cube_view(
-    srs = target_crs,
-    extent = list(
-      left = bbox_target[["xmin"]], right = bbox_target[["xmax"]],
-      bottom = bbox_target[["ymin"]], top = bbox_target[["ymax"]],
-      t0 = t0, t1 = t1
-    ),
-    dx = res, dy = res, dt = dt,
-    aggregation = aggregation, resampling = resampling
-  )
+  # Baseline-conditional offset: split items at the boundary so each side is
+  # corrected with its own offset (below). The split is by item date, so it is
+  # the same for every read extent — compute it (and announce it) once, before
+  # assembling any cube.
+  is_pre <- rep(FALSE, length(items$features))
+  if (!is.null(offset_boundary)) {
+    item_date <- as.Date(substr(
+      vapply(items$features, function(f) f$properties$datetime %||% NA_character_, ""),
+      1, 10
+    ))
+    is_pre <- !is.na(item_date) & item_date < as.Date(offset_boundary)
+  }
+  if (any(is_pre) && !all(is_pre)) {
+    message("  offset split at ", offset_boundary, ": ",
+            sum(is_pre), " pre / ", sum(!is_pre), " post")
+  }
 
-  # Build the index cube for one item subset with one offset, materialize it, and
-  # read it back as a terra stack. The cube spans the AOI bounding box:
-  # gdalcubes::filter_geom() to clip to the polygon yields an all-NA cube (and can
-  # crash the compute worker) on the pinned build, so we mask clouds here and clip
-  # the assembled stack to the AOI polygon afterward with terra::mask() (see
-  # stac_cube_clip, #32), as the sibling dft_stac_fetch() does — never filter_geom().
-  build_index_stack <- function(features, offset_use) {
+  # Build the masked index cube for one item subset with one offset over a given
+  # cube_view, materialize it, and read it back as a terra stack. The cube spans
+  # the view's extent: gdalcubes::filter_geom() to clip to the polygon yields an
+  # all-NA cube (and can crash the compute worker) on the pinned build, so we mask
+  # clouds here and clip the assembled stack to the AOI polygon afterward with
+  # terra::mask() (see stac_cube_clip, #32), as dft_stac_fetch() does — never
+  # filter_geom().
+  build_index_stack <- function(features, offset_use, v) {
     img_col <- gdalcubes::stac_image_collection(
       features, asset_names = c(band_assets, mask_asset)
     )
@@ -259,27 +289,54 @@ dft_stac_cube <- function(aoi,
     terra::rast(tmp)
   }
 
-  # Baseline-conditional offset: split items at the boundary and correct each
-  # side with its own offset, then coalesce onto the shared monthly grid. Both
-  # subcubes are built over the full view so their layers align for terra::cover.
-  is_pre <- rep(FALSE, length(items$features))
-  if (!is.null(offset_boundary)) {
-    item_date <- as.Date(substr(
-      vapply(items$features, function(f) f$properties$datetime %||% NA_character_, ""),
-      1, 10
-    ))
-    is_pre <- !is.na(item_date) & item_date < as.Date(offset_boundary)
+  # Assemble the full masked index stack for one space extent: build the cube_view
+  # over that extent (same t0/t1/dt for every extent, so every tile yields the same
+  # nlyr), run the offset split, and coalesce the pre/post subcubes with
+  # terra::cover (both built over the same view so their layers align). A local
+  # closure (not @noRd) because it reads the call's items/offset/index/etc.
+  assemble_index_stack <- function(extent) {
+    v <- gdalcubes::cube_view(
+      srs = target_crs,
+      extent = list(
+        left = extent$left, right = extent$right,
+        bottom = extent$bottom, top = extent$top,
+        t0 = t0, t1 = t1
+      ),
+      dx = res, dy = res, dt = dt,
+      aggregation = aggregation, resampling = resampling
+    )
+    if (any(is_pre) && !all(is_pre)) {
+      terra::cover(
+        build_index_stack(items$features[is_pre], offset_before, v),
+        build_index_stack(items$features[!is_pre], offset, v)
+      )
+    } else {
+      build_index_stack(items$features,
+                        if (all(is_pre)) offset_before else offset, v)
+    }
   }
 
-  if (any(is_pre) && !all(is_pre)) {
-    message("  offset split at ", offset_boundary, ": ",
-            sum(is_pre), " pre / ", sum(!is_pre), " post")
-    stk <- terra::cover(
-      build_index_stack(items$features[is_pre], offset_before),
-      build_index_stack(items$features[!is_pre], offset)
-    )
+  # Untiled (tile_size = NULL): one cube over the AOI bounding box — unchanged
+  # behavior. Tiled (#38): stream only the res-aligned tiles that intersect the
+  # AOI polygon and mosaic them, so a sparse corridor reads near its footprint
+  # instead of the full bbox. tile_grid()/tile_size_check() are the shared
+  # download-tiling helpers from #36 (defined in dft_stac_fetch.R); the GDAL
+  # /vsicurl tuning set at the top of this function already covers the extra
+  # per-tile COG opens.
+  bbox_ext <- list(
+    left = bbox_target[["xmin"]], right = bbox_target[["xmax"]],
+    bottom = bbox_target[["ymin"]], top = bbox_target[["ymax"]]
+  )
+  if (is.null(tile_size)) {
+    stk <- assemble_index_stack(bbox_ext)
   } else {
-    stk <- build_index_stack(items$features, if (all(is_pre)) offset_before else offset)
+    tiles <- tile_grid(aoi_target, tile_size, res)
+    message("  tiling read into ", length(tiles), " tile(s) intersecting the AOI")
+    tile_stacks <- lapply(tiles, assemble_index_stack)
+    # every tile shares t0/t1/dt so nlyr is uniform; guard so a future per-tile
+    # time bound fails legibly here rather than deep inside terra::merge.
+    stopifnot(length(unique(vapply(tile_stacks, terra::nlyr, integer(1)))) == 1L)
+    stk <- mosaic_stacks(tile_stacks)
   }
 
   # Restore the AOI-polygon clip removed in #30: mask the assembled stack (never
