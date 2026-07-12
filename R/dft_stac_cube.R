@@ -335,7 +335,8 @@ dft_stac_cube <- function(aoi,
     tile_stacks <- lapply(tiles, assemble_index_stack)
     # every tile shares t0/t1/dt so nlyr is uniform; guard so a future per-tile
     # time bound fails legibly here rather than deep inside terra::merge.
-    stopifnot(length(unique(vapply(tile_stacks, terra::nlyr, integer(1)))) == 1L)
+    # terra::nlyr() returns a double, so the vapply template is numeric(1).
+    stopifnot(length(unique(vapply(tile_stacks, terra::nlyr, numeric(1)))) == 1L)
     stk <- mosaic_stacks(tile_stacks)
   }
 

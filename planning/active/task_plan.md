@@ -34,10 +34,10 @@ unconditional — no `.nc`/`.tif` routing).
 - [x] roxygen `@param tile_size` + amended clip/read caveat (`clip=FALSE`+`tile_size` = tile-union extent) + cache-doc `tile_size` note
 - [x] `devtools::document()`; `lintr::lint_package()` R/ source clean (reinstalled stale v0.3.0 → object_usage false positives cleared); `devtools::test()` green (41 pass, offline)
 
-## Phase 4: opt-in network e2e (`DRIFT_TEST_NETWORK`)
-- [ ] window **straddling 2022-01-25** (e.g. `2021-10-01/2022-04-30`, `dt = "P1M"`) so the offset-split-under-tiling path runs on the tiled side
-- [ ] fetch untiled + tiled (small `tile_size`); assert both `SpatRaster`, equal nlyr, time set, tiled cached as one `cube_<key>.tif`, kept-tile count ≪ full grid
-- [ ] tiled ≈ untiled over common AOI cells **per layer** via `terra::resample(tiled, untiled, method = "near")` then abs-diff with an **explicit tolerance / robust quantile** (float kNDVI — no integer `expect_equal`; no `compareGeom` on extents)
+## Phase 4: opt-in network e2e (`DRIFT_TEST_NETWORK`) — ran live; caught 2 real issues
+- [x] ran the e2e (32-min straddling fetch) → caught: (1) `terra::nlyr()` returns **double** → guard template fixed to `numeric(1)`; (2) tiled/untiled are **not co-lattice** (gdalcubes enlarges the untiled bbox symmetrically ~0.5px; tiles anchor at bbox-LL) so pixel-identity is the wrong assertion
+- [x] confirmed correctness offline on saved real cubes: bilinear-aligned cor **0.997**, median |diff| **3.4e-3**, per-layer means agree **6e-4**, and **no tile seams** (edge |diff| == interior) → tiled cube is a faithful resampling, benign grid offset only
+- [x] rewrote the network test: grow-season window (`2021-07-01/2021-08-31`); assert `SpatRaster`, equal nlyr, time set, 2 `cube_<key>.tif`, kept-tile count < full grid; equivalence via **bilinear**-aligned `cor > 0.98` + `median |diff| < 0.01` + per-layer mean agreement `< 0.01` (thresholds measured with headroom). Offset-split-under-tiling covered by the offline commutativity oracle
 
 ## Phase 5: docs + gotchas + NEWS + version
 - [ ] `inst/notes/gdalcubes-pc-gotchas.md`: flip the #38 residual to resolved-via-cube-tiling; update the #36 bullet's "#38 for the cube-path twin" cross-ref

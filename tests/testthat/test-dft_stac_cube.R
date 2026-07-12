@@ -240,3 +240,70 @@ test_that("dft_stac_cube fetches an index stack end-to-end", {
   expect_length(list.files(file.path(cache, "sentinel-2-l2a"),
                            pattern = "^cube_.*\\.tif$"), 1)
 })
+
+# Tiled read (#38) vs untiled, end-to-end. Opt-in. This is the only test that
+# exercises the real gdalcubes tiled read against live COGs — that a tile
+# sub-extent reads the same source pixels as the full bbox. The tiled and untiled
+# cubes are NOT co-lattice and can't be compared pixel-for-pixel: gdalcubes
+# enlarges the untiled bbox extent symmetrically to align with dx/dy (~0.5 px),
+# while the tiles are anchored at the bbox lower-left. Both are valid resamplings
+# of the same source, so equivalence is asserted via bilinear alignment
+# (correlation + bulk agreement) and grid-independent per-layer means. Verified
+# offline against saved 2021-07/08 cubes to have no tile seams (edge |diff| ==
+# interior) — the residual is the benign sub-pixel offset, not a seam. Thresholds
+# are measured on those cubes (cor 0.997, median |diff| 3.4e-3, per-layer mean
+# 6e-4) with headroom. A growing-season window is used for robust valid-pixel
+# coverage; the offset split under tiling is proven by the offline commutativity
+# oracle above, not here.
+test_that("dft_stac_cube tiled read reproduces the untiled cube over the AOI", {
+  skip_if(Sys.getenv("DRIFT_TEST_NETWORK") != "true",
+          "network test — set DRIFT_TEST_NETWORK=true to run")
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"),
+    quiet = TRUE
+  )
+  dtwin <- "2021-07-01/2021-08-31"
+  cache <- tempfile("drift_cube_tiled_")
+  dir.create(cache)
+
+  untiled <- dft_stac_cube(aoi, index = "kndvi", datetime = dtwin, dt = "P1M",
+                           cache_dir = cache)
+  tiled <- dft_stac_cube(aoi, index = "kndvi", datetime = dtwin, dt = "P1M",
+                         tile_size = 1000, cache_dir = cache)
+
+  expect_s4_class(tiled, "SpatRaster")
+  expect_equal(terra::nlyr(tiled), terra::nlyr(untiled))   # same monthly axis
+  expect_false(anyNA(terra::time(tiled)))                  # time set per layer
+  # tiled and untiled each cache one cube_<key>.tif, keyed apart (2 files total)
+  expect_length(list.files(file.path(cache, "sentinel-2-l2a"),
+                           pattern = "^cube_.*\\.tif$"), 2)
+
+  # the efficiency claim: for this diagonal reach the tiled read streams fewer
+  # tiles than the full grid (offline-computable, but assert it alongside the fetch)
+  target_crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", target_crs)))
+  ts <- suppressMessages(drift:::tile_size_check(1000, 10))
+  be <- sf::st_bbox(aoi_t)
+  n_full <- ceiling((be[["xmax"]] - be[["xmin"]]) / ts) *
+    ceiling((be[["ymax"]] - be[["ymin"]]) / ts)
+  expect_lt(length(drift:::tile_grid(aoi_t, ts, 10)), n_full)
+
+  # equivalence over common in-AOI cells: align tiled onto the untiled grid with
+  # BILINEAR (corrects the sub-pixel offset), then compare. A genuinely wrong
+  # tiled read (wrong per-tile offset, scrambled tiles, real seams) would drop the
+  # correlation and shift the means far past these bounds.
+  aligned <- terra::resample(tiled, untiled, method = "bilinear")
+  a <- terra::values(untiled)
+  b <- terra::values(aligned)
+  both <- !is.na(a) & !is.na(b)
+  expect_gt(sum(both), 0)                                        # overlap exists
+  expect_gt(stats::cor(a[both], b[both]), 0.98)                  # spatial pattern reproduced
+  expect_lt(stats::median(abs(a[both] - b[both])), 0.01)         # bulk agreement
+  # grid-independent: per-layer spatial-mean kNDVI agrees closely
+  layer_mean <- function(x) {
+    vapply(seq_len(terra::nlyr(x)),
+           function(i) mean(terra::values(x[[i]]), na.rm = TRUE), 0)
+  }
+  expect_lt(max(abs(layer_mean(tiled) - layer_mean(untiled))), 0.01)
+})
