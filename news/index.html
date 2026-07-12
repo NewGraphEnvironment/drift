@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,11 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.7.0" id="drift-070">drift 0.7.0<a class="anchor" aria-label="anchor" href="#drift-070"></a></h2>
+<ul><li>
+<code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> gains <code>tile_size</code> (default <code>NULL</code>), the continuous-path twin of <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code>’s <code>tile_size</code> (<a href="https://github.com/NewGraphEnvironment/drift/issues/36" class="external-link">#36</a>): an opt-in that bounds the STAC <em>read</em> to the AOI footprint (<a href="https://github.com/NewGraphEnvironment/drift/issues/38" class="external-link">#38</a>). By default one gdalcubes cube is streamed over the whole AOI bounding box, so the COG streaming — the dominant cost (~10-30 min for a multi-year monthly Sentinel-2 fetch) — scales with the bbox, not the AOI; for a thin, diagonal floodplain corridor the bbox is largely empty. When <code>tile_size</code> (CRS units — metres for the default UTM CRS) is set, the bbox is split into a <code>res</code>-aligned grid and only tiles that intersect the AOI polygon are streamed — each carrying the full SCL mask, spectral index, and 2022 baseline-offset split — then mosaicked with <code><a href="https://rspatial.github.io/terra/reference/merge.html" class="external-link">terra::merge()</a></code>, so a corridor reads close to its footprint. This is the <code>filter_geom</code>-independent path (the polygon clip that would do this in-cube segfaults on the pinned gdalcubes build). The cube always caches a <code>.tif</code> and a tiled read keys distinctly, so untiled caches are untouched and <code>tile_size = NULL</code> is byte-for-byte the previous behavior. Because the cube resamples with bilinear, a tiled cube faithfully reproduces the untiled cube (bilinear-aligned correlation ~0.997, per-layer means within ~1e-3, no tile seams) but lands on a bbox-anchored grid that is sub-pixel-offset from — not pixel-identical to — the untiled cube; the offset is immaterial to the per-pixel <code><a href="../reference/dft_rast_break.html">dft_rast_break()</a></code> / <code><a href="../reference/dft_rast_trend.html">dft_rast_trend()</a></code> reducers. With <code>tile_size</code> set, <code>clip = FALSE</code> returns the AOI-intersecting tile union (with <code>NA</code> where empty tiles were skipped), not a gap-free bounding box.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0" id="drift-060">drift 0.6.0<a class="anchor" aria-label="anchor" href="#drift-060"></a></h2>
 <ul><li>

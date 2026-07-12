@@ -1,5 +1,41 @@
 # Changelog
 
+## drift 0.7.0
+
+- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  gains `tile_size` (default `NULL`), the continuous-path twin of
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)’s
+  `tile_size`
+  ([\#36](https://github.com/NewGraphEnvironment/drift/issues/36)): an
+  opt-in that bounds the STAC *read* to the AOI footprint
+  ([\#38](https://github.com/NewGraphEnvironment/drift/issues/38)). By
+  default one gdalcubes cube is streamed over the whole AOI bounding
+  box, so the COG streaming — the dominant cost (~10-30 min for a
+  multi-year monthly Sentinel-2 fetch) — scales with the bbox, not the
+  AOI; for a thin, diagonal floodplain corridor the bbox is largely
+  empty. When `tile_size` (CRS units — metres for the default UTM CRS)
+  is set, the bbox is split into a `res`-aligned grid and only tiles
+  that intersect the AOI polygon are streamed — each carrying the full
+  SCL mask, spectral index, and 2022 baseline-offset split — then
+  mosaicked with
+  [`terra::merge()`](https://rspatial.github.io/terra/reference/merge.html),
+  so a corridor reads close to its footprint. This is the
+  `filter_geom`-independent path (the polygon clip that would do this
+  in-cube segfaults on the pinned gdalcubes build). The cube always
+  caches a `.tif` and a tiled read keys distinctly, so untiled caches
+  are untouched and `tile_size = NULL` is byte-for-byte the previous
+  behavior. Because the cube resamples with bilinear, a tiled cube
+  faithfully reproduces the untiled cube (bilinear-aligned correlation
+  ~0.997, per-layer means within ~1e-3, no tile seams) but lands on a
+  bbox-anchored grid that is sub-pixel-offset from — not pixel-identical
+  to — the untiled cube; the offset is immaterial to the per-pixel
+  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+  /
+  [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  reducers. With `tile_size` set, `clip = FALSE` returns the
+  AOI-intersecting tile union (with `NA` where empty tiles were
+  skipped), not a gap-free bounding box.
+
 ## drift 0.6.0
 
 - [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)

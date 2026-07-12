@@ -28,6 +28,7 @@ dft_stac_cube(
   cloud_cover_max = 60,
   months = NULL,
   mask_values = NULL,
+  tile_size = NULL,
   cache_dir = NULL,
   force = FALSE,
   sign_fn = rstac::sign_planetary_computer()
@@ -93,11 +94,15 @@ dft_stac_cube(
   [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
   /
   [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
-  reduce only in-polygon pixels. Set `FALSE` to keep the full bounding
-  box (e.g. for surrounding context, or to mask later with a different
-  polygon). Note this clips the *output* only — the full bbox of COGs is
-  still streamed either way (the AOI cannot be pushed into the read on
-  the pinned gdalcubes build; see `inst/notes/gdalcubes-pc-gotchas.md`).
+  reduce only in-polygon pixels. Set `FALSE` to keep the wider extent
+  (e.g. for surrounding context, or to mask later with a different
+  polygon). This clips the *output* — with the default
+  `tile_size = NULL` the full bbox of COGs is still streamed either way,
+  so `clip = FALSE` returns the full bounding box. When `tile_size` is
+  set the read is tiled, so `clip = FALSE` returns the
+  **AOI-intersecting tile union** (a stair-stepped superset of the
+  polygon with `NA` where empty tiles were skipped), not a gap-free
+  bounding box.
 
 - cloud_cover_max:
 
@@ -122,6 +127,28 @@ dft_stac_cube(
   `mask_values` from
   [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
   (e.g. Sentinel-2 SCL cloud / shadow / cirrus classes).
+
+- tile_size:
+
+  Numeric or `NULL` (default). Edge length, in CRS units (metres for the
+  default UTM CRS), of the read-tiling grid (#38). When `NULL`, one cube
+  is streamed over the whole AOI bounding box (the read scales with the
+  bbox, not the AOI). When set, the bbox is split into a grid of
+  `tile_size`-square tiles and only tiles that intersect the AOI polygon
+  are streamed, then mosaicked — so a thin, diagonal AOI (e.g. a
+  floodplain corridor) reads close to its footprint. Snapped to a
+  multiple of `res`. Smaller tiles waste less bbox but cost more
+  per-tile round trips; there is no auto-tuning. The cube always caches
+  a `.tif` either way; a tiled read keys distinctly (see the caching
+  note above), so untiled caches are untouched and `tile_size = NULL` is
+  byte-for-byte the previous behavior. This is the continuous-path twin
+  of
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)'s
+  `tile_size` — the `filter_geom`-independent way to bound the read.
+  Because the cube resamples with bilinear, a tiled cube faithfully
+  reproduces the untiled cube (the per-pixel reducers are unaffected)
+  but lands on a bbox-anchored grid that is sub-pixel-offset from — not
+  pixel-identical to — the untiled cube.
 
 - cache_dir:
 
@@ -148,17 +175,18 @@ the AOI polygon (cloud-masked, cells outside the polygon `NA`), so the
 reduced raster from
 [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
 is already polygon-tight; pass `clip = FALSE` for the full AOI
-**bounding box**. For sources with a reflectance-offset baseline
-boundary (Sentinel-2), items are split at the boundary and
-offset-corrected per side, so a series crossing it carries no artificial
-index step.
+**bounding box** (or, with `tile_size` set, the AOI-intersecting tile
+union). For sources with a reflectance-offset baseline boundary
+(Sentinel-2), items are split at the boundary and offset-corrected per
+side, so a series crossing it carries no artificial index step.
 
 ## Details
 
 The index stack is materialized once to a GeoTIFF under
 [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
 as `<source>/cube_<key>.tif`, keyed by a hash of the AOI geometry and
-every cube-affecting parameter. Because it is invariant to
+every cube-affecting parameter (including `clip` and `tile_size`, so a
+tiled read keys apart from an untiled one). Because it is invariant to
 [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)'s
 parameters, caching it here makes bfast parameter sweeps cheap — they
 re-read the local raster instead of re-streaming COGs.

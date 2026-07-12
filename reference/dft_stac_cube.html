@@ -17,7 +17,7 @@ breakpoint detection."><meta property="og:image" content="https://newgraphenviro
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,6 +72,7 @@ breakpoint detection.</p>
 <span>  cloud_cover_max <span class="op">=</span> <span class="fl">60</span>,</span>
 <span>  months <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mask_values <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  tile_size <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  cache_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  force <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  sign_fn <span class="op">=</span> <span class="fu">rstac</span><span class="fu">::</span><span class="fu"><a href="https://brazil-data-cube.github.io/rstac/reference/items_sign_planetary_computer.html" class="external-link">sign_planetary_computer</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -129,10 +130,13 @@ must agree with.</p></dd>
 <dd><p>Logical. When <code>TRUE</code> (default), clip the returned stack to the AOI
 polygon with <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> (cells outside → <code>NA</code> on every layer), so
 <code><a href="dft_rast_break.html">dft_rast_break()</a></code> / <code><a href="dft_rast_trend.html">dft_rast_trend()</a></code> reduce only in-polygon pixels. Set
-<code>FALSE</code> to keep the full bounding box (e.g. for surrounding context, or to
-mask later with a different polygon). Note this clips the <em>output</em> only — the
-full bbox of COGs is still streamed either way (the AOI cannot be pushed into
-the read on the pinned gdalcubes build; see <code>inst/notes/gdalcubes-pc-gotchas.md</code>).</p></dd>
+<code>FALSE</code> to keep the wider extent (e.g. for surrounding context, or to mask
+later with a different polygon). This clips the <em>output</em> — with the default
+<code>tile_size = NULL</code> the full bbox of COGs is still streamed either way, so
+<code>clip = FALSE</code> returns the full bounding box. When <code>tile_size</code> is set the read
+is tiled, so <code>clip = FALSE</code> returns the <strong>AOI-intersecting tile union</strong> (a
+stair-stepped superset of the polygon with <code>NA</code> where empty tiles were
+skipped), not a gap-free bounding box.</p></dd>
 
 
 <dt id="arg-cloud-cover-max">cloud_cover_max<a class="anchor" aria-label="anchor" href="#arg-cloud-cover-max"></a></dt>
@@ -157,6 +161,24 @@ to fit a stable BFAST baseline.</p></dd>
 cloud / shadow / cirrus classes).</p></dd>
 
 
+<dt id="arg-tile-size">tile_size<a class="anchor" aria-label="anchor" href="#arg-tile-size"></a></dt>
+<dd><p>Numeric or <code>NULL</code> (default). Edge length, in CRS units
+(metres for the default UTM CRS), of the read-tiling grid (#38). When <code>NULL</code>,
+one cube is streamed over the whole AOI bounding box (the read scales with the
+bbox, not the AOI). When set, the bbox is split into a grid of <code>tile_size</code>-square
+tiles and only tiles that intersect the AOI polygon are streamed, then mosaicked
+— so a thin, diagonal AOI (e.g. a floodplain corridor) reads close to its
+footprint. Snapped to a multiple of <code>res</code>. Smaller tiles waste less bbox but
+cost more per-tile round trips; there is no auto-tuning. The cube always caches
+a <code>.tif</code> either way; a tiled read keys distinctly (see the caching note above),
+so untiled caches are untouched and <code>tile_size = NULL</code> is byte-for-byte the
+previous behavior. This is the continuous-path twin of <code><a href="dft_stac_fetch.html">dft_stac_fetch()</a></code>'s
+<code>tile_size</code> — the <code>filter_geom</code>-independent way to bound the read. Because the
+cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
+cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
+that is sub-pixel-offset from — not pixel-identical to — the untiled cube.</p></dd>
+
+
 <dt id="arg-cache-dir">cache_dir<a class="anchor" aria-label="anchor" href="#arg-cache-dir"></a></dt>
 <dd><p>Character. Cache directory. When <code>NULL</code>, uses
 <code><a href="dft_cache_path.html">dft_cache_path()</a></code>.</p></dd>
@@ -178,7 +200,8 @@ cloud / shadow / cirrus classes).</p></dd>
 time value per layer — cached as a GeoTIFF. By default (<code>clip = TRUE</code>) the
 stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
 <code>NA</code>), so the reduced raster from <code><a href="dft_rast_break.html">dft_rast_break()</a></code> is already polygon-tight;
-pass <code>clip = FALSE</code> for the full AOI <strong>bounding box</strong>. For sources with a
+pass <code>clip = FALSE</code> for the full AOI <strong>bounding box</strong> (or, with <code>tile_size</code>
+set, the AOI-intersecting tile union). For sources with a
 reflectance-offset baseline boundary (Sentinel-2), items are split at the
 boundary and offset-corrected per side, so a series crossing it carries no
 artificial index step.</p>
@@ -187,7 +210,8 @@ artificial index step.</p>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The index stack is materialized once to a GeoTIFF under <code><a href="dft_cache_path.html">dft_cache_path()</a></code>
 as <code>&lt;source&gt;/cube_&lt;key&gt;.tif</code>, keyed by a hash of the AOI geometry and every
-cube-affecting parameter. Because it is invariant to <code><a href="dft_rast_break.html">dft_rast_break()</a></code>'s
+cube-affecting parameter (including <code>clip</code> and <code>tile_size</code>, so a tiled read
+keys apart from an untiled one). Because it is invariant to <code><a href="dft_rast_break.html">dft_rast_break()</a></code>'s
 parameters, caching it here makes bfast parameter sweeps cheap — they re-read
 the local raster instead of re-streaming COGs.</p>
 <p>Three STAC-query specifics distinguish cube mode from <code><a href="dft_stac_fetch.html">dft_stac_fetch()</a></code>:
