@@ -72,7 +72,10 @@
 #'   a `.tif` either way; a tiled read keys distinctly (see the caching note above),
 #'   so untiled caches are untouched and `tile_size = NULL` is byte-for-byte the
 #'   previous behavior. This is the continuous-path twin of [dft_stac_fetch()]'s
-#'   `tile_size` — the `filter_geom`-independent way to bound the read.
+#'   `tile_size` — the `filter_geom`-independent way to bound the read. Because the
+#'   cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
+#'   cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
+#'   that is sub-pixel-offset from — not pixel-identical to — the untiled cube.
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
 #'   [dft_cache_path()].
 #' @param force Logical. Re-fetch even if cached, overwriting the cached raster

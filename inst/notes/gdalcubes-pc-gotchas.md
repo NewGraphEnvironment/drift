@@ -13,10 +13,11 @@ bfast 1.7.2.
   the AOI polygon client-side (helper `stac_cube_clip()` = `terra::mask(stk,
   terra::vect(aoi))`), so the cube is polygon-tight and
   `dft_rast_break()`/`dft_rast_trend()` skip out-of-AOI pixels via their
-  `rowSums(!is.na) >= min_obs` gate. **Residual:** this clips the *output* only —
-  `cube_view(extent = bbox)` still streams the full bbox of COGs, so fetch time is
-  unchanged; pushing the AOI into the read would need a working `filter_geom` or
-  server-side windowing. `clip = FALSE` keeps the full bbox.
+  `rowSums(!is.na) >= min_obs` gate. **Residual (resolved, #38):** this clips the
+  *output* only — `cube_view(extent = bbox)` streams the full bbox of COGs, so the
+  clip alone does not cut fetch time. `dft_stac_cube(tile_size = <metres>)` now bounds
+  the *read* by tiling the `cube_view` (see the next bullet). `clip = FALSE` keeps the
+  full bbox (or, with `tile_size`, the AOI-intersecting tile union).
 - **Download-side workaround without `filter_geom`: tile the `cube_view` (#36).**
   Since `filter_geom` can't push the AOI into the read, the categorical
   `dft_stac_fetch(tile_size = <metres>)` splits the AOI bbox into a `res`-aligned
@@ -28,8 +29,26 @@ bfast 1.7.2.
   co-lattice — otherwise the merge seams. The tiled mosaic is written with
   `terra::writeRaster()` to a **`.tif`** (terra's NetCDF *write* is fragile — see
   the round-trip bullet below), so tiled and untiled fetches cache under different
-  extensions and keys. The same read residual on the continuous `dft_stac_cube()`
-  path (its `cube_view` still streams the full bbox) is tracked as **#38**.
+  extensions and keys. The continuous `dft_stac_cube(tile_size = <metres>)` (#38)
+  applies the same technique to the reflectance-cube read (per-tile `cube_view` +
+  SCL mask + the 2022 offset split + `terra::cover`, mosaicked by `mosaic_stacks()`;
+  the cube already caches `.tif`, so no extension split there).
+- **Bilinear tiling is not co-lattice with the untiled cube (#38).** The cube's
+  default `resampling = "bilinear"` makes the tiled read sensitive to grid alignment
+  in a way the categorical `near` path (#36) is not. gdalcubes *enlarges the untiled
+  bbox extent symmetrically* to align with `dx/dy` (observed ~0.5 px on a ~3.3 km
+  reach), while the tiles anchor at the bbox lower-left — so the tiled cube is **not
+  co-lattice** with the untiled cube and is **not pixel-identical** to it. It is still
+  a faithful resampling of the same source: bilinear-aligned correlation ~0.997,
+  per-layer means within ~1e-3, and **no tile seams** (gdalcubes reads the source
+  margin at tile edges, so |diff| at seams == interior). The only difference is a
+  benign sub-pixel grid offset, immaterial to the per-pixel `dft_rast_break()` /
+  `dft_rast_trend()` reducers. Consequence for tests/QA: compare a tiled cube to an
+  untiled one by **bilinear-aligning** one onto the other (`terra::resample(...,
+  method = "bilinear")`) and checking correlation + per-layer means — never
+  pixel-for-pixel. Re-anchoring the tiles to gdalcubes' enlarged origin to force
+  co-lattice was rejected: it would couple `tile_grid()` to gdalcubes internals and
+  change the shared #36 helper for no reducer-visible gain.
 - **`reduce_time()` R-callback runs in spawned worker processes at EVERY parallel
   setting** (incl. `parallel = 1`). A closure over enclosing locals fails there
   (`object 'band' not found`). Options: build a self-contained callback (inline

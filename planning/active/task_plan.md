@@ -40,9 +40,9 @@ unconditional — no `.nc`/`.tif` routing).
 - [x] rewrote the network test: grow-season window (`2021-07-01/2021-08-31`); assert `SpatRaster`, equal nlyr, time set, 2 `cube_<key>.tif`, kept-tile count < full grid; equivalence via **bilinear**-aligned `cor > 0.98` + `median |diff| < 0.01` + per-layer mean agreement `< 0.01` (thresholds measured with headroom). Offset-split-under-tiling covered by the offline commutativity oracle
 
 ## Phase 5: docs + gotchas + NEWS + version
-- [ ] `inst/notes/gdalcubes-pc-gotchas.md`: flip the #38 residual to resolved-via-cube-tiling; update the #36 bullet's "#38 for the cube-path twin" cross-ref
-- [ ] `NEWS.md` `# drift 0.7.0` — `dft_stac_cube()` gains `tile_size` (opt-in, default `NULL` = unchanged; bounds the read for sparse AOIs; always caches `.tif`); Closes #38
-- [ ] `DESCRIPTION` `0.6.0 → 0.7.0` + `Date` (final commit)
+- [x] `inst/notes/gdalcubes-pc-gotchas.md`: flipped the #38 residual to resolved-via-cube-tiling; updated the #36 bullet's cross-ref; added the bilinear-tiling not-co-lattice / no-seams lesson
+- [x] `NEWS.md` `# drift 0.7.0` — `dft_stac_cube()` gains `tile_size` (opt-in, default `NULL` = unchanged; bounds the read for sparse AOIs; faithful-but-grid-offset from untiled); Closes #38. Roxygen `@param tile_size` grid-offset note added
+- [ ] `DESCRIPTION` `0.6.0 → 0.7.0` + `Date` (final commit, after `devtools::check`)
 
 ## Phase 6: validate, archive, PR, release
 - [ ] `devtools::test()` / `lint` / `document` / `check` clean (network tests skip)

@@ -88,7 +88,10 @@ cost more per-tile round trips; there is no auto-tuning. The cube always caches
 a \code{.tif} either way; a tiled read keys distinctly (see the caching note above),
 so untiled caches are untouched and \code{tile_size = NULL} is byte-for-byte the
 previous behavior. This is the continuous-path twin of \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}'s
-\code{tile_size} — the \code{filter_geom}-independent way to bound the read.}
+\code{tile_size} — the \code{filter_geom}-independent way to bound the read. Because the
+cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
+cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
+that is sub-pixel-offset from — not pixel-identical to — the untiled cube.}
 
 \item{cache_dir}{Character. Cache directory. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
