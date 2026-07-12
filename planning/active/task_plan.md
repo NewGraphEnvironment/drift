@@ -42,10 +42,10 @@ unconditional — no `.nc`/`.tif` routing).
 ## Phase 5: docs + gotchas + NEWS + version
 - [x] `inst/notes/gdalcubes-pc-gotchas.md`: flipped the #38 residual to resolved-via-cube-tiling; updated the #36 bullet's cross-ref; added the bilinear-tiling not-co-lattice / no-seams lesson
 - [x] `NEWS.md` `# drift 0.7.0` — `dft_stac_cube()` gains `tile_size` (opt-in, default `NULL` = unchanged; bounds the read for sparse AOIs; faithful-but-grid-offset from untiled); Closes #38. Roxygen `@param tile_size` grid-offset note added
-- [ ] `DESCRIPTION` `0.6.0 → 0.7.0` + `Date` (final commit, after `devtools::check`)
+- [x] `DESCRIPTION` `0.6.0 → 0.7.0` + `Date 2026-07-11` (final commit, after `devtools::check`)
 
 ## Phase 6: validate, archive, PR, release
-- [ ] `devtools::test()` / `lint` / `document` / `check` clean (network tests skip)
+- [x] `devtools::test()` (365 pass / 6 skip) / `lint` / `document` / `check` clean (0/0/0; network tests skip)
 - [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #38`, `Relates to NewGraphEnvironment/sred-2025-2026#16`)
 - [ ] `/gh-pr-merge` → release v0.7.0
 
