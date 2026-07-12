@@ -18,6 +18,7 @@ dft_stac_cube(
   cloud_cover_max = 60,
   months = NULL,
   mask_values = NULL,
+  tile_size = NULL,
   cache_dir = NULL,
   force = FALSE,
   sign_fn = rstac::sign_planetary_computer()
@@ -52,10 +53,13 @@ must agree with.}
 \item{clip}{Logical. When \code{TRUE} (default), clip the returned stack to the AOI
 polygon with \code{terra::mask()} (cells outside → \code{NA} on every layer), so
 \code{\link[=dft_rast_break]{dft_rast_break()}} / \code{\link[=dft_rast_trend]{dft_rast_trend()}} reduce only in-polygon pixels. Set
-\code{FALSE} to keep the full bounding box (e.g. for surrounding context, or to
-mask later with a different polygon). Note this clips the \emph{output} only — the
-full bbox of COGs is still streamed either way (the AOI cannot be pushed into
-the read on the pinned gdalcubes build; see \code{inst/notes/gdalcubes-pc-gotchas.md}).}
+\code{FALSE} to keep the wider extent (e.g. for surrounding context, or to mask
+later with a different polygon). This clips the \emph{output} — with the default
+\code{tile_size = NULL} the full bbox of COGs is still streamed either way, so
+\code{clip = FALSE} returns the full bounding box. When \code{tile_size} is set the read
+is tiled, so \code{clip = FALSE} returns the \strong{AOI-intersecting tile union} (a
+stair-stepped superset of the polygon with \code{NA} where empty tiles were
+skipped), not a gap-free bounding box.}
 
 \item{cloud_cover_max}{Numeric. Scene-level \code{eo:cloud_cover} maximum percent
 for the STAC pre-filter (default 60).}
@@ -73,6 +77,22 @@ to fit a stable BFAST baseline.}
 \code{NULL}, uses \code{mask_values} from \code{\link[=dft_stac_config]{dft_stac_config()}} (e.g. Sentinel-2 SCL
 cloud / shadow / cirrus classes).}
 
+\item{tile_size}{Numeric or \code{NULL} (default). Edge length, in CRS units
+(metres for the default UTM CRS), of the read-tiling grid (#38). When \code{NULL},
+one cube is streamed over the whole AOI bounding box (the read scales with the
+bbox, not the AOI). When set, the bbox is split into a grid of \code{tile_size}-square
+tiles and only tiles that intersect the AOI polygon are streamed, then mosaicked
+— so a thin, diagonal AOI (e.g. a floodplain corridor) reads close to its
+footprint. Snapped to a multiple of \code{res}. Smaller tiles waste less bbox but
+cost more per-tile round trips; there is no auto-tuning. The cube always caches
+a \code{.tif} either way; a tiled read keys distinctly (see the caching note above),
+so untiled caches are untouched and \code{tile_size = NULL} is byte-for-byte the
+previous behavior. This is the continuous-path twin of \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}'s
+\code{tile_size} — the \code{filter_geom}-independent way to bound the read. Because the
+cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
+cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
+that is sub-pixel-offset from — not pixel-identical to — the untiled cube.}
+
 \item{cache_dir}{Character. Cache directory. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
 
@@ -87,7 +107,8 @@ A \link[terra:SpatRaster-class]{terra::SpatRaster} index stack — one layer per
 time value per layer — cached as a GeoTIFF. By default (\code{clip = TRUE}) the
 stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
 \code{NA}), so the reduced raster from \code{\link[=dft_rast_break]{dft_rast_break()}} is already polygon-tight;
-pass \code{clip = FALSE} for the full AOI \strong{bounding box}. For sources with a
+pass \code{clip = FALSE} for the full AOI \strong{bounding box} (or, with \code{tile_size}
+set, the AOI-intersecting tile union). For sources with a
 reflectance-offset baseline boundary (Sentinel-2), items are split at the
 boundary and offset-corrected per side, so a series crossing it carries no
 artificial index step.
@@ -103,7 +124,8 @@ breakpoint detection.
 \details{
 The index stack is materialized once to a GeoTIFF under \code{\link[=dft_cache_path]{dft_cache_path()}}
 as \verb{<source>/cube_<key>.tif}, keyed by a hash of the AOI geometry and every
-cube-affecting parameter. Because it is invariant to \code{\link[=dft_rast_break]{dft_rast_break()}}'s
+cube-affecting parameter (including \code{clip} and \code{tile_size}, so a tiled read
+keys apart from an untiled one). Because it is invariant to \code{\link[=dft_rast_break]{dft_rast_break()}}'s
 parameters, caching it here makes bfast parameter sweeps cheap — they re-read
 the local raster instead of re-streaming COGs.
 
