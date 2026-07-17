@@ -253,4 +253,18 @@ test_that("validation errors are raised with informative messages", {
                "numeric")
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
                                         match_mode = "banana"))
+  # sf::st_join(largest = TRUE) ignores the join predicate, so a custom
+  # predicate with match_mode = "largest" would silently mis-attribute
+  expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
+                                        predicate = sf::st_within,
+                                        match_mode = "largest"),
+               "largest")
+  # cols naming the overlay geometry column (when named differently from the
+  # patches geometry) must be rejected, not silently dropped by st_join
+  overlay_geom <- overlay
+  names(overlay_geom)[names(overlay_geom) == "geometry"] <- "geom"
+  sf::st_geometry(overlay_geom) <- "geom"
+  expect_error(dft_transition_attribute(patches, overlay_geom,
+                                        cols = c("fire_year", "geom")),
+               "geom")
 })

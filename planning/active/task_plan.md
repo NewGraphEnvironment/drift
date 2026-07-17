@@ -29,11 +29,11 @@ dft_transition_attribute(patches, overlay, cols, predicate = sf::st_intersects,
 
 ## Phase 2: Implementation
 
-- [ ] Create `R/dft_transition_attribute.R` with approved signature
-- [ ] Validation block: `cli::cli_abort` with `{.fn}`/`{.val}`/`{.arg}` markup; `match.arg(match_mode)`; predicate-is-function; cols checks; paired year_col+interval; CRS present
-- [ ] Temporal filter (inclusive numeric interval, NA years dropped)
-- [ ] Short-circuit path (typed-NA cols) + join path (subset -> transform -> make_valid -> st_join)
-- [ ] Test file green; full `devtools::test()` no regressions
+- [x] Create `R/dft_transition_attribute.R` with approved signature
+- [x] Validation block: `cli::cli_abort` with `{.fn}`/`{.val}`/`{.arg}` markup; `match.arg(match_mode)`; predicate-is-function; cols checks; paired year_col+interval; CRS present
+- [x] Temporal filter (inclusive numeric interval, NA years dropped)
+- [x] Short-circuit path (typed-NA cols) + join path (subset -> transform -> make_valid -> st_join)
+- [x] Test file green; full `devtools::test()` no regressions
 
 ## Phase 3: Docs and examples
 
