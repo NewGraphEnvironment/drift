@@ -44,8 +44,8 @@ dft_transition_attribute(patches, overlay, cols, predicate = sf::st_intersects,
 
 ## Phase 4: Release bookkeeping
 
-- [ ] NEWS.md entry (new unreleased heading): generic overlay attribution, both match modes, temporal filter, ref #42
-- [ ] DESCRIPTION version bump 0.7.0 -> 0.8.0 as FINAL commit
+- [x] NEWS.md entry (new unreleased heading): generic overlay attribution, both match modes, temporal filter, ref #42
+- [x] DESCRIPTION version bump 0.7.0 -> 0.8.0 as FINAL commit
 
 ## Out of scope
 
@@ -53,7 +53,7 @@ Date/POSIXct year columns; multi-value aggregation (concatenating fire years); a
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
