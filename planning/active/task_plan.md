@@ -37,10 +37,10 @@ dft_transition_attribute(patches, overlay, cols, predicate = sf::st_intersects,
 
 ## Phase 3: Docs and examples
 
-- [ ] Roxygen: params incl. duplicate-row semantics of `"all"`, one-row guarantee of `"largest"`, inclusive bounds, numeric-years-only, silent CRS transform, `st_make_valid` in `@details`; `@seealso [dft_transition_vectors()]` + reciprocal in `R/dft_transition_vectors.R`
-- [ ] Runnable `@examples` from bundled data with inline synthetic overlay; with and without `interval`; no `\dontrun`
-- [ ] `devtools::document()`; NAMESPACE gains export
-- [ ] `devtools::check()` clean
+- [x] Roxygen: params incl. duplicate-row semantics of `"all"`, one-row guarantee of `"largest"`, inclusive bounds, numeric-years-only, silent CRS transform, `st_make_valid` in `@details`; `@seealso [dft_transition_vectors()]` + reciprocal in `R/dft_transition_vectors.R`
+- [x] Runnable `@examples` from bundled data with inline synthetic overlay; with and without `interval`; no `\dontrun`
+- [x] `devtools::document()`; NAMESPACE gains export
+- [x] `devtools::check()` clean
 
 ## Phase 4: Release bookkeeping
 
