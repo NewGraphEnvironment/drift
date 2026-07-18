@@ -73,6 +73,12 @@ Patches are 8-connected components of same-valued cells, computed in a
 single pass over the grid, so large sparse rasters vectorize without
 per-class memory cost.
 
+## See also
+
+[`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
+to tag the returned patches from an overlay polygon layer (fire
+perimeters, cutblocks, ...).
+
 ## Examples
 
 ``` r

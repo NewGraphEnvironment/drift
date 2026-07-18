@@ -1,5 +1,30 @@
 # Changelog
 
+## drift 0.8.0
+
+- [`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
+  tags change patches from
+  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  with columns from any overlay polygon layer — fire perimeters,
+  cutblocks, roads, tenures — so a driver can separate mapped
+  transitions by cause without hand-rolling spatial joins
+  ([\#42](https://github.com/NewGraphEnvironment/drift/issues/42)).
+  Deliberately generic: drift carries no BC/domain knowledge; the caller
+  supplies the overlay, the columns to carry (`cols`), and optionally a
+  numeric temporal filter (`time_col` + `time_interval`, bounds
+  inclusive) that keeps only overlay features whose time falls within
+  the transition interval — a 2022 fire attributes a 2017→2023 loss, a
+  2012 fire does not. Two assignment modes for a patch that straddles
+  multiple overlay features: `match_mode = "all"` (left join, one row
+  per match) or `"largest"` (one row per patch by greatest overlap
+  area). Largest-overlap assignment is intersection-based, so combining
+  it with a custom `predicate` is an error rather than a silent
+  mis-attribution; the overlay is reprojected to the patch CRS and run
+  through
+  [`st_make_valid()`](https://r-spatial.github.io/sf/reference/valid.html)
+  automatically, since real-world disturbance perimeters routinely fail
+  validity checks.
+
 ## drift 0.7.0
 
 - [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
