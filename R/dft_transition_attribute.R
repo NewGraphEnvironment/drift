@@ -162,6 +162,10 @@ dft_transition_attribute <- function(patches,
       "{.arg cols} not found in {.arg overlay}: {.val {cols_missing}}."
     )
   }
+  # Only the active geometry column is guarded here; a secondary sfc column
+  # named in `cols` would slip through and leak a second geometry into the
+  # result. Left unguarded as a low-risk edge (overlays rarely carry two sfc
+  # columns); guard on names(overlay) types if that ever bites.
   if (attr(overlay, "sf_column") %in% cols) {
     cli::cli_abort(
       "{.arg cols} must not include the {.arg overlay} geometry column
