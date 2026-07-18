@@ -184,6 +184,41 @@ test_that("custom predicate is honoured", {
   expect_true(is.na(out$cause[out$patch_id == 2]))
 })
 
+test_that("match_mode defaults to 'all'", {
+  patches <- attribute_test_patches()
+  overlay <- attribute_test_overlay()
+
+  # no match_mode passed -> documented default is "all"
+  out <- dft_transition_attribute(patches, overlay, cols = "fire_year")
+
+  # "all" duplicates the straddling patch 1 (two overlay matches) -> 3 rows
+  expect_equal(nrow(out), 3L)
+  expect_equal(sum(out$patch_id == 1), 2L)
+})
+
+test_that("invalid overlay geometry is repaired (st_make_valid), not fatal", {
+  patches <- attribute_test_patches()
+
+  # self-intersecting bow-tie spanning patch 1 -- invalid until st_make_valid.
+  # This is the real-world case the make_valid call exists for (BC fire /
+  # cutblock perimeters routinely fail GEOS validity). "largest" runs
+  # st_intersection internally, so an unrepaired input would throw here.
+  bowtie <- sf::st_polygon(list(rbind(
+    c(-10, -10), c(110, 110), c(110, -10), c(-10, 110), c(-10, -10)
+  )))
+  overlay <- sf::st_sf(
+    fire_year = 2020,
+    geometry = sf::st_sfc(bowtie, crs = "EPSG:32609")
+  )
+  expect_false(all(sf::st_is_valid(overlay)))  # fixture really is invalid
+
+  out <- dft_transition_attribute(patches, overlay, cols = "fire_year",
+                                  match_mode = "largest")
+
+  expect_equal(nrow(out), nrow(patches))
+  expect_equal(out$fire_year[out$patch_id == 1], 2020)
+})
+
 test_that("0-row patches return a 0-row sf with correctly-typed cols", {
   patches <- attribute_test_patches()[0, ]
   overlay <- attribute_test_overlay()
