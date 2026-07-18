@@ -33,6 +33,9 @@
 #'   When `patch_area_min` or `changes_only` drop patches, `patch_id` is numbered
 #'   over the surviving patches (dense `1..n`), not the pre-filter grid.
 #'
+#' @seealso [dft_transition_attribute()] to tag the returned patches from an
+#'   overlay polygon layer (fire perimeters, cutblocks, ...).
+#'
 #' @export
 #' @examples
 #' r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))

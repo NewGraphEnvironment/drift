@@ -73,3 +73,7 @@ head(patches_large)
 changes <- dft_transition_vectors(result$raster, changes_only = TRUE)
 head(changes)
 }
+\seealso{
+\code{\link[=dft_transition_attribute]{dft_transition_attribute()}} to tag the returned patches from an
+overlay polygon layer (fire perimeters, cutblocks, ...).
+}
