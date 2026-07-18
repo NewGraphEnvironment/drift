@@ -10,8 +10,8 @@ dft_transition_attribute(
   cols,
   predicate = sf::st_intersects,
   match_mode = c("all", "largest"),
-  year_col = NULL,
-  interval = NULL
+  time_col = NULL,
+  time_interval = NULL
 )
 }
 \arguments{
@@ -42,15 +42,17 @@ feature with the greatest intersection area (via
 \code{predicate}).
 }}
 
-\item{year_col}{Character or \code{NULL}. Name of a numeric year column in
-\code{overlay} used for temporal filtering. Must be supplied together with
-\code{interval}. For \code{Date} columns, extract a numeric year first.}
+\item{time_col}{Character or \code{NULL}. Name of a \strong{numeric} time column in
+\code{overlay} used for temporal filtering (e.g. \code{FIRE_YEAR}, \code{HARVEST_YEAR}).
+Must be supplied together with \code{time_interval}, and both must be on the
+\strong{same numeric scale} (see Details). \code{NULL} (default) skips the filter.}
 
-\item{interval}{Length-2 numeric or \code{NULL}. The transition interval, e.g.
-\code{c(2017, 2023)}. Overlay features whose \code{year_col} falls outside the
-interval (bounds inclusive) are dropped before joining; features with an
-\code{NA} year are also dropped. Patches from \code{\link[=dft_transition_vectors]{dft_transition_vectors()}} carry
-no interval columns, so the interval is always supplied explicitly.}
+\item{time_interval}{Length-2 numeric or \code{NULL}. The transition interval on
+the same scale as \code{time_col}, e.g. \code{c(2017, 2023)} for calendar years.
+Overlay features whose \code{time_col} falls outside the interval (both bounds
+inclusive) are dropped before joining; features with an \code{NA} time are also
+dropped. Patches from \code{\link[=dft_transition_vectors]{dft_transition_vectors()}} carry no time columns, so
+the interval is always supplied explicitly.}
 }
 \value{
 \code{patches} with the \code{cols} columns joined on (\code{NA} where a patch
@@ -71,6 +73,53 @@ through \code{\link[sf:valid]{sf::st_make_valid()}} first — real-world disturb
 routinely fail GEOS validity checks, which would otherwise break the
 largest-overlap computation.
 }
+\section{Temporal filter — how \code{time_col} and \code{time_interval} must be presented}{
+The filter is a plain numeric comparison
+(\verb{overlay[[time_col]] >= time_interval[1] & <= time_interval[2]}), so it is
+scale-agnostic — the numbers may be calendar years, decimal years, months,
+or epoch offsets — but \strong{both arguments must be numeric and on the same
+scale}. \code{time_col} must name a \code{numeric} (integer or double) column;
+passing a \code{Date} or \code{POSIXct} column is a hard error, not a silent
+mis-comparison. Values are not coerced or rounded: a decimal year like
+\code{2018.5} is compared as-is.
+
+To filter on dates, convert to a numeric axis first, on \strong{both} the column
+and the interval:
+\itemize{
+\item Calendar year (simplest for annual disturbance data):
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{overlay$yr <- as.numeric(format(overlay$burn_date, "\%Y"))
+dft_transition_attribute(..., time_col = "yr", time_interval = c(2017, 2023))
+}\if{html}{\out{</div>}}
+\item Epoch days (\code{Date} stores days since 1970-01-01, so \code{as.numeric()} is the
+coercion):
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{overlay$t <- as.numeric(overlay$burn_date)               # days since epoch
+dft_transition_attribute(..., time_col = "t",
+  time_interval = as.numeric(as.Date(c("2017-01-01", "2023-12-31"))))
+}\if{html}{\out{</div>}}
+
+(\code{POSIXct} coerces to \emph{seconds} since epoch — keep the interval in seconds
+to match.)
+}
+
+Mixing scales (e.g. epoch-day column against a \code{c(2017, 2023)} year
+interval) does not error — it silently matches nothing. Keep both on one
+axis.
+}
+
+\section{Limitations}{
+
+\itemize{
+\item \code{overlay} is treated as a polygon layer. Passing point or line geometries
+is not supported: \code{match_mode = "largest"} compares intersection \emph{area},
+which is zero for non-polygon overlays. Use a point-in-polygon join
+directly for such cases.
+\item Temporal filtering is numeric-only; \code{Date}/\code{POSIXct} columns must be
+coerced by the caller (see Details).
+}
+}
+
 \examples{
 r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
 r20 <- terra::rast(system.file("extdata", "example_2020.tif", package = "drift"))
@@ -97,7 +146,7 @@ table(tagged$fire_year, useNA = "ifany")
 # temporal filter: only overlay features within the transition interval
 tagged_2017_2020 <- dft_transition_attribute(
   patches, west, cols = "fire_year", match_mode = "largest",
-  year_col = "fire_year", interval = c(2017, 2020)
+  time_col = "fire_year", time_interval = c(2017, 2020)
 )
 }
 \seealso{

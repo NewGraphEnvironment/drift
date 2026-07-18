@@ -31,14 +31,58 @@
 #'     feature with the greatest intersection area (via
 #'     `sf::st_join(largest = TRUE)`; matching is by intersection, see
 #'     `predicate`).
-#' @param year_col Character or `NULL`. Name of a numeric year column in
-#'   `overlay` used for temporal filtering. Must be supplied together with
-#'   `interval`. For `Date` columns, extract a numeric year first.
-#' @param interval Length-2 numeric or `NULL`. The transition interval, e.g.
-#'   `c(2017, 2023)`. Overlay features whose `year_col` falls outside the
-#'   interval (bounds inclusive) are dropped before joining; features with an
-#'   `NA` year are also dropped. Patches from [dft_transition_vectors()] carry
-#'   no interval columns, so the interval is always supplied explicitly.
+#' @param time_col Character or `NULL`. Name of a **numeric** time column in
+#'   `overlay` used for temporal filtering (e.g. `FIRE_YEAR`, `HARVEST_YEAR`).
+#'   Must be supplied together with `time_interval`, and both must be on the
+#'   **same numeric scale** (see Details). `NULL` (default) skips the filter.
+#' @param time_interval Length-2 numeric or `NULL`. The transition interval on
+#'   the same scale as `time_col`, e.g. `c(2017, 2023)` for calendar years.
+#'   Overlay features whose `time_col` falls outside the interval (both bounds
+#'   inclusive) are dropped before joining; features with an `NA` time are also
+#'   dropped. Patches from [dft_transition_vectors()] carry no time columns, so
+#'   the interval is always supplied explicitly.
+#'
+#' @details
+#' # Temporal filter — how `time_col` and `time_interval` must be presented
+#'
+#' The filter is a plain numeric comparison
+#' (`overlay[[time_col]] >= time_interval[1] & <= time_interval[2]`), so it is
+#' scale-agnostic — the numbers may be calendar years, decimal years, months,
+#' or epoch offsets — but **both arguments must be numeric and on the same
+#' scale**. `time_col` must name a `numeric` (integer or double) column;
+#' passing a `Date` or `POSIXct` column is a hard error, not a silent
+#' mis-comparison. Values are not coerced or rounded: a decimal year like
+#' `2018.5` is compared as-is.
+#'
+#' To filter on dates, convert to a numeric axis first, on **both** the column
+#' and the interval:
+#'
+#' - Calendar year (simplest for annual disturbance data):
+#'   ```
+#'   overlay$yr <- as.numeric(format(overlay$burn_date, "%Y"))
+#'   dft_transition_attribute(..., time_col = "yr", time_interval = c(2017, 2023))
+#'   ```
+#' - Epoch days (`Date` stores days since 1970-01-01, so `as.numeric()` is the
+#'   coercion):
+#'   ```
+#'   overlay$t <- as.numeric(overlay$burn_date)               # days since epoch
+#'   dft_transition_attribute(..., time_col = "t",
+#'     time_interval = as.numeric(as.Date(c("2017-01-01", "2023-12-31"))))
+#'   ```
+#'   (`POSIXct` coerces to *seconds* since epoch — keep the interval in seconds
+#'   to match.)
+#'
+#' Mixing scales (e.g. epoch-day column against a `c(2017, 2023)` year
+#' interval) does not error — it silently matches nothing. Keep both on one
+#' axis.
+#'
+#' @section Limitations:
+#' - `overlay` is treated as a polygon layer. Passing point or line geometries
+#'   is not supported: `match_mode = "largest"` compares intersection *area*,
+#'   which is zero for non-polygon overlays. Use a point-in-polygon join
+#'   directly for such cases.
+#' - Temporal filtering is numeric-only; `Date`/`POSIXct` columns must be
+#'   coerced by the caller (see Details).
 #'
 #' @return `patches` with the `cols` columns joined on (`NA` where a patch
 #'   matches no overlay feature). Under `match_mode = "all"` a patch matching
@@ -74,15 +118,15 @@
 #' # temporal filter: only overlay features within the transition interval
 #' tagged_2017_2020 <- dft_transition_attribute(
 #'   patches, west, cols = "fire_year", match_mode = "largest",
-#'   year_col = "fire_year", interval = c(2017, 2020)
+#'   time_col = "fire_year", time_interval = c(2017, 2020)
 #' )
 dft_transition_attribute <- function(patches,
                                      overlay,
                                      cols,
                                      predicate = sf::st_intersects,
                                      match_mode = c("all", "largest"),
-                                     year_col = NULL,
-                                     interval = NULL) {
+                                     time_col = NULL,
+                                     time_interval = NULL) {
   match_mode <- match.arg(match_mode)
 
   if (!inherits(patches, "sf")) {
@@ -134,39 +178,43 @@ dft_transition_attribute <- function(patches,
   if (is.na(sf::st_crs(patches)) || is.na(sf::st_crs(overlay))) {
     cli::cli_abort("Both {.arg patches} and {.arg overlay} must have a CRS.")
   }
-  if (is.null(year_col) != is.null(interval)) {
+  if (is.null(time_col) != is.null(time_interval)) {
     cli::cli_abort(
-      "{.arg year_col} and {.arg interval} must be supplied together."
+      "{.arg time_col} and {.arg time_interval} must be supplied together."
     )
   }
 
-  # Temporal filter: keep overlay features whose year falls within the
-  # transition interval (bounds inclusive); NA years are dropped
-  if (!is.null(year_col)) {
-    if (!is.character(year_col) || length(year_col) != 1 ||
-          !year_col %in% names(overlay)) {
+  # Temporal filter: keep overlay features whose time falls within the
+  # transition interval (bounds inclusive); NA times are dropped
+  if (!is.null(time_col)) {
+    if (!is.character(time_col) || length(time_col) != 1 ||
+          !time_col %in% names(overlay)) {
       cli::cli_abort(
-        "{.arg year_col} must name a single column in {.arg overlay}."
+        "{.arg time_col} must name a single column in {.arg overlay}."
       )
     }
-    if (!is.numeric(interval) || length(interval) != 2 || anyNA(interval)) {
+    if (!is.numeric(time_interval) || length(time_interval) != 2 ||
+          anyNA(time_interval)) {
       cli::cli_abort(
-        "{.arg interval} must be a length-2 numeric vector with no NA."
+        "{.arg time_interval} must be a length-2 numeric vector with no NA."
       )
     }
-    if (interval[1] > interval[2]) {
+    if (time_interval[1] > time_interval[2]) {
       cli::cli_abort(
-        "{.arg interval} must be increasing, got {.val {interval[1]}} > {.val {interval[2]}}."
+        "{.arg time_interval} must be increasing, got {.val {time_interval[1]}} > {.val {time_interval[2]}}."
       )
     }
-    if (!is.numeric(overlay[[year_col]])) {
+    if (!is.numeric(overlay[[time_col]])) {
       cli::cli_abort(c(
-        "{.arg overlay} column {.val {year_col}} must be numeric.",
-        "i" = "Extract a numeric year first, e.g. with {.code as.numeric(format(date, \"%Y\"))}."
+        "{.arg overlay} column {.val {time_col}} must be numeric.",
+        "i" = "Convert dates to a numeric axis first, e.g.
+               {.code as.numeric(format(date, \"%Y\"))} for calendar year or
+               {.code as.numeric(date)} for epoch days."
       ))
     }
-    yr <- overlay[[year_col]]
-    overlay <- overlay[!is.na(yr) & yr >= interval[1] & yr <= interval[2], ]
+    tv <- overlay[[time_col]]
+    overlay <- overlay[!is.na(tv) &
+                         tv >= time_interval[1] & tv <= time_interval[2], ]
   }
 
   # Nothing to join: return patches with typed-NA cols so the schema matches

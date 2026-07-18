@@ -102,30 +102,30 @@ test_that("match_mode = 'all' duplicates a straddling patch per match", {
   expect_true(is.na(out$fire_year[out$patch_id == 2]))
 })
 
-test_that("temporal filter is inclusive on both interval bounds", {
+test_that("temporal filter is inclusive on both time_interval bounds", {
   patches <- attribute_test_patches()
   overlay <- attribute_test_overlay()
 
   # inclusive: both 2018 and 2022 kept
   out_all <- dft_transition_attribute(patches, overlay, cols = "fire_year",
                                       match_mode = "all",
-                                      year_col = "fire_year",
-                                      interval = c(2018, 2022))
+                                      time_col = "fire_year",
+                                      time_interval = c(2018, 2022))
   expect_setequal(out_all$fire_year[out_all$patch_id == 1], c(2018, 2022))
 
   # only the 2022 feature survives the filter
   out_22 <- dft_transition_attribute(patches, overlay, cols = "fire_year",
                                      match_mode = "largest",
-                                     year_col = "fire_year",
-                                     interval = c(2022, 2023))
+                                     time_col = "fire_year",
+                                     time_interval = c(2022, 2023))
   expect_equal(out_22$fire_year[out_22$patch_id == 1], 2022)
 
-  # no feature in interval -> all-NA cols, nrow preserved
+  # no feature in time_interval -> all-NA cols, nrow preserved
   out_none <- dft_transition_attribute(patches, overlay,
                                        cols = c("fire_year", "cause"),
                                        match_mode = "largest",
-                                       year_col = "fire_year",
-                                       interval = c(2019, 2021))
+                                       time_col = "fire_year",
+                                       time_interval = c(2019, 2021))
   expect_equal(nrow(out_none), nrow(patches))
   expect_true(all(is.na(out_none$fire_year)))
   expect_true(all(is.na(out_none$cause)))
@@ -140,8 +140,8 @@ test_that("overlay features with NA year are dropped by the temporal filter", {
 
   out <- dft_transition_attribute(patches, overlay, cols = "cause",
                                   match_mode = "largest",
-                                  year_col = "fire_year",
-                                  interval = c(2000, 2030))
+                                  time_col = "fire_year",
+                                  time_interval = c(2000, 2030))
   # only the 2018 feature remains -> patch 1 attributed to it
   expect_equal(out$cause[out$patch_id == 1], "fire")
 })
@@ -257,34 +257,34 @@ test_that("validation errors are raised with informative messages", {
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
                                         predicate = "st_intersects"),
                "predicate")
-  # year_col and interval must come together
+  # time_col and time_interval must come together
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        year_col = "fire_year"),
-               "interval")
+                                        time_col = "fire_year"),
+               "time_interval")
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        interval = c(2018, 2022)),
-               "year_col")
-  # interval shape
+                                        time_interval = c(2018, 2022)),
+               "time_col")
+  # time_interval shape
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        year_col = "fire_year",
-                                        interval = 2018),
-               "interval")
+                                        time_col = "fire_year",
+                                        time_interval = 2018),
+               "time_interval")
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        year_col = "fire_year",
-                                        interval = c("a", "b")),
-               "interval")
+                                        time_col = "fire_year",
+                                        time_interval = c("a", "b")),
+               "time_interval")
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        year_col = "fire_year",
-                                        interval = c(2022, 2018)),
-               "interval")
-  # year_col must exist and be numeric
+                                        time_col = "fire_year",
+                                        time_interval = c(2022, 2018)),
+               "time_interval")
+  # time_col must exist and be numeric
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        year_col = "nope",
-                                        interval = c(2018, 2022)),
-               "year_col")
+                                        time_col = "nope",
+                                        time_interval = c(2018, 2022)),
+               "time_col")
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
-                                        year_col = "cause",
-                                        interval = c(2018, 2022)),
+                                        time_col = "cause",
+                                        time_interval = c(2018, 2022)),
                "numeric")
   expect_error(dft_transition_attribute(patches, overlay, cols = "fire_year",
                                         match_mode = "banana"))
