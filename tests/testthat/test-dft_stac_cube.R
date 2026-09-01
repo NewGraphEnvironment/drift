@@ -169,6 +169,43 @@ test_that("cube_parallel_check floors to 1 when the core count is undetectable",
   expect_identical(drift:::cube_parallel_check(NULL), 1L)
 })
 
+test_that("cube_parallel_check honours a deliberate session-level parallel", {
+  # gdalcubes ships parallel = 1, so anything above that was set on purpose.
+  # Overriding it with our cap would silently halve the throughput the caller
+  # asked for, and the session restore would hide it afterwards.
+  expect_identical(drift:::cube_parallel_check(NULL, session = 8), 8L)
+  expect_identical(drift:::cube_parallel_check(NULL, session = 16), 16L)
+  # 1 is gdalcubes' own default, not a choice, so auto still applies
+  auto <- drift:::cube_parallel_check(NULL, session = 1)
+  expect_identical(auto, drift:::cube_parallel_check(NULL))
+  # an explicit argument always outranks the session
+  expect_identical(drift:::cube_parallel_check(2, session = 8), 2L)
+  # and a junk session value must not leak through as the answer
+  for (bad in list(NA, NULL, "8", c(2, 3))) {
+    expect_identical(drift:::cube_parallel_check(NULL, session = bad), auto)
+  }
+})
+
+test_that("cube_check_nonempty aborts only when NOTHING is present", {
+  r <- terra::rast(nrows = 4, ncols = 4, nlyrs = 3, crs = "EPSG:32609")
+
+  terra::values(r) <- NA_real_
+  expect_error(drift:::cube_check_nonempty(r, "coll", "d", cached = FALSE),
+               "no data on any layer")
+  # the cached-path message must tell the reader how to recover, since nothing
+  # will ever regenerate the file under force = FALSE
+  expect_error(drift:::cube_check_nonempty(r, "coll", "d", cached = TRUE),
+               "force = TRUE|Delete the cached")
+
+  # one non-NA cell anywhere is enough — an individual empty LAYER is documented
+  # `months` behaviour, and aborting on it would break the packaged example
+  v <- matrix(NA_real_, nrow = terra::ncell(r), ncol = 3)
+  v[1, 2] <- 1
+  terra::values(r) <- v
+  expect_silent(drift:::cube_check_nonempty(r, "coll", "d", cached = FALSE))
+  expect_identical(sum(terra::global(r, "notNA")$notNA), 1)   # premise
+})
+
 test_that("cube_parallel_check rejects non-finite and out-of-integer-range input", {
   # Inf clears a naive whole-number test (trunc(Inf) == Inf, Inf < 1 is FALSE)
   # and >= 2^31 clears it outright; both then coerce to NA_integer_, so a

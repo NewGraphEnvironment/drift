@@ -117,8 +117,12 @@ full core count because each worker holds chunks in memory; raise it on a
 machine with headroom, or set \code{1} for the previous single-threaded
 behaviour. Prior to v0.9.0 drift never called
 \code{\link[gdalcubes:gdalcubes_options]{gdalcubes::gdalcubes_options()}} at all, so every fetch ran single-threaded
-— and, because gdalcubes derives its default chunk size from this value,
-with the coarsest possible chunking (drift#47).}
+(drift#47). gdalcubes also derives its default chunk size from this value,
+so raising it makes chunks finer as a side effect — measured in isolation on
+this AOI that is a \emph{cost} (343.7 s / 693 requests at 128 px against 236.9 s
+/ 462 at the default), so the speedup is attributable to concurrency. When
+\code{NULL} and a session-level \code{\link[gdalcubes:gdalcubes_options]{gdalcubes::gdalcubes_options()}} \code{parallel} above
+1 is already set, that value is honoured rather than overridden.}
 
 \item{cache_dir}{Character. Cache directory. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}

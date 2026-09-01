@@ -99,8 +99,12 @@
 #'   machine with headroom, or set `1` for the previous single-threaded
 #'   behaviour. Prior to v0.9.0 drift never called
 #'   [gdalcubes::gdalcubes_options()] at all, so every fetch ran single-threaded
-#'   — and, because gdalcubes derives its default chunk size from this value,
-#'   with the coarsest possible chunking (drift#47).
+#'   (drift#47). gdalcubes also derives its default chunk size from this value,
+#'   so raising it makes chunks finer as a side effect — measured in isolation on
+#'   this AOI that is a *cost* (343.7 s / 693 requests at 128 px against 236.9 s
+#'   / 462 at the default), so the speedup is attributable to concurrency. When
+#'   `NULL` and a session-level [gdalcubes::gdalcubes_options()] `parallel` above
+#'   1 is already set, that value is honoured rather than overridden.
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
 #'   [dft_cache_path()].
 #' @param force Logical. Re-fetch even if cached, overwriting the cached raster
@@ -163,10 +167,12 @@ dft_stac_cube <- function(aoi,
   # consequence of never calling gdalcubes_options(). Measured 2.05x at 4 and
   # 2.47x at 8 on the packaged AOI, with byte-identical output at every setting
   # (drift#47), so it is a pure cost knob and stays out of the cache key.
+  # The gain is CONCURRENCY, not the finer chunking it also causes: arms that
+  # isolate chunk size at parallel = 1 measured finer chunks 45% SLOWER.
   # Restored on exit so the caller's gdalcubes session is untouched, matching
   # the GDAL config handling below.
-  parallel <- cube_parallel_check(parallel)
   old_parallel <- gdalcubes::gdalcubes_options()$parallel
+  parallel <- cube_parallel_check(parallel, session = old_parallel)
   gdalcubes::gdalcubes_options(parallel = parallel)
   on.exit(gdalcubes::gdalcubes_options(parallel = old_parallel), add = TRUE)
 
@@ -258,6 +264,12 @@ dft_stac_cube <- function(aoi,
   if (!force && file.exists(cache_file)) {
     message("  cube: cached")
     r <- terra::rast(cache_file)
+    # Guard the READ path too, not only the write. A cube written by an earlier
+    # version could be all-NA — drift's end-to-end test passed on exactly that
+    # (#47) — and the cache key is unchanged, so upgrading does not invalidate
+    # it. Without this the empty cube is served silently and, under
+    # `force = FALSE`, permanently.
+    cube_check_nonempty(r, cfg$collection, datetime, cached = TRUE)
     terra::time(r) <- month_times(terra::nlyr(r))
     return(r)
   }
@@ -410,23 +422,44 @@ dft_stac_cube <- function(aoi,
   # with no retained scenes as NA, so the packaged `months = 6:9` example has
   # eight all-NA layers and January first. Checking layer 1 would abort the
   # vignette's own call after the full COG stream.
-  #
-  # terra::global() reduces chunk-wise, so this does not materialise the stack —
-  # the same reason dft_rast_transition() avoids terra::values() (#34).
-  if (sum(terra::global(stk, "notNA")$notNA) == 0) {
-    cli::cli_abort(c(
-      "The assembled cube has no data on any layer.",
-      "i" = "Every cell is {.val NA} on all {terra::nlyr(stk)} layers. This is \\
-             either the gdalcubes all-{.val NA} failure mode, or the AOI does \\
-             not overlap {.val {cfg$collection}} for {.val {datetime}}.",
-      "i" = "Nothing was cached. Check the AOI, {.arg datetime} and {.arg months}."
-    ))
-  }
+  cube_check_nonempty(stk, cfg$collection, datetime, cached = FALSE)
 
   terra::time(stk) <- month_times(terra::nlyr(stk))
   names(stk) <- rep(index, terra::nlyr(stk))
   terra::writeRaster(stk, cache_file, overwrite = TRUE)
   stk
+}
+
+
+#' Abort on a cube with no data anywhere
+#'
+#' The gdalcubes all-`NA` failure mode (#32/#47) is SILENT — nothing upstream
+#' raises. Applied on BOTH the write path and the cache-read path: a cube
+#' written by an earlier version can be all-`NA`, and the cache key is unchanged,
+#' so nothing would ever regenerate it under `force = FALSE`.
+#'
+#' Tests the whole stack, never a single layer: an individual layer being empty
+#' is documented `months` behaviour (months with no retained scenes stay `NA` so
+#' the series remains regular for bfast), so a per-layer test would abort the
+#' packaged `months = 6:9` example.
+#'
+#' `terra::global()` reduces chunk-wise, so this does not materialise the stack —
+#' the same reason `dft_rast_transition()` avoids `terra::values()` (#34).
+#' @noRd
+cube_check_nonempty <- function(stk, collection, datetime, cached) {
+  if (sum(terra::global(stk, "notNA")$notNA) > 0) return(invisible(stk))
+  cli::cli_abort(c(
+    "The {if (cached) 'cached' else 'assembled'} cube has no data on any layer.",
+    "i" = "Every cell is {.val NA} on all {terra::nlyr(stk)} layers. This is \\
+           either the gdalcubes all-{.val NA} failure mode, or the AOI does \\
+           not overlap {.val {collection}} for {.val {datetime}}.",
+    "i" = if (cached) {
+      "Delete the cached {.file .tif} under {.fn dft_cache_path}, or re-run with \\
+       {.code force = TRUE}, to rebuild it."
+    } else {
+      "Nothing was cached. Check the AOI, {.arg datetime} and {.arg months}."
+    }
+  ))
 }
 
 
@@ -442,8 +475,15 @@ dft_stac_cube <- function(aoi,
 #' rather than propagating `NA` into `gdalcubes_options()` — an auto default that
 #' errors on an unusual machine is worse than a slow one.
 #' @noRd
-cube_parallel_check <- function(parallel) {
+cube_parallel_check <- function(parallel, session = 1L) {
   if (is.null(parallel)) {
+    # A caller who ran gdalcubes_options(parallel = 8) meant it. gdalcubes ships
+    # 1, so anything above that is a deliberate choice and outranks our cap —
+    # otherwise the auto default silently halves throughput they asked for.
+    if (is.numeric(session) && length(session) == 1L && !is.na(session) &&
+          session > 1) {
+      return(as.integer(session))
+    }
     cores <- parallel::detectCores()
     return(if (is.na(cores)) 1L else max(1L, min(4L, as.integer(cores) - 1L)))
   }

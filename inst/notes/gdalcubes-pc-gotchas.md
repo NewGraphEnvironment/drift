@@ -18,7 +18,7 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
   Do NOT reach for it anyway. Three findings, all measured on the
   packaged AOI with `CPL_CURL_VERBOSE` request counts
   (`data-raw/benchmark_filter_geom.R`, `data-raw/logs/benchmark_filter_geom/`):
-  - **It skips whole CHUNKS, not pixels**, and `gdalcubes:::default_chunksize()`
+  - **It skips whole CHUNKS, not pixels**, and `gdalcubes:::.default_chunk_size()`
     targets `2 * parallel` spatial chunks with the edge clamped to `[64, 1024]`
     px. At `parallel = 1` that is a **2x2 grid** on a 3.3 km reach, which a
     corridor intersects entirely — so at the default it skips **nothing**:
@@ -26,9 +26,10 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
   - **Forcing chunking finer costs more than it saves.** Sentinel-2 L2A COGs are
     `Block=512x512`; a 64 px chunk sits inside one source block, so the same
     bytes are refetched per chunk. 64 px and 128 px chunking both measured
-    **693 requests / ~345 s — 1.5x the requests and ~47% slower** — to skip 26.7%
-    of the ground (predicted by `data-raw/benchmark_filter_geom_chunkskip.R`;
-    the gap between that prediction and the wire is the whole finding). The AOI/bbox area ratio (0.102) is the wrong bound: the read
+    **693 requests / ~345 s — 1.5x the requests and ~47% slower** — while
+    skipping 26.7% and 11.1% of the ground respectively (predicted by
+    `data-raw/benchmark_filter_geom_chunkskip.R`; the gap between that prediction
+    and the wire is the whole finding — more skipping, more cost). The AOI/bbox area ratio (0.102) is the wrong bound: the read
     is chunk-granular and the cost is COG-block-granular.
   - **It clips at CELL CENTRE where `terra::mask()` is `touches = TRUE`.**
     Swapping them shrinks the analysed footprint by **15.5%** (49,244 -> 41,608
@@ -114,9 +115,12 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
 - **`gdalcubes_options(parallel =)` is the biggest single lever, and drift did
   not set it at all before v0.9.0 (#47).** Every cube read therefore ran
   single-threaded — not a considered choice, just the consequence of never
-  calling `gdalcubes_options()`. It costs twice over, because
-  `default_chunksize()` *derives the chunk size from* `parallel`, so
-  `parallel = 1` also produced the coarsest possible chunking. Measured on the
+  calling `gdalcubes_options()`. gdalcubes also *derives the chunk size from*
+  `parallel` (`gdalcubes:::.default_chunk_size()`), so raising it makes chunks
+  finer as a side effect — but that is **not** where the win comes from. Arms
+  isolating chunk size at `parallel = 1` measured finer chunks **45% slower and
+  50% more requests** (343.7 s / 693 requests at 128 px against 236.9 s / 462 at
+  the default), so the speedup below is concurrency alone. Measured on the
   packaged AOI, 4-month monthly kNDVI cube:
 
   | setting | wall clock | vs default | output |
