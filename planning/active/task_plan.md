@@ -49,7 +49,7 @@ post-read mask, with a follow-up issue carrying the measured numbers.
 | C — `filter_geom`, 128 px chunking | 343.7 s | 693 | 1.50 | 41,608 |
 | D — `tile_size = 640` (already shipped) | 1263.6 s | 3213 | 6.96 | 49,244 |
 
-- [ ] Rival hypothesis: `gdalcubes_options(parallel = 4/8)` on the baseline. drift never
+- [x] Rival hypothesis: `gdalcubes_options(parallel = 4/8)` on the baseline. drift never
       calls `gdalcubes_options()` at all, so every fetch is single-threaded *and* coarse-chunked
 
 **GATE: FAILED for `filter_geom`.** Not a close call — no arm beats the baseline on either
@@ -64,32 +64,34 @@ the wire said 693.
 
 Found while reviewing. These land regardless of how #47 is resolved.
 
-- [ ] `tests/testthat/test-dft_stac_cube.R:219-242` — the only end-to-end cube test **passes
+- [x] `tests/testthat/test-dft_stac_cube.R:219-242` — the only end-to-end cube test **passes
       on an all-NA cube**. `fully_na` is 1.0 for an empty cube and the assertion is
       `expect_gt(fully_na, 0.5)`; `nlyr`, `time` and the cache-file checks pass too. Replace
       with in-polygon non-NA, per-layer non-NA, and outside-NA. Confirm red against a stubbed
       all-NA cube before believing the fix
-- [ ] `R/dft_stac_cube.R:364-366` — documents the clip as "cells whose centre falls outside",
+- [x] `R/dft_stac_cube.R:364-366` — documents the clip as "cells whose centre falls outside",
       but `terra::mask()` defaults to `touches = TRUE`. Correct the roxygen
-- [ ] Add the offline oracle that distinguishes the two rules — the existing clip test
+- [x] Add the offline oracle that distinguishes the two rules — the existing clip test
       (`:116-138`) uses an axis-aligned polygon on a cell boundary, where they agree, so it
       cannot reach the difference. Assert the premise beside the property
-- [ ] Post-condition before `terra::writeRaster()` (`:355`): abort when no in-polygon cell is
+- [x] Post-condition before `terra::writeRaster()` (`:355`): abort when no in-polygon cell is
       non-NA, so the all-NA mode cannot reach a cache file
 
 ## Phase 2: Close #47 with the measurement
 
-- [ ] Rewrite the issue body — its premise (~10× from the 0.102 area ratio) is refuted. The
+- [x] Rewrite the issue body — its premise (~10× from the 0.102 area ratio) is refuted. The
       area ratio is the wrong bound: the read is chunk-granular and cost is COG-block-granular
-- [ ] Record in `inst/notes/gdalcubes-pc-gotchas.md`: the fork fixes the segfault, but the
+- [x] Record in `inst/notes/gdalcubes-pc-gotchas.md`: the fork fixes the segfault, but the
       default chunking defeats the skip and fine chunking costs more than it saves. Keep the
       "do not use `filter_geom`" guidance, replacing the *reason* — it is no longer "it
       segfaults" but "it is measurably not worth it"
 - [ ] Report the `default_chunksize` × `filter_geom` interaction upstream on
       `appelmar/gdalcubes` — at `parallel = 1` the default chunking makes `filter_geom` a
       guaranteed no-op, which is a real observation independent of drift
-- [ ] Follow-up issue if the `parallel` arm wins: `gdalcubes_options(parallel =)` is a one-line
-      change with no fork, no probe and no cache question
+- [x] The `parallel` arm won outright (2.05× at 4, 2.47× at 8, byte-identical), so it
+      shipped in this PR rather than as a follow-up — `dft_stac_cube(parallel =)`
+- [x] #48 filed: both frozen cache-key goldens fail on `main`, so the key moved and
+      silently orphaned every cached cube and fetch. Found by this work, unrelated to it
 
 **Not doing:** the capability probe (Phase 2 as originally planned), the `filter_geom` code
 path, the `Remotes:` entry, and the cache-key change. All were downstream of a gate that
@@ -98,9 +100,9 @@ failed. `Remotes:` was in any case a weaker guarantee than it reads as — it is
 
 ## Validation
 
-- [ ] Tests pass (`devtools::test()`); `devtools::document()` output read for unexpected `.Rd` writes
-- [ ] The replaced smoke test is confirmed RED against a stubbed all-NA cube
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass (`devtools::test()`); `devtools::document()` output read for unexpected `.Rd` writes
+- [x] The replaced smoke test is confirmed RED against a stubbed all-NA cube
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion, with the Phase-1 table in the archive README's
       Measurement section
