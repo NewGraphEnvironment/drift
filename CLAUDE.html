@@ -1136,6 +1136,22 @@
 <li><p>Generalizes past <code>sf</code>. Ask it of anything taking <code>...</code>: <em>does this constructor decide what to keep by looking at the first argument?</em> Same shape in any language where a variadic builder dispatches on an argument’s type.</p></li>
 </ul></div>
 <div class="section level3">
+<h3 id="terra-mask-is-touches--true-so-two-clip-to-the-polygon-routines-disagree-by-a-cell-ring">terra: <code>mask()</code> is <code>touches = TRUE</code>, so two “clip to the polygon” routines disagree by a cell ring<a class="anchor" aria-label="anchor" href="#terra-mask-is-touches--true-so-two-clip-to-the-polygon-routines-disagree-by-a-cell-ring"></a></h3>
+<p>Swapping one polygon clip for another looks like a refactor and is a <strong>methodology change</strong>. <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> defaults to <code>touches = TRUE</code> — every cell the polygon touches is kept — while most other clips rasterize at <strong>cell centre</strong>: <code><a href="https://rspatial.github.io/terra/reference/rasterize.html" class="external-link">terra::rasterize()</a></code> without <code>touches</code>, <code><a href="https://rdrr.io/pkg/gdalcubes/man/filter_geom.html" class="external-link">gdalcubes::filter_geom()</a></code>, and <code>gdal_rasterize</code> without <code>-at</code>. Nothing errors, nothing warns, and the values agree exactly where both have data. Only the <em>footprint</em> moves.</p>
+<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">mask</span><span class="op">(</span><span class="va">r</span>, <span class="va">v</span><span class="op">)</span>                  <span class="co"># 150 cells   &lt;- the default</span></span>
+<span><span class="fu">mask</span><span class="op">(</span><span class="va">r</span>, <span class="va">v</span>, touches <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span> <span class="co"># 122 cells</span></span>
+<span><span class="co"># true polygon area: 123.4 cells</span></span></code></pre></div>
+<p>The magnitude is a perimeter-to-area ratio, so it is worst exactly where these clips get used — thin corridors, floodplains, riparian buffers. Measured 2026-09-01 in drift#47 on a 3.3 km reach: <strong>−15.5%</strong> of the analysed footprint (49,244 → 41,608 cells) from a change whose entire stated purpose was to remove a redundant step. Against a parity tolerance of ±1 ha on 943 ha, that is 30–150×.</p>
+<ul><li>
+<strong>Do not describe a clip without naming its rule.</strong> drift’s roxygen said “cells whose centre falls outside become <code>NA</code>” for a <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> call, and was wrong for two releases. Anyone reasoning about boundary hectares from that doc was off by a ring.</li>
+<li>
+<strong>An axis-aligned fixture cannot catch this.</strong> A rectangle on a cell boundary makes both rules agree, so the test passes for nothing. Use a polygon with fractional coordinates and no edge parallel to the grid, and assert the premise beside the property — <code>expect_gt(touch, centre)</code> — so a future terra default change fails by naming the real cause.</li>
+<li>
+<strong>To swap in a cell-centre clip without moving the footprint</strong>, buffer the polygon by <code>&gt;= res * sqrt(2)/2</code> first: if a polygon intersects a cell square, that cell’s centre is within a half-diagonal of it, so the buffered cell-centre footprint is a guaranteed superset of <code>touches = TRUE</code>. Then keep the <code>mask()</code> to trim back, and the output is byte-identical.</li>
+</ul><p>Generalises past terra: whenever two libraries both offer “clip raster to polygon”, assume they disagree at the boundary until measured. Count the cells.</p>
+</div>
+<div class="section level3">
 <h3 id="sf-st_joinlargest--true-ignores-the-join-predicate">sf: <code>st_join(largest = TRUE)</code> ignores the join predicate<a class="anchor" aria-label="anchor" href="#sf-st_joinlargest--true-ignores-the-join-predicate"></a></h3>
 <ul><li>
 <code>sf::st_join(x, y, join = predicate, largest = TRUE)</code> does <strong>not</strong> use <code>predicate</code> to decide matches — with <code>largest = TRUE</code>, sf runs <code>st_intersection(x, y)</code> and keeps the feature of greatest overlap area, so matching is <em>always</em> intersection-based regardless of what <code>join =</code> is set to. A function that exposes a configurable predicate AND a largest-overlap mode therefore silently mis-attributes when both are combined: pass <code>st_within</code> expecting containment, get anything that merely <em>overlaps</em>. Verify against sf source, not the argument list — the <code>join</code> arg is accepted and ignored, not rejected. Fix: abort when a non-default predicate is combined with the largest-overlap mode, rather than honouring one and dropping the other. (drift#42)</li>
@@ -1144,6 +1160,26 @@
 <div class="section level3">
 <h3 id="sf-name-validation-must-account-for-the-geometry-column">sf: name validation must account for the geometry column<a class="anchor" aria-label="anchor" href="#sf-name-validation-must-account-for-the-geometry-column"></a></h3>
 <ul><li>The active geometry column is a named entry in <code>names(x)</code>, but its name is <strong>not fixed</strong> — <code>"geometry"</code> from <code><a href="https://r-spatial.github.io/sf/reference/st_read.html" class="external-link">sf::st_read()</a></code> of some sources, <code>"geom"</code> from a GeoPackage/PostGIS layer, <code>"geometry"</code> or <code>"_ogr_geometry_"</code> elsewhere. Code that validates user-supplied column names with <code>cols %in% names(x)</code> will happily accept the geometry column, then break downstream (<code>st_join</code> drops <code>y</code>’s geometry, so a requested “attribute” column silently never appears; a 0-row short-circuit path may instead attach a stray empty sfc). A same-name collision check across two sf objects also misses this when the two layers name their geometry differently. Guard explicitly with <code>attr(x, "sf_column")</code> — reject it from the caller-supplied column set. (drift#42)</li>
+</ul></div>
+<div class="section level3">
+<h3 id="sf-st_intersection--st_difference-return-a-geometrycollection-that-qgis-will-not-draw">sf: <code>st_intersection()</code> / <code>st_difference()</code> return a GEOMETRYCOLLECTION that QGIS will not draw<a class="anchor" aria-label="anchor" href="#sf-st_intersection--st_difference-return-a-geometrycollection-that-qgis-will-not-draw"></a></h3>
+<ul><li>Intersecting or differencing two polygon layers yields a <code>GEOMETRYCOLLECTION</code> wherever the inputs <em>also</em> touch along a line or at a point. The polygonal part is real and <code>st_area()</code> reports it correctly, so every numeric check passes — but QGIS renders the feature as nothing, and it reads to the user as “one row with no geometry”.</li>
+<li>The failure is silent in exactly the wrong direction: written to a GeoPackage the layer reports its <code>geometry_type</code> as <code>Geometry Collection</code> and its area as correct. Nothing errors. It surfaces only when someone opens it.</li>
+<li>Whether it fires depends on the geometry, not the code, so the same call can be clean on one input and a collection on the next. Do not conclude from one working case that a path is safe.</li>
+<li>Fix: <code>sf::st_collection_extract(g, "POLYGON")</code> then cast to a single type before writing. Areas are unchanged — the discarded fragments have zero area.</li>
+<li>
+<strong>Assert it on anything you hand over</strong>, not just the layer you expect to be interesting: no <code>GEOMETRYCOLLECTION</code> in <code>st_geometry_type()</code>, and <code>sum(st_is_empty())</code> is 0, across <em>every</em> layer in the file. Caught 2026-08-31 in floodplains only because the user opened the deliverable and asked why a layer looked empty.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="a-per-tenant-key-looks-global-whenever-your-test-data-has-one-tenant">A per-tenant key looks global whenever your test data has one tenant<a class="anchor" aria-label="anchor" href="#a-per-tenant-key-looks-global-whenever-your-test-data-has-one-tenant"></a></h3>
+<ul><li>
+<code>code-check-infra.md</code> records this for database joins (link’s <code>id_segment</code>, unique per watershed group, cartesian against a multi-tenant table). The same mechanism appears well outside Postgres — in vector attribute tables, exported layers, and anything numbered per group during generation — and the reason it survives review is always the same: <strong>the data that would expose it is the data nobody tested on.</strong>
+</li>
+<li>If N-1 of your areas have exactly one tenant, a per-tenant key is <em>observably</em> unique in all of them. Verifying uniqueness on one of those and generalising is not carelessness; it is a correct observation about an unrepresentative sample.</li>
+<li>Caught 2026-08-31 in floodplains: <code>patch_id</code> is numbered within each sub-basin. Every whole-watershed-group area has one sub-basin, so <code>patch_id</code> was globally unique in all five that had been run. The only subset area (13 sub-basins) had 2032 rows and 1973 distinct ids. Grouping on it alone mis-apportioned by 6%.</li>
+<li>
+<strong>The tell is a contradictory pass.</strong> That run reported “weights sum to 1 per patch” and “0 unbridged patches” <em>and</em> a 6% shortfall — three results that cannot all be true. A reconciliation check that disagrees with its own component checks is pointing at a key, not at arithmetic.</li>
+<li>Before keying on an id you did not generate, ask what it is unique <em>within</em>, and prefer the composite (<code>(patch_id, name_basin)</code>) even where the current data makes the extra column redundant.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="sf-reproject-the-polygon-to-get-a-latlon-bbox-never-transform-the-projected-bbox-corners">sf: reproject the polygon to get a lat/lon bbox, never transform the projected bbox corners<a class="anchor" aria-label="anchor" href="#sf-reproject-the-polygon-to-get-a-latlon-bbox-never-transform-the-projected-bbox-corners"></a></h3>
@@ -1163,7 +1199,7 @@
 <h3 id="asposixct-on-character-infers-one-format-for-the-whole-vector">as.POSIXct on character infers ONE format for the whole vector<a class="anchor" aria-label="anchor" href="#asposixct-on-character-infers-one-format-for-the-whole-vector"></a></h3>
 <ul><li>
 <p><code>as.POSIXct(x)</code> on a character vector picks a single format by finding the first candidate that parses <strong>every</strong> element — and <code>strptime</code> <strong>ignores trailing characters</strong>. So one coarse value silently truncates the entire column, and nothing warns:</p>
-<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2026-08-15 18:33:46"</span>, <span class="st">"2026-08-15 18:34:20"</span>, <span class="st">"2026-08-16"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; all three at 00:00:00   &lt;- the times are gone</span></span></code></pre></div>
 <p>One minute-precision value does the same to its neighbours’ seconds. Order-independent, and the values are not <code>NA</code> afterwards, so an <code><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na()</a></code> guard on the result cannot see it.</p>
@@ -1179,12 +1215,33 @@
 <li>The mirror mistake is requiring four offset digits. <code>±hh</code> is valid ISO 8601 and is what Postgres emits for whole-hour zones; a two-digit-offset value then falls through the guard, gets stripped as trailing junk, and the instant moves by hours with nothing reported.</li>
 </ul></div>
 <div class="section level3">
+<h3 id="a-reader-that-accepts-a-utc-offset-may-not-be-applying-it">A reader that accepts a UTC offset may not be applying it<a class="anchor" aria-label="anchor" href="#a-reader-that-accepts-a-utc-offset-may-not-be-applying-it"></a></h3>
+<ul><li><p>The rule above is about parsing an offset correctly. This is the case where the parse never happens: the value is accepted, no error is raised, and the offset is <strong>silently discarded</strong>. GDAL does this with a GeoPackage <code>DATETIME</code> — it returns the wall-clock digits, which the caller then reads in the machine’s zone.</p></li>
+<li>
+<p>So the same file yields a different instant on every machine. Measured 2026-09-01 on <code>trap</code>, writing one value and reading it back under three zones:</p>
+<pre><code>stored                      TZ=America/Vancouver   TZ=UTC       TZ=Asia/Tokyo
+2026-07-21T14:04:28Z        14:04:28Z              14:04:28Z    14:04:28Z
+2026-07-21T14:04:28-07      21:04:28Z              14:04:28Z    05:04:28Z
+2026-07-21T14:04:28+05:30   21:04:28Z              14:04:28Z    05:04:28Z</code></pre>
+<p><strong>The tell is that the two offsets give identical answers.</strong> Only the <code>Z</code> row is a fact about the file; the other two are facts about the reader.</p>
+</li>
+<li><p><strong>The test that let it through asserted <code>-07</code> on a <code>-07</code> machine</strong>, where a wholly-ignored offset and a correctly-applied one produce the same number. The coincidence was written into the fixture by choosing an offset equal to the local one, so no amount of running it locally could have found it — CI on a UTC runner did. Same family as “a fixture set that cannot reach the failure mode”, with the blind spot supplied by the machine rather than by the data.</p></li>
+<li>
+<p>Two things follow, and the second is the general one:</p>
+<ul><li>
+<strong>Refuse what you cannot read.</strong> Where every real value carries <code>Z</code>, accepting an offset buys nothing and costs a silent multi-hour error. Refusing it with its own message — a missing zone and an untrusted zone are different failures — is strictly better than honouring a parse you have not verified.</li>
+<li>
+<strong>Test a timezone-sensitive property in more than one zone</strong>, and make one of them differ from the developer’s. <code><a href="https://withr.r-lib.org/reference/with_timezone.html" class="external-link">withr::with_timezone()</a></code> costs nothing. The property worth asserting is <em>the instant is the same in every zone</em>, which a single-zone test structurally cannot check.</li>
+</ul></li>
+<li><p>Generalises past GDAL to anything that returns a naive local timestamp from a zone-bearing source: some JDBC drivers, <code>datetime.fromisoformat</code> before 3.11 on certain shapes, spreadsheet readers. If a library hands back a value with no zone attached, assume the zone was dropped rather than applied, and prove otherwise.</p></li>
+</ul></div>
+<div class="section level3">
 <h3 id="paste0-treats-a-zero-length-argument-as-">
 <code>paste0()</code> treats a zero-length argument as <code>""</code>
 <a class="anchor" aria-label="anchor" href="#paste0-treats-a-zero-length-argument-as-"></a></h3>
 <ul><li>
 <p><code>paste0(character(0), "x")</code> returns <code>"x"</code> — length <strong>one</strong>, not zero. So a composite key built from an empty data frame yields one phantom row rather than none:</p>
-<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb45"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">a</span>, <span class="st">"\x1f"</span>, <span class="va">df</span><span class="op">$</span><span class="va">b</span><span class="op">)</span>   <span class="co"># nrow(df) == 0  -&gt;  "\x1f"</span></span></code></pre></div>
 </li>
 <li><p>Downstream that reads as a real record. Caught 2026-08-24 in trap#14: an empty annotation table produced one key, which the join then reported as “an annotation matching no session”. Guard with an explicit <code>if (!nrow(x)) return(character(0))</code>.</p></li>
@@ -1194,7 +1251,7 @@
 <h3 id="a-zero-length-value-in-a-row-builder-drops-the-whole-record-group-and-all">A zero-length value in a row-builder drops the whole record, group and all<a class="anchor" aria-label="anchor" href="#a-zero-length-value-in-a-row-builder-drops-the-whole-record-group-and-all"></a></h3>
 <ul><li>
 <p>Third member of the zero-length family above, and the one that removes evidence rather than corrupting it. A tibble/data.frame constructor recycles its columns: give one of them a zero-length value and you get <strong>zero rows</strong>, not one row with a blank. Inside a <code>map_dfr()</code>/<code>bind_rows()</code> over groups, that group then vanishes from the result entirely.</p>
-<div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb46"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">covered_area</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_measures.html" class="external-link">st_area</a></span><span class="op">(</span><span class="va">covered</span><span class="op">)</span><span class="op">)</span>   <span class="co"># empty geometry -&gt; numeric(0)</span></span>
 <span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tibble</a></span><span class="op">(</span>group <span class="op">=</span> <span class="va">grp</span>, covered_km2 <span class="op">=</span> <span class="va">covered_area</span> <span class="op">/</span> <span class="fl">1e6</span><span class="op">)</span>   <span class="co"># 0 rows</span></span></code></pre></div>
 </li>
@@ -1210,8 +1267,8 @@
 <li><p>Caught 2026-08-28 in fly#30: <code>export(fly_footprint)</code> disappeared and <code>fly_film_media.Rd</code> appeared; 120 tests passed throughout. The signal was in <code>devtools::document()</code> output, not the test run.</p></li>
 <li>
 <p>Read what <code>document()</code> prints, every time. <code>Writing '&lt;something unexpected&gt;.Rd'</code> or <code>Deleting</code> on a file you did not touch is the tell. Cheap confirmation:</p>
-<div class="sourceCode" id="cb45"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb45-1"><a href="#cb45-1" tabindex="-1"></a><span class="fu">git</span> diff NAMESPACE            <span class="co"># an export you did not intend to change</span></span>
-<span id="cb45-2"><a href="#cb45-2" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-c</span> <span class="st">"^export("</span> NAMESPACE  <span class="co"># count should not fall</span></span></code></pre></div>
+<div class="sourceCode" id="cb47"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb47-1"><a href="#cb47-1" tabindex="-1"></a><span class="fu">git</span> diff NAMESPACE            <span class="co"># an export you did not intend to change</span></span>
+<span id="cb47-2"><a href="#cb47-2" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-c</span> <span class="st">"^export("</span> NAMESPACE  <span class="co"># count should not fall</span></span></code></pre></div>
 </li>
 <li><p>Put internal helpers at the top of the file or in their own file. The roxygen block must sit immediately above the function it documents, with nothing between.</p></li>
 </ul></div>
@@ -1219,7 +1276,7 @@
 <h3 id="a-zero-length-value-in-a-comparison-makes-every-branch-false-and-silently-picks-the-fallback">A zero-length value in a comparison makes every branch false and silently picks the fallback<a class="anchor" aria-label="anchor" href="#a-zero-length-value-in-a-comparison-makes-every-branch-false-and-silently-picks-the-fallback"></a></h3>
 <ul><li>
 <p><code>x == character(0)</code> is <code>logical(0)</code>, so <code><a href="https://rdrr.io/r/base/which.html" class="external-link">which()</a></code> gives <code>integer(0)</code> and <code>if (length(hit))</code> is FALSE <strong>for every element</strong>. A lookup written this way does not error and does not report “not found” — it falls through to whatever the else-branch does, usually <em>create</em>. The created thing then carries the zero-length value as its name or key, and is unnamed rather than absent.</p>
-<div class="sourceCode" id="cb46"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb48"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws</a></span><span class="op">(</span><span class="fu">xml2</span><span class="fu">::</span><span class="fu"><a href="http://xml2.r-lib.org/reference/xml_attr.html" class="external-link">xml_attr</a></span><span class="op">(</span><span class="va">groups</span>, <span class="st">"name"</span><span class="op">)</span><span class="op">)</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws</a></span><span class="op">(</span><span class="va">group</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">hit</span><span class="op">)</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="va">groups</span><span class="op">[[</span><span class="va">hit</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">]</span><span class="op">]</span><span class="op">)</span>   <span class="co"># group = NULL -&gt; never taken</span></span>
 <span><span class="va">g</span> <span class="op">&lt;-</span> <span class="fu">xml2</span><span class="fu">::</span><span class="fu"><a href="http://xml2.r-lib.org/reference/xml_replace.html" class="external-link">xml_add_child</a></span><span class="op">(</span><span class="va">parent</span>, <span class="st">"layer-tree-group"</span><span class="op">)</span></span>
@@ -1294,15 +1351,15 @@
 </ul></li>
 <li>
 <p><strong>Detection (cheap; do it before any commit, merge, or visibility flip):</strong> assert the branch is what you think it is, not just that the tree is clean.</p>
-<div class="sourceCode" id="cb47"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb47-1"><a href="#cb47-1" tabindex="-1"></a><span class="bu">[</span> <span class="st">"</span><span class="va">$(</span><span class="fu">git</span> branch <span class="at">--show-current</span><span class="va">)</span><span class="st">"</span> <span class="ot">=</span> <span class="st">"</span><span class="va">$EXPECTED_BRANCH</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">||</span> <span class="kw">{</span> <span class="bu">echo</span> <span class="st">"WRONG BRANCH"</span><span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb49"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb49-1"><a href="#cb49-1" tabindex="-1"></a><span class="bu">[</span> <span class="st">"</span><span class="va">$(</span><span class="fu">git</span> branch <span class="at">--show-current</span><span class="va">)</span><span class="st">"</span> <span class="ot">=</span> <span class="st">"</span><span class="va">$EXPECTED_BRANCH</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">||</span> <span class="kw">{</span> <span class="bu">echo</span> <span class="st">"WRONG BRANCH"</span><span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span></code></pre></div>
 </li>
 <li><p><strong>Recovery:</strong> back up the touched files first (<code>cp</code> to a scratch dir, <code>git diff &gt; x.diff</code>), confirm the other branch’s changes don’t overlap yours (<code>git diff --name-only main..their-branch</code>), then <code>git checkout &lt;your-branch&gt;</code> — uncommitted changes carry across cleanly when there is no overlap. Commit <strong>and push</strong> immediately; an unpushed branch is what gets stranded. If you already committed onto their branch, restore their pointer with <code>git branch -f &lt;their-branch&gt; &lt;their-last-sha&gt;</code> (your commit stays reachable via reflog).</p></li>
 <li>
 <p><strong>Recovery when their branch is already pushed, with an open PR:</strong> do <strong>not</strong> rewrite it — <code>git branch -f</code> plus a force-push into a PR another session is working in trades your problem for theirs. Cherry-pick forward instead, through a throwaway worktree so their checkout is never disturbed:</p>
-<div class="sourceCode" id="cb48"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" tabindex="-1"></a><span class="fu">git</span> worktree add <span class="at">-q</span> /tmp/repo-main main</span>
-<span id="cb48-2"><a href="#cb48-2" tabindex="-1"></a><span class="fu">git</span> <span class="at">-C</span> /tmp/repo-main cherry-pick <span class="op">&lt;</span>your-sha<span class="op">&gt;</span></span>
-<span id="cb48-3"><a href="#cb48-3" tabindex="-1"></a><span class="fu">git</span> <span class="at">-C</span> /tmp/repo-main push origin main</span>
-<span id="cb48-4"><a href="#cb48-4" tabindex="-1"></a><span class="fu">git</span> worktree remove /tmp/repo-main</span></code></pre></div>
+<div class="sourceCode" id="cb50"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb50-1"><a href="#cb50-1" tabindex="-1"></a><span class="fu">git</span> worktree add <span class="at">-q</span> /tmp/repo-main main</span>
+<span id="cb50-2"><a href="#cb50-2" tabindex="-1"></a><span class="fu">git</span> <span class="at">-C</span> /tmp/repo-main cherry-pick <span class="op">&lt;</span>your-sha<span class="op">&gt;</span></span>
+<span id="cb50-3"><a href="#cb50-3" tabindex="-1"></a><span class="fu">git</span> <span class="at">-C</span> /tmp/repo-main push origin main</span>
+<span id="cb50-4"><a href="#cb50-4" tabindex="-1"></a><span class="fu">git</span> worktree remove /tmp/repo-main</span></code></pre></div>
 <p>Their PR now carries a commit whose content is already on main. That is harmless — git sees identical changes on both sides and merges cleanly — and verifiable before you rely on it: <code>git diff origin/main -- &lt;the-file&gt;</code> on their branch should be empty. The cost is one duplicated commit message in the log, which is cheaper than a contested force-push.</p>
 </li>
 <li><p><strong>The moment to use a worktree is when you are about to touch a second repo</strong>, not after something goes wrong. Observed 2026-08-26 in gq#57: a fix in the primary repo needed a matching change in <code>soul</code>, and <code>soul</code>’s shared checkout had meanwhile been switched to a parallel session’s feature branch. The commit landed in their open PR silently — <code>git push</code> reported success, because it was a perfectly valid push to a branch nobody had said was wrong.</p></li>
@@ -1425,10 +1482,10 @@
 <li><p>This is the sibling of <em>“a wrapper’s exit 0 is not the work completing”</em> below, one step earlier: that rule is about trusting the wrong exit status, this one is about never seeing the status at all. <code>cmd | grep ...</code> reports <strong>grep’s</strong> exit, so <code>$?</code> is 0 whenever the pattern matched, whatever the command did.</p></li>
 <li>
 <p>Capture the whole run, gate on it, then look at the part you care about:</p>
-<div class="sourceCode" id="cb49"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb49-1"><a href="#cb49-1" tabindex="-1"></a><span class="ex">cmd</span> <span class="op">&gt;</span> run.log <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span><span class="kw">;</span> <span class="va">rc</span><span class="op">=</span><span class="va">$?</span></span>
-<span id="cb49-2"><a href="#cb49-2" tabindex="-1"></a><span class="va">errs</span><span class="op">=</span><span class="va">$(</span><span class="fu">grep</span> <span class="at">-c</span> <span class="st">'Execution halted\|^Error\|could not find'</span> run.log<span class="va">)</span></span>
-<span id="cb49-3"><a href="#cb49-3" tabindex="-1"></a><span class="bu">[</span> <span class="st">"</span><span class="va">$rc</span><span class="st">"</span> <span class="ot">-eq</span> 0 <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$errs</span><span class="st">"</span> <span class="ot">-eq</span> 0 <span class="bu">]</span> <span class="kw">||</span> <span class="kw">{</span> <span class="fu">tail</span> <span class="at">-30</span> run.log<span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span>
-<span id="cb49-4"><a href="#cb49-4" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-E</span> <span class="st">"the interesting lines"</span> run.log</span></code></pre></div>
+<div class="sourceCode" id="cb51"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb51-1"><a href="#cb51-1" tabindex="-1"></a><span class="ex">cmd</span> <span class="op">&gt;</span> run.log <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span><span class="kw">;</span> <span class="va">rc</span><span class="op">=</span><span class="va">$?</span></span>
+<span id="cb51-2"><a href="#cb51-2" tabindex="-1"></a><span class="va">errs</span><span class="op">=</span><span class="va">$(</span><span class="fu">grep</span> <span class="at">-c</span> <span class="st">'Execution halted\|^Error\|could not find'</span> run.log<span class="va">)</span></span>
+<span id="cb51-3"><a href="#cb51-3" tabindex="-1"></a><span class="bu">[</span> <span class="st">"</span><span class="va">$rc</span><span class="st">"</span> <span class="ot">-eq</span> 0 <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$errs</span><span class="st">"</span> <span class="ot">-eq</span> 0 <span class="bu">]</span> <span class="kw">||</span> <span class="kw">{</span> <span class="fu">tail</span> <span class="at">-30</span> run.log<span class="kw">;</span> <span class="bu">exit</span> 1<span class="kw">;</span> <span class="kw">}</span></span>
+<span id="cb51-4"><a href="#cb51-4" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-E</span> <span class="st">"the interesting lines"</span> run.log</span></code></pre></div>
 </li>
 </ul></div>
 <div class="section level3">
@@ -1444,12 +1501,12 @@
 <ul><li><p>The interop rule above says to get the real consumer’s own output as ground truth. The trap is <em>how</em> you get it. Ask the consumer to <strong>load your artifact and save it back</strong> and it hands you your own artifact with its blessing — so every later comparison against that reference passes by construction, however wrong the artifact is. It looks like the strongest possible evidence, because the consumer really did produce the file.</p></li>
 <li>
 <p>The tell is a generation step of the shape <code>load(ours) -&gt; save()</code>. Ground truth has to be <strong>constructed from the consumer’s own API</strong>, from inputs that are not your artifact, so the consumer decides the shape rather than echoing it.</p>
-<div class="sourceCode" id="cb50"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" tabindex="-1"></a><span class="co"># circular: hands back what it was given</span></span>
-<span id="cb50-2"><a href="#cb50-2" tabindex="-1"></a>layer.loadNamedStyle(<span class="st">'/data/ours.qml'</span>)<span class="op">;</span> layer.saveNamedStyle(<span class="st">'/data/ref.qml'</span>)</span>
-<span id="cb50-3"><a href="#cb50-3" tabindex="-1"></a></span>
-<span id="cb50-4"><a href="#cb50-4" tabindex="-1"></a><span class="co"># ground truth: the consumer builds it</span></span>
-<span id="cb50-5"><a href="#cb50-5" tabindex="-1"></a>layer.setRenderer(QgsHillshadeRenderer(prov, <span class="dv">1</span>, <span class="fl">315.0</span>, <span class="fl">45.0</span>))</span>
-<span id="cb50-6"><a href="#cb50-6" tabindex="-1"></a>layer.saveNamedStyle(<span class="st">'/data/ref.qml'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb52"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" tabindex="-1"></a><span class="co"># circular: hands back what it was given</span></span>
+<span id="cb52-2"><a href="#cb52-2" tabindex="-1"></a>layer.loadNamedStyle(<span class="st">'/data/ours.qml'</span>)<span class="op">;</span> layer.saveNamedStyle(<span class="st">'/data/ref.qml'</span>)</span>
+<span id="cb52-3"><a href="#cb52-3" tabindex="-1"></a></span>
+<span id="cb52-4"><a href="#cb52-4" tabindex="-1"></a><span class="co"># ground truth: the consumer builds it</span></span>
+<span id="cb52-5"><a href="#cb52-5" tabindex="-1"></a>layer.setRenderer(QgsHillshadeRenderer(prov, <span class="dv">1</span>, <span class="fl">315.0</span>, <span class="fl">45.0</span>))</span>
+<span id="cb52-6"><a href="#cb52-6" tabindex="-1"></a>layer.saveNamedStyle(<span class="st">'/data/ref.qml'</span>)</span></code></pre></div>
 </li>
 <li><p>Same shape outside XML: a schema “validated” by exporting your own rows and re-importing them, a golden file regenerated by the code under test, a fixture built by serialising the object you are about to assert on.</p></li>
 <li><p>Caught 2026-08-30 in rfp#227. The repo already carried a note that a style file <em>it had exported</em> was useless as evidence about that consumer’s behaviour — and the obvious way to author the new references would have reintroduced exactly that, through a helper that already existed and did the wrong one of the two.</p></li>
@@ -1478,7 +1535,7 @@
 <li><p>The failure is loud, which is lucky. The dangerous variant is the same change landing where the test would still pass: a refusal test whose chosen X quietly becomes supported and whose assertion is on something looser than the refusal itself now passes for nothing.</p></li>
 <li>
 <p>Fix by <strong>asserting the premise beside the assertion</strong>, in the same test:</p>
-<div class="sourceCode" id="cb51"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb53"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">unshipped</span> <span class="op">&lt;-</span> <span class="st">"EPSG:32609"</span></span>
 <span><span class="fu">expect_false</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"srs"</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">":"</span>, <span class="st">"_"</span>, <span class="va">unshipped</span><span class="op">)</span>, <span class="st">".xml"</span><span class="op">)</span>, package <span class="op">=</span> <span class="st">"rfp"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>   <span class="co"># &lt;- the premise</span></span>
@@ -1493,7 +1550,7 @@
 <ul><li><p>Every guard grows two things that can silently disable it: an <strong>exemption list</strong> (“these are allowed to fail the rule”) and a <strong>lookup</strong> (“find the thing I am checking”). Both fail toward <em>pass</em>, and both read as diligence on the page. When reviewing a guard, read those two before reading the assertion — the assertion is the part that is usually already right.</p></li>
 <li>
 <p><strong>An exemption list that covers every input makes the assertion unreachable.</strong> It is not a weakened guard; it is a guard that cannot go red, and it looks more careful than the correct version because it is longer.</p>
-<div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb54"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">legend_exempt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  lake    <span class="op">=</span> <span class="st">"drawn and legended"</span>,     <span class="co"># &lt;- every one of these is a REASON</span></span>
 <span>  wetland <span class="op">=</span> <span class="st">"drawn and legended"</span>,     <span class="co">#    to remove the entry, not to keep it</span></span>
@@ -1504,7 +1561,7 @@
 </li>
 <li>
 <p><strong>A lookup that matches a container rather than the artifact reports success and then dies — or worse, checks the wrong thing.</strong> Test for the <em>file</em>, never for a directory of the right name:</p>
-<div class="sourceCode" id="cb53"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb55"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">for</span> <span class="op">(</span><span class="va">up</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">".."</span>, <span class="st">"../.."</span>, <span class="st">"../../.."</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.exists</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">up</span>, <span class="st">"vignettes"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="va">...</span><span class="op">)</span>   <span class="co"># matched SOME vignettes/</span></span>
 <span><span class="op">}</span></span></code></pre></div>
@@ -1592,14 +1649,14 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <td><code>asNamespace("&lt;pkg&gt;")</code></td>
 </tr><tr><td>either, on testthat &gt;= 3.2.0</td>
 <td><code>local_mocked_bindings(f = ..., .package = "&lt;pkg&gt;")</code></td>
-</tr></tbody></table><div class="sourceCode" id="cb55"><pre class="downlit sourceCode r">
+</tr></tbody></table><div class="sourceCode" id="cb57"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">for</span> <span class="op">(</span><span class="va">e</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-internal.html" class="external-link">asNamespace</a></span><span class="op">(</span><span class="st">"pkg"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/as.environment.html" class="external-link">as.environment</a></span><span class="op">(</span><span class="st">"package:pkg"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/bindenv.html" class="external-link">unlockBinding</a></span><span class="op">(</span><span class="st">"f"</span>, <span class="va">e</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/base/assign.html" class="external-link">assign</a></span><span class="op">(</span><span class="st">"f"</span>, <span class="va">broken_version</span>, <span class="va">e</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 </li>
 <li>
 <p><strong>Restore the defect from the source that had it, not from memory.</strong> A hand-rewritten “previous version” is a <em>different</em> program, and the difference is invisible because both look like the bug you remember. Measured 2026-08-29 in fly#9: a reconstruction used <code>sum(!is.na(x))</code> where the original had <code>length(x)</code>, and failed <strong>4</strong> tests where the real prior code failed <strong>0</strong> — so the reconstruction said “the guard works” about a guard that did not. Pull the exact bytes:</p>
-<div class="sourceCode" id="cb56"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb56-1"><a href="#cb56-1" tabindex="-1"></a><span class="fu">git</span> show <span class="op">&lt;</span>sha<span class="op">&gt;</span>:R/f.R <span class="kw">|</span> <span class="fu">sed</span> <span class="at">-n</span> <span class="st">'/^my_fn &lt;- function/,/^}/p'</span> <span class="op">&gt;</span> /tmp/prior.R</span></code></pre></div>
+<div class="sourceCode" id="cb58"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb58-1"><a href="#cb58-1" tabindex="-1"></a><span class="fu">git</span> show <span class="op">&lt;</span>sha<span class="op">&gt;</span>:R/f.R <span class="kw">|</span> <span class="fu">sed</span> <span class="at">-n</span> <span class="st">'/^my_fn &lt;- function/,/^}/p'</span> <span class="op">&gt;</span> /tmp/prior.R</span></code></pre></div>
 <p>The direction of that error is the dangerous one: a reconstruction is <em>more</em> likely to fail the tests than the real defect was, because any incidental difference can trip an assertion. A green reconstruction proves nothing and a red one proves almost nothing.</p>
 </li>
 <li><p><strong>Do not reason about which environment — print a value that proves the patch took.</strong> One line, before the assertion, whose output can only come from the broken version. That is what turns “I patched it” into “the broken code ran”, and it is the same check whether the language is R, Python or JS. Assigning into <code><a href="https://rdrr.io/r/base/environment.html" class="external-link">globalenv()</a></code> also appears to work in R, by <em>shadowing</em> the attached copy earlier on the search path — a workaround that happens to produce the right answer for the wrong reason, and silently fails the moment the caller is inside the package.</p></li>
@@ -1618,8 +1675,8 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <ul><li><p>The YAML 1.1 core schema resolves <code>y</code>, <code>Y</code>, <code>n</code>, <code>N</code>, <code>yes</code>, <code>no</code>, <code>on</code>, <code>off</code>, <code>true</code>, <code>false</code> (and their case variants) to <strong>booleans</strong>. Most parsers in wide use — libyaml, PyYAML, R’s <code>yaml</code> — still do this.</p></li>
 <li>
 <p>So a column, key, or field literally named <code>y</code> stops being a string the moment it is written unquoted:</p>
-<div class="sourceCode" id="cb57"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb57-1"><a href="#cb57-1" tabindex="-1"></a><span class="fu">cols</span><span class="kw">:</span></span>
-<span id="cb57-2"><a href="#cb57-2" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="ch">y</span><span class="co">        # parses as logical TRUE, not "y"</span></span></code></pre></div>
+<div class="sourceCode" id="cb59"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a><span class="fu">cols</span><span class="kw">:</span></span>
+<span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a><span class="at">  </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> </span><span class="ch">y</span><span class="co">        # parses as logical TRUE, not "y"</span></span></code></pre></div>
 <p>Nothing errors. The consumer simply never matches that entry again, and whatever it was supposed to do to it silently does not happen.</p>
 </li>
 <li><p>Bites hardest in <strong>schema and config files</strong>, where single-letter names are normal: coordinate columns (<code>x</code>, <code>y</code>, <code>z</code>), flags, short codes. Quote them: <code>- name: "y"</code>.</p></li>
@@ -1690,7 +1747,7 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <li><p>Caught 2026-08-26 syncing <code>fly</code> from <code>soul</code>: <code>karpathy.md</code> gained a section, shifting “Subagents Are Evidence” from §5 to §6. <code>planning.md</code>’s pointer was corrected in soul minutes later, in a separate commit. The sync landed between the two, so <code>fly</code> shipped “see <code>karpathy.md</code> §5” pointing at the wrong rule. <code>git pull</code> in soul reported “Already up to date” both times — the changes were staged, not unpushed, so nothing about the source repo <em>looked</em> stale.</p></li>
 <li>
 <p>Generate from the committed tree, not the checkout:</p>
-<div class="sourceCode" id="cb59"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a><span class="va">SRC</span><span class="op">=</span><span class="va">$(</span><span class="fu">mktemp</span> <span class="at">-d</span><span class="va">)</span> <span class="kw">&amp;&amp;</span> <span class="fu">git</span> <span class="at">-C</span> /path/to/source archive HEAD <span class="op">&lt;</span>subdir<span class="op">&gt;</span> <span class="kw">|</span> <span class="fu">tar</span> <span class="at">-x</span> <span class="at">-C</span> <span class="st">"</span><span class="va">$SRC</span><span class="st">"</span></span></code></pre></div>
+<div class="sourceCode" id="cb61"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb61-1"><a href="#cb61-1" tabindex="-1"></a><span class="va">SRC</span><span class="op">=</span><span class="va">$(</span><span class="fu">mktemp</span> <span class="at">-d</span><span class="va">)</span> <span class="kw">&amp;&amp;</span> <span class="fu">git</span> <span class="at">-C</span> /path/to/source archive HEAD <span class="op">&lt;</span>subdir<span class="op">&gt;</span> <span class="kw">|</span> <span class="fu">tar</span> <span class="at">-x</span> <span class="at">-C</span> <span class="st">"</span><span class="va">$SRC</span><span class="st">"</span></span></code></pre></div>
 </li>
 <li><p>Verify the same way after any concurrent-session sync: rebuild from <code>HEAD</code> into a temp file and <code>diff</code> it against what you committed. Identical means the source was quiet while you read it; a diff is the drift, and it is cheaper to find now than in a downstream repo weeks later.</p></li>
 </ul></div>
@@ -1742,7 +1799,7 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <li><p>Caught 2026-08-29 in gq#64, and only by testing the guard against a checkout deliberately placed at a path containing a space. Reading it proved nothing; the two-answer test did.</p></li>
 <li>
 <p><strong>And it <em>raises</em> rather than returning a status when the command does not exist.</strong> So a skip written after the call cannot be reached, and a machine lacking the tool errors the test instead of skipping it — reported as <code>error in running command</code>, which reads as a broken test rather than a missing dependency. <code><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings()</a></code> does not catch it; it is an error, not a warning. Test for the tool <strong>before</strong> calling it:</p>
-<div class="sourceCode" id="cb60"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb62"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">skip_if</span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Sys.which.html" class="external-link">Sys.which</a></span><span class="op">(</span><span class="st">"git"</span><span class="op">)</span><span class="op">)</span>, <span class="st">"git not installed"</span><span class="op">)</span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html" class="external-link">suppressWarnings</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system2.html" class="external-link">system2</a></span><span class="op">(</span><span class="st">"git"</span>, <span class="va">args</span>, stdout <span class="op">=</span> <span class="cn">TRUE</span>, stderr <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">expect_null</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">out</span>, <span class="st">"status"</span><span class="op">)</span><span class="op">)</span>   <span class="co"># a tool that RAN and failed is a failure</span></span></code></pre></div>
@@ -1755,7 +1812,7 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <ul><li><p>An exemption list keyed by name — <code>c(layer_a = "reason", layer_b = "reason")</code> — is normally asserted two ways: the offenders are all exempt, and every exemption is still needed. The second calls <code><a href="https://rdrr.io/r/base/names.html" class="external-link">names()</a></code>.</p></li>
 <li>
 <p>Emptying that list, which is the goal every such list documents as its correct state, then <strong>errors the test</strong>:</p>
-<div class="sourceCode" id="cb61"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb63"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">local_exempt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span>     <span class="co"># or c(), or NULL</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">local_exempt</span><span class="op">)</span>              <span class="co"># NULL, not character(0)</span></span>
 <span><span class="fu">expect_setequal</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">local_exempt</span><span class="op">)</span>, <span class="va">offenders</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
@@ -1783,9 +1840,9 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 </ol></li>
 <li>
 <p><strong>The fix is to derive the expectation from the artifact the consumer actually consumes</strong>, so the two cannot drift:</p>
-<div class="sourceCode" id="cb62"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb62-1"><a href="#cb62-1" tabindex="-1"></a><span class="fu">cut</span> <span class="at">-f2</span> hrefs.tsv <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="op">&gt;</span> urls.txt     <span class="co"># what the fetch loop iterates</span></span>
-<span id="cb62-2"><a href="#cb62-2" tabindex="-1"></a><span class="va">N_URLS</span><span class="op">=</span><span class="va">$(</span><span class="ex">count_lines</span> urls.txt<span class="va">)</span>             <span class="co"># ...so count THAT, not the id list</span></span>
-<span id="cb62-3"><a href="#cb62-3" tabindex="-1"></a><span class="bu">[</span> <span class="st">"</span><span class="va">$N_FETCHED</span><span class="st">"</span> <span class="ot">-eq</span> <span class="st">"</span><span class="va">$N_URLS</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">||</span> <span class="bu">exit</span> 1</span></code></pre></div>
+<div class="sourceCode" id="cb64"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb64-1"><a href="#cb64-1" tabindex="-1"></a><span class="fu">cut</span> <span class="at">-f2</span> hrefs.tsv <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="op">&gt;</span> urls.txt     <span class="co"># what the fetch loop iterates</span></span>
+<span id="cb64-2"><a href="#cb64-2" tabindex="-1"></a><span class="va">N_URLS</span><span class="op">=</span><span class="va">$(</span><span class="ex">count_lines</span> urls.txt<span class="va">)</span>             <span class="co"># ...so count THAT, not the id list</span></span>
+<span id="cb64-3"><a href="#cb64-3" tabindex="-1"></a><span class="bu">[</span> <span class="st">"</span><span class="va">$N_FETCHED</span><span class="st">"</span> <span class="ot">-eq</span> <span class="st">"</span><span class="va">$N_URLS</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">||</span> <span class="bu">exit</span> 1</span></code></pre></div>
 </li>
 <li><p>Review question that finds it, and it is not “are there more instances”: <strong>for each guard, name the producer of each side. If they differ, the guard can fire on good input.</strong> Ask it once per comparison; it is a five-minute audit and it terminates, where hunting instances does not.</p></li>
 </ul></div>
@@ -1804,11 +1861,11 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <li><p><code>grep -c</code> also counts <strong>matching lines, not occurrences</strong>. Counting records in a compact single-line JSON with <code>grep -c</code> returns 1 for a file holding 102,460 of them — not off by a bit, structurally meaningless.</p></li>
 <li>
 <p>Safe helper, checked against all four inputs (empty, unterminated, terminated, missing) rather than reasoned about:</p>
-<div class="sourceCode" id="cb63"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb63-1"><a href="#cb63-1" tabindex="-1"></a><span class="fu">count_lines()</span> <span class="kw">{</span></span>
-<span id="cb63-2"><a href="#cb63-2" tabindex="-1"></a>  <span class="bu">local</span> <span class="va">n</span></span>
-<span id="cb63-3"><a href="#cb63-3" tabindex="-1"></a>  <span class="va">n</span><span class="op">=</span><span class="va">$(</span><span class="fu">grep</span> <span class="at">-c</span> <span class="st">''</span> <span class="st">"</span><span class="va">$1</span><span class="st">"</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null<span class="va">)</span> <span class="kw">||</span> <span class="va">n</span><span class="op">=</span><span class="st">"</span><span class="va">${n</span><span class="op">:-</span>0<span class="va">}</span><span class="st">"</span></span>
-<span id="cb63-4"><a href="#cb63-4" tabindex="-1"></a>  <span class="bu">printf</span> <span class="st">'%s'</span> <span class="st">"</span><span class="va">${n</span><span class="op">:-</span>0<span class="va">}</span><span class="st">"</span></span>
-<span id="cb63-5"><a href="#cb63-5" tabindex="-1"></a><span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb65"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb65-1"><a href="#cb65-1" tabindex="-1"></a><span class="fu">count_lines()</span> <span class="kw">{</span></span>
+<span id="cb65-2"><a href="#cb65-2" tabindex="-1"></a>  <span class="bu">local</span> <span class="va">n</span></span>
+<span id="cb65-3"><a href="#cb65-3" tabindex="-1"></a>  <span class="va">n</span><span class="op">=</span><span class="va">$(</span><span class="fu">grep</span> <span class="at">-c</span> <span class="st">''</span> <span class="st">"</span><span class="va">$1</span><span class="st">"</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null<span class="va">)</span> <span class="kw">||</span> <span class="va">n</span><span class="op">=</span><span class="st">"</span><span class="va">${n</span><span class="op">:-</span>0<span class="va">}</span><span class="st">"</span></span>
+<span id="cb65-4"><a href="#cb65-4" tabindex="-1"></a>  <span class="bu">printf</span> <span class="st">'%s'</span> <span class="st">"</span><span class="va">${n</span><span class="op">:-</span>0<span class="va">}</span><span class="st">"</span></span>
+<span id="cb65-5"><a href="#cb65-5" tabindex="-1"></a><span class="kw">}</span></span></code></pre></div>
 </li>
 <li><p>For records inside a structured file, do not count with a line tool at all — parse it.</p></li>
 <li><p>The dangerous variant is a count that looks <strong>right</strong>. The <code>grep -c</code>-on-JSON case above returns 1 for 102,460 records — wrong enough to notice. A CSV whose free-text fields carry embedded newlines gives <code>wc -l</code> a number a few percent high, which survives eyeball review and gets quoted downstream as a record count. Observed 2026-07-30: <code>mdb-export</code> of an Access table reported 556 lines for 517 records (comment fields held the extra newlines), and the inflated number reached a provenance table in a README before the parsed count contradicted it. If a line count is only a did-this-produce-anything smoke test, label it <code>lines</code> and let whatever parses the file report the records.</p></li>
@@ -1817,7 +1874,7 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <h3 id="local_mocked_bindingsenv---is-the-cleanup-environment-not-the-target">
 <code>local_mocked_bindings(.env = )</code> is the cleanup environment, not the target<a class="anchor" aria-label="anchor" href="#local_mocked_bindingsenv---is-the-cleanup-environment-not-the-target"></a></h3>
 <p><code>.package</code> names the package to mock in; <code>.env</code> says what the mock <strong>unwinds with</strong>. Passing a namespace to <code>.env</code> installs the stub correctly and then never removes it, because a namespace does not exit — so every later test in the run keeps it.</p>
-<div class="sourceCode" id="cb64"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb66"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># WRONG: installs correctly, never unwinds. Every later test sees the stub.</span></span>
 <span><span class="fu">local_mocked_bindings</span><span class="op">(</span>f <span class="op">=</span> <span class="va">stub</span>, .env <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/ns-internal.html" class="external-link">asNamespace</a></span><span class="op">(</span><span class="st">"pkg"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -1832,7 +1889,7 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <h3 id="check-a-threshold-against-the-least-favourable-case-computed--not-a-remembered-example">Check a threshold against the least favourable case, computed — not a remembered example<a class="anchor" aria-label="anchor" href="#check-a-threshold-against-the-least-favourable-case-computed--not-a-remembered-example"></a></h3>
 <p>A tolerance, timeout, or size limit is only correct relative to the <strong>binding</strong> member of the population it governs. Reaching for the vivid example instead is how it gets set wrong, and the test written to guard it inherits the same mistake, so nothing fires.</p>
 <p>The tell: the guard’s test asserts against the case that is easiest to picture — the biggest, the most extreme, the one from the bug report. Any threshold clears that one. Ask which member is <strong>closest to the line</strong>, and compute it over the whole set:</p>
-<div class="sourceCode" id="cb65"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb67"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Wrong: the most eccentric camera, which any tolerance clears</span></span>
 <span><span class="fu">expect_gt</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">1654</span> <span class="op">/</span> <span class="fl">1063</span><span class="op">)</span><span class="op">)</span>, <span class="va">tol</span><span class="op">)</span>              <span class="co"># 0.442</span></span>
 <span></span>
@@ -1845,11 +1902,11 @@ asNamespace("flooded") patched     FAIL = 0     zeros = 1    &lt;- false green, 
 <div class="section level3">
 <h3 id="a-case-allowlist-matches-a-substring-not-a-token">A <code>case</code> allowlist matches a substring, not a token<a class="anchor" aria-label="anchor" href="#a-case-allowlist-matches-a-substring-not-a-token"></a></h3>
 <p><code>case " $allowed " in *" $item "*)</code> reads like set membership and is not: it matches any contiguous run of the list, so an item whose name spans two entries passes.</p>
-<div class="sourceCode" id="cb66"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb66-1"><a href="#cb66-1" tabindex="-1"></a><span class="va">allowed</span><span class="op">=</span><span class="st">"404 authors index LICENSE"</span></span>
-<span id="cb66-2"><a href="#cb66-2" tabindex="-1"></a><span class="va">b</span><span class="op">=</span><span class="st">"authors index"</span>                       <span class="co"># passes; it is a substring of the list</span></span>
-<span id="cb66-3"><a href="#cb66-3" tabindex="-1"></a><span class="cf">case</span> <span class="st">" </span><span class="va">$allowed</span><span class="st"> "</span> <span class="kw">in</span> <span class="pp">*</span><span class="st">" </span><span class="va">$b</span><span class="st"> "</span><span class="pp">*</span><span class="kw">)</span> <span class="bu">echo</span> <span class="st">"allowed"</span> <span class="cf">;;</span> <span class="cf">esac</span></span></code></pre></div>
+<div class="sourceCode" id="cb68"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb68-1"><a href="#cb68-1" tabindex="-1"></a><span class="va">allowed</span><span class="op">=</span><span class="st">"404 authors index LICENSE"</span></span>
+<span id="cb68-2"><a href="#cb68-2" tabindex="-1"></a><span class="va">b</span><span class="op">=</span><span class="st">"authors index"</span>                       <span class="co"># passes; it is a substring of the list</span></span>
+<span id="cb68-3"><a href="#cb68-3" tabindex="-1"></a><span class="cf">case</span> <span class="st">" </span><span class="va">$allowed</span><span class="st"> "</span> <span class="kw">in</span> <span class="pp">*</span><span class="st">" </span><span class="va">$b</span><span class="st"> "</span><span class="pp">*</span><span class="kw">)</span> <span class="bu">echo</span> <span class="st">"allowed"</span> <span class="cf">;;</span> <span class="cf">esac</span></span></code></pre></div>
 <p>Fails toward <strong>pass</strong>, and the padding-with-spaces idiom is what makes it look rigorous. Use an explicit loop:</p>
-<div class="sourceCode" id="cb67"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb67-1"><a href="#cb67-1" tabindex="-1"></a><span class="fu">is_allowed()</span> <span class="kw">{</span> <span class="cf">for</span> a <span class="kw">in</span> <span class="va">$allowed</span><span class="kw">;</span> <span class="cf">do</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$a</span><span class="st">"</span> <span class="ot">=</span> <span class="st">"</span><span class="va">$1</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="cf">return</span> <span class="dv">0</span><span class="kw">;</span> <span class="cf">done</span><span class="kw">;</span> <span class="cf">return</span> <span class="dv">1</span><span class="kw">;</span> <span class="kw">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb69"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb69-1"><a href="#cb69-1" tabindex="-1"></a><span class="fu">is_allowed()</span> <span class="kw">{</span> <span class="cf">for</span> a <span class="kw">in</span> <span class="va">$allowed</span><span class="kw">;</span> <span class="cf">do</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$a</span><span class="st">"</span> <span class="ot">=</span> <span class="st">"</span><span class="va">$1</span><span class="st">"</span> <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="cf">return</span> <span class="dv">0</span><span class="kw">;</span> <span class="cf">done</span><span class="kw">;</span> <span class="cf">return</span> <span class="dv">1</span><span class="kw">;</span> <span class="kw">}</span></span></code></pre></div>
 <p>Same class as the exact-vs-substring rule for snapshot names in <code>code-check-infra.md</code>, generalised: <strong>whenever a guard decides membership, check that a value spanning two legitimate entries is refused.</strong> Reachability is often low — <code>R CMD check</code> rejects a filename containing a space, for instance — but a guard is only worth its maintenance if it is trusted, and one that reads stronger than it is will be.</p>
 <p>While you are there: strip only the suffix that actually matched. <code>b="${b%.html}"; b="${b%.md}"</code> applied unconditionally reduces <code>index.md.html</code> to <code>index</code>.</p>
 <p>Caught 2026-08-31 in fly#42, in the second draft of a guard whose first draft had already failed the empty-result check above. Two rounds, both invisible by reading, both found by running the shipped script against inputs built to break it rather than against the one case it was written for.</p>
@@ -1890,7 +1947,7 @@ $ git status --porcelain --untracked-files=no
                                       # empty: zero tracked modifications</code></pre>
 <p>Only the dispatcher was affected, because the workers reset to origin and shipped their logs back over the wire rather than writing into their own checkout. So the defect is invisible on exactly the hosts that are easiest to test, and it survived four pilot runs.</p>
 <p><strong>Match the predicate to the subject.</strong> Both readers above actually want <em>does tracked code differ from what will be deployed</em>, which untracked outputs cannot affect:</p>
-<div class="sourceCode" id="cb69"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb69-1"><a href="#cb69-1" tabindex="-1"></a><span class="fu">git</span> status <span class="at">--porcelain</span> <span class="at">--untracked-files</span><span class="op">=</span>no <span class="at">--</span> . <span class="st">':(exclude)path/to/logs'</span></span></code></pre></div>
+<div class="sourceCode" id="cb71"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb71-1"><a href="#cb71-1" tabindex="-1"></a><span class="fu">git</span> status <span class="at">--porcelain</span> <span class="at">--untracked-files</span><span class="op">=</span>no <span class="at">--</span> . <span class="st">':(exclude)path/to/logs'</span></span></code></pre></div>
 <ul><li>
 <strong><code>:(exclude)</code> long form, never <code>:!</code></strong> — <code>:!path</code> keeps parsing magic after the <code>!</code>, aborts, and an aborted <code>git status</code> returns empty, which reads as <em>clean</em>. Fail-toward-skip on the guard whose job is to stop the run.</li>
 <li>
@@ -1902,14 +1959,14 @@ $ git status --porcelain --untracked-files=no
 <p>The positive-control rule above catches a probe reporting a <strong>defect</strong> that isn’t there. This is the mirror, and it is worse, because its output is <em>reassuring</em>: a search that cannot match returns empty, empty reads as clean, and a clean result ends the investigation instead of prompting one.</p>
 <p>It is how an audit gets reported as passed without ever having run.</p>
 <p><strong>The common cause is a regex feature the local tool does not have.</strong> BSD tools (macOS default) and GNU tools disagree, and the disagreement is silent — an unsupported escape is treated as a literal, matches nothing, and exits 1 like an honest no-match:</p>
-<div class="sourceCode" id="cb70"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb70-1"><a href="#cb70-1" tabindex="-1"></a><span class="co"># macOS: \b is not reliably supported. Matches nothing. Exit 1. Looks clean.</span></span>
-<span id="cb70-2"><a href="#cb70-2" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-InE</span> <span class="st">'\b([0-9]{1,3}\.){3}[0-9]{1,3}\b'</span> <span class="at">--</span> .</span>
-<span id="cb70-3"><a href="#cb70-3" tabindex="-1"></a></span>
-<span id="cb70-4"><a href="#cb70-4" tabindex="-1"></a><span class="co"># Same tree, working pattern: 33 distinct addresses across 101 files.</span></span>
-<span id="cb70-5"><a href="#cb70-5" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-ohE</span> <span class="st">'([0-9]{1,3}\.){3}[0-9]{1,3}'</span> <span class="at">--</span> . <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span></span></code></pre></div>
+<div class="sourceCode" id="cb72"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb72-1"><a href="#cb72-1" tabindex="-1"></a><span class="co"># macOS: \b is not reliably supported. Matches nothing. Exit 1. Looks clean.</span></span>
+<span id="cb72-2"><a href="#cb72-2" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-InE</span> <span class="st">'\b([0-9]{1,3}\.){3}[0-9]{1,3}\b'</span> <span class="at">--</span> .</span>
+<span id="cb72-3"><a href="#cb72-3" tabindex="-1"></a></span>
+<span id="cb72-4"><a href="#cb72-4" tabindex="-1"></a><span class="co"># Same tree, working pattern: 33 distinct addresses across 101 files.</span></span>
+<span id="cb72-5"><a href="#cb72-5" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-ohE</span> <span class="st">'([0-9]{1,3}\.){3}[0-9]{1,3}'</span> <span class="at">--</span> . <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span></span></code></pre></div>
 <p>Measured 2026-08-31 in link. The first form was run as a repo audit for exposed host addresses in a public repo, returned empty, and the result was written into an issue as <em>“no IPs in any tracked file”</em> — an affirmative finding, from a command that could not have found one. This is the same shape as the empty-result-set rule near the top of this file, arriving through a regex dialect rather than through a loop.</p>
 <p><strong>Before trusting an empty search, make it match something.</strong> One line, and it converts “I found nothing” into “I looked, and here is proof I could see”:</p>
-<div class="sourceCode" id="cb71"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb71-1"><a href="#cb71-1" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-c</span> <span class="st">'PATTERN'</span> <span class="at">--</span> <span class="op">&lt;</span>a file you KNOW contains it<span class="op">&gt;</span>   <span class="co"># must be non-zero</span></span></code></pre></div>
+<div class="sourceCode" id="cb73"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb73-1"><a href="#cb73-1" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-c</span> <span class="st">'PATTERN'</span> <span class="at">--</span> <span class="op">&lt;</span>a file you KNOW contains it<span class="op">&gt;</span>   <span class="co"># must be non-zero</span></span></code></pre></div>
 <p>If you cannot name a file that should match, construct one in <code>/tmp</code> and search that. A search whose ability to match has never been demonstrated is not evidence, and reporting it as an audit result is worse than not auditing — someone will rely on it.</p>
 <p>Two habits that make this cheap:</p>
 <ul><li>
@@ -1940,27 +1997,27 @@ $ git status --porcelain --untracked-files=no
 <h3 id="psql-does-not-interpolate-var-inside-a-dollar-quoted-string-and-quit-n-exits-0">psql does not interpolate <code>:'var'</code> inside a dollar-quoted string, and <code>\quit N</code> exits 0<a class="anchor" aria-label="anchor" href="#psql-does-not-interpolate-var-inside-a-dollar-quoted-string-and-quit-n-exits-0"></a></h3>
 <p>Two traps in the same file type, both of which read perfectly and fail at run time.</p>
 <p><strong>Interpolation.</strong> psql substitutes its <code>-v</code> variables in the query buffer, but a dollar-quoted body is a <em>string literal</em> to it, so nothing inside <code>$$ … $$</code> is substituted. The natural form dies with a message that points at SQL syntax rather than at the quoting layer:</p>
-<div class="sourceCode" id="cb72"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb72-1"><a href="#cb72-1" tabindex="-1"></a>DO $$ <span class="kw">DECLARE</span> v text <span class="op">:=</span> :<span class="st">'run_uid'</span>; <span class="cf">BEGIN</span> <span class="op">..</span>. <span class="cf">END</span> $$;</span>
-<span id="cb72-2"><a href="#cb72-2" tabindex="-1"></a><span class="co">-- ERROR:  syntax error at or near ":"</span></span></code></pre></div>
+<div class="sourceCode" id="cb74"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb74-1"><a href="#cb74-1" tabindex="-1"></a>DO $$ <span class="kw">DECLARE</span> v text <span class="op">:=</span> :<span class="st">'run_uid'</span>; <span class="cf">BEGIN</span> <span class="op">..</span>. <span class="cf">END</span> $$;</span>
+<span id="cb74-2"><a href="#cb74-2" tabindex="-1"></a><span class="co">-- ERROR:  syntax error at or near ":"</span></span></code></pre></div>
 <p>Pass parameters through session settings instead, set outside the block:</p>
-<div class="sourceCode" id="cb73"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb73-1"><a href="#cb73-1" tabindex="-1"></a><span class="kw">SELECT</span> set_config(<span class="st">'app.run_uid'</span>, :<span class="st">'run_uid'</span>, <span class="kw">false</span>) \gset</span>
-<span id="cb73-2"><a href="#cb73-2" tabindex="-1"></a>DO $$ <span class="kw">DECLARE</span> v text <span class="op">:=</span> current_setting(<span class="st">'app.run_uid'</span>); <span class="cf">BEGIN</span> <span class="op">..</span>. <span class="cf">END</span> $$;</span></code></pre></div>
+<div class="sourceCode" id="cb75"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb75-1"><a href="#cb75-1" tabindex="-1"></a><span class="kw">SELECT</span> set_config(<span class="st">'app.run_uid'</span>, :<span class="st">'run_uid'</span>, <span class="kw">false</span>) \gset</span>
+<span id="cb75-2"><a href="#cb75-2" tabindex="-1"></a>DO $$ <span class="kw">DECLARE</span> v text <span class="op">:=</span> current_setting(<span class="st">'app.run_uid'</span>); <span class="cf">BEGIN</span> <span class="op">..</span>. <span class="cf">END</span> $$;</span></code></pre></div>
 <p><strong><code>\quit</code> takes no exit code.</strong> <code>\quit 1</code> warns <code>extra argument "1" ignored</code> and exits <strong>0</strong> (measured, psql 16.10 and 18.3). So a guard written as</p>
 <pre><code>\echo 'FATAL: …'
 \quit 1</code></pre>
 <p>prints FATAL in red and then reports <strong>success</strong> — fail-toward-pass on precisely the branch that exists to stop a silent zero-row pass. Raise instead, with <code>\set ON_ERROR_STOP on</code> at the top of the file:</p>
-<div class="sourceCode" id="cb75"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb75-1"><a href="#cb75-1" tabindex="-1"></a>DO $$ <span class="cf">BEGIN</span> RAISE <span class="kw">EXCEPTION</span> <span class="st">'no run_uid supplied'</span>; <span class="cf">END</span> $$;</span></code></pre></div>
+<div class="sourceCode" id="cb77"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb77-1"><a href="#cb77-1" tabindex="-1"></a>DO $$ <span class="cf">BEGIN</span> RAISE <span class="kw">EXCEPTION</span> <span class="st">'no run_uid supplied'</span>; <span class="cf">END</span> $$;</span></code></pre></div>
 <p>Related, same family: a <code>.sql</code> file whose checks are all bare <code>SELECT</code>s has no exit status at all — a human reading output is the only verdict. If the script is invoked by anything, at least one check must <code>RAISE</code>.</p>
 <p>Caught 2026-09-01 in link#262, in a verify script whose own header advertised that it “exits non-zero on a real failure”.</p>
 </div>
 <div class="section level3">
 <h3 id="a-second-trap--exit-replaces-the-first">A second <code>trap … EXIT</code> replaces the first<a class="anchor" aria-label="anchor" href="#a-second-trap--exit-replaces-the-first"></a></h3>
 <p><code>trap</code> registers <strong>one</strong> handler per signal. Registering cleanup for a temp file and then cleanup for a database schema leaves only the second — the first is silently discarded, and nothing warns.</p>
-<div class="sourceCode" id="cb76"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb76-1"><a href="#cb76-1" tabindex="-1"></a><span class="bu">trap</span> <span class="st">'rm -f "$TMP"'</span> EXIT</span>
-<span id="cb76-2"><a href="#cb76-2" tabindex="-1"></a><span class="bu">trap</span> <span class="st">'drop_schema'</span> EXIT        <span class="co"># the rm never runs again</span></span></code></pre></div>
+<div class="sourceCode" id="cb78"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb78-1"><a href="#cb78-1" tabindex="-1"></a><span class="bu">trap</span> <span class="st">'rm -f "$TMP"'</span> EXIT</span>
+<span id="cb78-2"><a href="#cb78-2" tabindex="-1"></a><span class="bu">trap</span> <span class="st">'drop_schema'</span> EXIT        <span class="co"># the rm never runs again</span></span></code></pre></div>
 <p>One handler, both jobs:</p>
-<div class="sourceCode" id="cb77"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb77-1"><a href="#cb77-1" tabindex="-1"></a><span class="fu">cleanup()</span> <span class="kw">{</span> <span class="fu">rm</span> <span class="at">-f</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">"</span><span class="kw">;</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$MADE</span><span class="st">"</span> <span class="ot">=</span> 1 <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="ex">drop_schema</span><span class="kw">;</span> <span class="kw">}</span></span>
-<span id="cb77-2"><a href="#cb77-2" tabindex="-1"></a><span class="bu">trap</span> cleanup EXIT</span></code></pre></div>
+<div class="sourceCode" id="cb79"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb79-1"><a href="#cb79-1" tabindex="-1"></a><span class="fu">cleanup()</span> <span class="kw">{</span> <span class="fu">rm</span> <span class="at">-f</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">"</span><span class="kw">;</span> <span class="bu">[</span> <span class="st">"</span><span class="va">$MADE</span><span class="st">"</span> <span class="ot">=</span> 1 <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="ex">drop_schema</span><span class="kw">;</span> <span class="kw">}</span></span>
+<span id="cb79-2"><a href="#cb79-2" tabindex="-1"></a><span class="bu">trap</span> cleanup EXIT</span></code></pre></div>
 <p><strong>Arm it before the thing it cleans up exists</strong>, guarded by a flag. Registering the trap <em>after</em> the resource is created leaves a window in which <code>set -euo pipefail</code> can exit with no handler installed — and that window is exactly where a failure lands.</p>
 <p>The two halves interact, which is how this survives review: adding <code>ON_ERROR_STOP</code> to a psql call can turn a previously exit-0 setup step into an abort <em>inside</em> that window, reopening a leak the early trap was added to close. Both changes individually right; neither measured against the other. Caught 2026-09-01 in link#262.</p>
 </div>
@@ -1982,10 +2039,10 @@ $ git status --porcelain --untracked-files=no
 <td>shadowed the same arm again</td>
 </tr></tbody></table><p>The invariant was never “FAILs before NOTEs” but “every arm above the line is <strong>unconditionally</strong> a failure” — which no comment reliably enforces.</p>
 <p><strong>Accumulate instead of dispatching.</strong> Report every condition that holds:</p>
-<div class="sourceCode" id="cb78"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb78-1"><a href="#cb78-1" tabindex="-1"></a><span class="fu">coalesce</span>(<span class="fu">nullif</span>(concat_ws(<span class="st">'; '</span>,</span>
-<span id="cb78-2"><a href="#cb78-2" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="op">&lt;</span>a<span class="op">&gt;</span> <span class="cf">THEN</span> <span class="st">'FAIL: …'</span> <span class="cf">END</span>,</span>
-<span id="cb78-3"><a href="#cb78-3" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="op">&lt;</span>b<span class="op">&gt;</span> <span class="cf">THEN</span> <span class="st">'FAIL: …'</span> <span class="cf">END</span>,</span>
-<span id="cb78-4"><a href="#cb78-4" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="op">&lt;</span>c<span class="op">&gt;</span> <span class="cf">THEN</span> <span class="st">'NOTE: …'</span> <span class="cf">END</span>), <span class="st">''</span>), <span class="st">'OK'</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb80"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb80-1"><a href="#cb80-1" tabindex="-1"></a><span class="fu">coalesce</span>(<span class="fu">nullif</span>(concat_ws(<span class="st">'; '</span>,</span>
+<span id="cb80-2"><a href="#cb80-2" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="op">&lt;</span>a<span class="op">&gt;</span> <span class="cf">THEN</span> <span class="st">'FAIL: …'</span> <span class="cf">END</span>,</span>
+<span id="cb80-3"><a href="#cb80-3" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="op">&lt;</span>b<span class="op">&gt;</span> <span class="cf">THEN</span> <span class="st">'FAIL: …'</span> <span class="cf">END</span>,</span>
+<span id="cb80-4"><a href="#cb80-4" tabindex="-1"></a>  <span class="cf">CASE</span> <span class="cf">WHEN</span> <span class="op">&lt;</span>c<span class="op">&gt;</span> <span class="cf">THEN</span> <span class="st">'NOTE: …'</span> <span class="cf">END</span>), <span class="st">''</span>), <span class="st">'OK'</span>)</span></code></pre></div>
 <p><code>concat_ws</code> skips NULLs, so arm order changes only the order of the joined tokens.</p>
 <p>Two checks worth making once you have one:</p>
 <ul><li>
@@ -1993,6 +2050,126 @@ $ git status --porcelain --untracked-files=no
 <li>
 <strong>No arm labelled FAIL may exit 0.</strong> Sweep every single-fault state and check the label against the exit status; a reported-but-unenforced FAIL trains people to ignore the word. Where a condition is deliberately advisory, label it NOTE.</li>
 </ul></div>
+<div class="section level3">
+<h3 id="when-a-system-both-records-and-renders-the-rendered-copy-drifts-into-fiction">When a system both records and renders, the rendered copy drifts into fiction<a class="anchor" aria-label="anchor" href="#when-a-system-both-records-and-renders-the-rendered-copy-drifts-into-fiction"></a></h3>
+<p>A pipeline that writes a durable record (a log table, a manifest) often also renders a human-readable summary beside its output — a <code>.stamp.md</code>, a README, a report header. Consumers reach for the <strong>rendered</strong> one, because it is a file sitting next to the artifact rather than a query against a database they may not have. So that is the copy that gets published, and the copy nobody checks.</p>
+<p>Measured 2026-09-01 across <code>link</code> and <code>floodplains</code>. Same runs, two artifacts:</p>
+<pre><code>fresh.log            UTRE 1.04 min   UTRE 1.67 min   FRAN 3.33 min   UFRA 4.12 min
+aquatic_network.stamp.md   "Started: 22:42:31  Ended: 22:42:31 (0.0s elapsed)"</code></pre>
+<p>The sidecar was constructed by calling the open and the close on <strong>one line</strong>, so the interval it reports is the cost of building the stamp object — not the work. A 0.0s network build for a 4,877-segment watershed group is not plausible, and the file states it as fact. It was a candidate field for publication into a STAC catalogue, where a consumer would have had no way to tell a wrong duration from a right one.</p>
+<p>Two rules, and the second is the one that saves the time:</p>
+<ul><li>
+<strong>Prefer the record over the rendering</strong> when both exist. The record is written by the code doing the work, at the moment it does it; the rendering is assembled afterwards by code that has to be <em>told</em> what happened. Only one of those can be wrong about its own subject.</li>
+<li>
+<strong>A duration whose start and end are set in the same expression is not a measurement.</strong> Grep for it: <code>finish(start(...))</code>, <code>stamp &lt;- close(open(x))</code>, any construction where the two calls cannot have work between them. It reads as bookkeeping and produces a number with a unit.</li>
+</ul><p>The wider tell: <strong>a rendered artifact that nothing consumes programmatically has nothing keeping it honest.</strong> Tests assert on the record; the sidecar is prose. When a downstream repo then starts publishing the sidecar, it inherits every drift that accumulated while nobody was reading it — which is exactly when it becomes load-bearing.</p>
+<p>Same family as <em>“Measure the output, not the input you handed in”</em> above, one level out: there the probe reads back its own input, here the artifact reports a quantity it never observed.</p>
+</div>
+<div class="section level3">
+<h3 id="a-serializers-default-for-no-value-is-rarely-a-null-and-every-wrong-answer-is-silent">A serializer’s default for “no value” is rarely a null, and every wrong answer is silent<a class="anchor" aria-label="anchor" href="#a-serializers-default-for-no-value-is-rarely-a-null-and-every-wrong-answer-is-silent"></a></h3>
+<p>Publishing an explicit null — “we looked and there was not one”, as distinct from “not implemented” — depends on the serializer actually emitting one. Library defaults usually do not, and each wrong answer is a <em>valid</em> value that passes every downstream schema check.</p>
+<p>Three measured in one afternoon (stac_floodplains_bc#17), two of them live in the first draft:</p>
+<table class="table"><colgroup><col width="33%"><col width="33%"><col width="33%"></colgroup><thead><tr><th>producer</th>
+<th>default behaviour</th>
+<th>fix</th>
+</tr></thead><tbody><tr><td>
+<code><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">jsonlite::toJSON</a></code> / <code>write_json</code>
+</td>
+<td>
+<code>NA_real_</code> serialises as the <strong>string</strong> <code>"NA"</code>
+</td>
+<td><code>na = "null"</code></td>
+</tr><tr><td>
+<code><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">jsonlite::toJSON</a></code> / <code>write_json</code>
+</td>
+<td>an R <code>NULL</code> serialises as <code><a href="https://rdrr.io/r/base/Paren.html" class="external-link">{}</a></code>
+</td>
+<td><code>null = "null"</code></td>
+</tr><tr><td>GDAL metadata</td>
+<td>no null exists; <code>str(None)</code> writes the literal <code>'None'</code>
+</td>
+<td>see below</td>
+</tr></tbody></table><p>The <code><a href="https://rdrr.io/r/base/Paren.html" class="external-link">{}</a></code> one is the nastiest: it survives a JSON round trip, and on the Python side it passes <code>is not None</code>, so a consumer’s own guard waves it through. <code>NA</code> (logical) and <code>NA_character_</code> happen to emit <code>null</code> under the defaults while <code>NA_real_</code> does not — so a probe that tests only one NA type reports the library as fine.</p>
+<p>Two habits:</p>
+<ul><li>
+<strong>Set both arguments and say why at the call site.</strong> They are independent: <code>na</code> governs <code>NA</code>, <code>null</code> governs <code>NULL</code>, and the two failure modes are different. Check they are byte-inert on the existing fields, which makes the change safe as well as necessary.</li>
+<li>
+<strong>Never build the record with <code>[[&lt;-</code> or <code>modifyList</code>.</strong> Both <strong>drop</strong> a <code>NULL</code> member, turning an intended null into an absent key — the one outcome “publish the null” exists to prevent. <code>list(...)</code> and <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> keep it.</li>
+</ul><p>For a string-only metadata store (GDAL tags, EXIF, HTTP headers) there is no null at all, so pick the encoding by measuring what the store does with each candidate rather than by choosing the one that reads best. Measured for GDAL: the <strong>empty string</strong> is treated as absence on write <em>and</em> deletes an existing key, which makes it both the encoding and the clearing mechanism — the latter mattering because <code>update_tags()</code> merges rather than replaces, so a stale tag otherwise survives a rewrite. <code>'None'</code>, <code>'NA'</code> and <code>'null'</code> all round-trip as ordinary strings a consumer cannot tell from a real value.</p>
+<p><strong>And check what the key namespace does to your names.</strong> A colon in a GDAL tag key is a namespace separator: <code>update_tags(**{"NGE:LINK_RUN_UID": "abc"})</code> round-trips as key <code>NGE</code> with value <code>LINK_RUN_UID=abc</code>. Eleven prefixed fields collapse into one tag holding whichever was written last — uniform, silent, on every file.</p>
+</div>
+<div class="section level3">
+<h3 id="a-rename-emits-two-signals-and-reading-only-one-cannot-distinguish-it-from-absence">A rename emits two signals, and reading only one cannot distinguish it from absence<a class="anchor" aria-label="anchor" href="#a-rename-emits-two-signals-and-reading-only-one-cannot-distinguish-it-from-absence"></a></h3>
+<p>When code reads a document produced by something else — an upstream JSON contract, a config, an API response — a renamed or removed key produces <strong>two</strong> observable facts: an expected key is missing, and an unrecognised sibling is present. The first is ambiguous with a legitimate absence. The second never is.</p>
+<p>Guards are almost always written against the first, because that is the one the reading code naturally trips over. So an upstream rename degrades to whatever “absent” means — usually a published null or a default — and stays invisible for as long as nobody compares the output against the producer’s own file.</p>
+<p><strong>The ambiguity is not uniform: it depends on whether the key has a parent whose presence is itself evidence.</strong> At depth ≥ 2 a missing leaf inside a <em>present</em> section is already unambiguous, because the section being there proves the producer wrote this block. At the document root, and anywhere the key space is open, there is no such witness.</p>
+<p>That is what makes this recur rather than resolve. Fixing the leaf leaves the section; fixing the section leaves the root. Measured 2026-09-01 in stac_floodplains_bc#17 — three review rounds, the same defect at three depths, each found inside the previous round’s fix:</p>
+<table class="table"><colgroup><col width="25%"><col width="25%"><col width="25%"><col width="25%"></colgroup><thead><tr><th>depth</th>
+<th>what was renamed</th>
+<th>before</th>
+<th>after</th>
+</tr></thead><tbody><tr><td>leaf</td>
+<td>
+<code>link_log</code> key absent/renamed</td>
+<td>3 fields published null</td>
+<td>stop</td>
+</tr><tr><td>section</td>
+<td>
+<code>inputs</code> → <code>inputs_v2</code>
+</td>
+<td>4 fields published null</td>
+<td>stop</td>
+</tr><tr><td>root</td>
+<td>
+<code>floodplain</code> → <code>floodplain_v2</code>
+</td>
+<td>1 field published null</td>
+<td>stop</td>
+</tr></tbody></table><p>Two closures, and they are not interchangeable:</p>
+<ul><li>
+<strong>Where the key set is closed, reject unknown keys.</strong> One <code>setdiff(names(got), known)</code> at the document root closes that whole axis, and it is the only guard that reads the second signal.</li>
+<li>
+<strong>Where the keys are DATA, pin their shape instead.</strong> A map keyed by scenario id cannot use unknown-key rejection — any string is a possible key — so assert the documented form (<code>^[a-z]{2}_ff[0-9]{2}$</code>). Re-keying <code>ch_ff04</code> to <code>ff04</code> otherwise nulls every field on every item at once, which is precisely the uniform loss a cross-item check cannot see.</li>
+</ul><p><strong>Version pins do not substitute.</strong> A <code>schema_version</code> field fires only when the producer <em>bumps</em> it, and a rename shipped without a bump is the realistic case for anything still in flight.</p>
+<p><strong>One direction is worse than a null and belongs in the same sweep.</strong> A scalar check written as <code>length(x) != 1</code> is a proxy that a single-key object satisfies: a leaf becoming <code>{"algorithm": "sha256"}</code> published <code>"sha256"</code> as the value. Every other failure here produces an absence a reader can see; this one produces something that looks like a real answer and is counted as present. Reject a list outright rather than testing its length.</p>
+</div>
+<div class="section level3">
+<h3 id="making-an-optional-field-mandatory-breaks-every-producer-that-legitimately-left-it-empty">Making an optional field mandatory breaks every producer that legitimately left it empty<a class="anchor" aria-label="anchor" href="#making-an-optional-field-mandatory-breaks-every-producer-that-legitimately-left-it-empty"></a></h3>
+<p>The rule above is about a <em>bypass</em> whose stated reason expires. This is the mirror, and it reaches further: tightening an assertion on a field — NULL becomes a failure, a warning becomes an error, a tolerance is removed — is a change to every path that <strong>writes</strong> that field, and those paths are usually not in the diff.</p>
+<p>The tell is a one-line change to a check accompanied by no change to a producer. Ask directly: <em>what are all the ways this field gets populated, and does each one still satisfy the new rule?</em> Enumerate them by grep, not by memory — the one that bites is always the path nobody thinks of as a producer, because it is an install script, a migration, a manual runbook step, or a fallback branch.</p>
+<p>Measured 2026-09-01 in link#264. A resolver was fixed so a package’s commit SHA became recordable, and the verifier was tightened to require it on every host. Four producers existed. Three were fine. The fourth was <code>scripts/update_hosts.sh</code>, which installs with <code>R CMD INSTALL</code> of a source tarball — deliberately, to route around r-lib/pak#658 — and that writes <strong>no <code>Remote*</code> fields at all</strong>. So the repo’s own maintenance script silently produced hosts that the new assertion would reject, and the rejection landed <em>after</em> cloud instances had been paid for, because the check ran post-provision. Found by review, not by any test: every test passed, because the tests exercised the resolver rather than the install paths feeding it.</p>
+<p>Three habits, and the second is the one that keeps being skipped:</p>
+<ul><li>
+<strong>Grep for the producers before tightening the consumer.</strong> Anything that writes the field, sets the env var it reads, or installs the artifact it describes.</li>
+<li>
+<strong>Move the check as early as the fact is knowable.</strong> A gate that fires after spend is a report, not a gate. The same assertion five seconds in costs nothing and the failure becomes free.</li>
+<li>
+<strong>Say what happens to existing records.</strong> Historical rows written under the old rule will now fail, and that is usually correct — but it has to be stated, or the first person to run the check against last month’s data reports it as a regression.</li>
+</ul><p>Related and distinct: <em>“A fix to code that writes data is not done until the written data is reconciled”</em> covers the records already on disk. This one covers the <em>writers</em> still running.</p>
+</div>
+<div class="section level3">
+<h3 id="teaching-a-build-or-install-step-to-record-provenance-is-a-change-to-a-safety-critical-path">Teaching a build or install step to record provenance is a change to a safety-critical path<a class="anchor" aria-label="anchor" href="#teaching-a-build-or-install-step-to-record-provenance-is-a-change-to-a-safety-critical-path"></a></h3>
+<p>The remedy above — make the producer record what it produced — is correct and is where the next three defects come from. Provenance a build step writes is trusted absolutely by everything downstream, so a wrong value there is worse than the missing value it replaced: absence fails loudly, and a confident wrong SHA satisfies every guard built to catch exactly it.</p>
+<p>Three failures, all measured 2026-09-01 in the same ~40-line change, each individually invisible:</p>
+<ul><li>
+<strong>The record outlived the thing recorded.</strong> <code>R CMD INSTALL ... | tail -3</code> reports <em>tail’s</em> status, and <code>set -e</code> does not cross a pipeline, so a failed install exited 0 and the pin was written for a build that never happened. Quieter still when an older version is present: the version probe succeeds and nothing looks wrong. Gate the write on the build’s own exit status — tempfile plus an explicit check — so the record is unreachable unless the work returned 0.</li>
+<li>
+<strong>The pin was applied to something that had its own identity.</strong> Writing an env override for a package that is run from a checkout beat the checkout’s git state, which would have pinned a dirty-tree flag to a permanent <code>false</code>. A flag stuck always-TRUE gets noticed and filed; <strong>stuck always-FALSE is the direction nobody can notice.</strong> Pin only what has no other identity available.</li>
+<li>
+<strong>Nothing expires it.</strong> An env pin written once wins forever, so a later install by another route leaves the stale value winning — and the guard reading that variable is now reading the thing it is meant to be checking. Cross-check the pin against an independent source wherever one exists, and fail naming both values.</li>
+</ul><p>Also: resolve the identifier <strong>once</strong> for the whole operation, not per target. Six API calls across a five-minute run put targets on different commits if someone pushes mid-run, which is precisely the disagreement the provenance was added to detect.</p>
+<p>The meta-lesson is worth more than any of the three. All of them arrived in the <em>fix</em> for a defect found in review, and the following round found all five of its findings inside that one fix. <strong>Review the fixes at least as hard as the original</strong>, and when a fix expands scope into a new file, treat that file as unreviewed code rather than as an extension of the change you already checked.</p>
+</div>
+<div class="section level3">
+<h3 id="a-claim-flagged-as-under-evidenced-gets-repaired-by-widening-and-widening-is-what-breaks">A claim flagged as under-evidenced gets repaired by widening, and widening is what breaks<a class="anchor" aria-label="anchor" href="#a-claim-flagged-as-under-evidenced-gets-repaired-by-widening-and-widening-is-what-breaks"></a></h3>
+<p>The two rules above are about a claim’s scope when it is <em>written</em>. This is about what happens to that scope when it is <strong>repaired</strong>, and it is the more expensive failure because it recurs inside its own fix.</p>
+<p>Told that a claim is not supported, the natural repair is to widen the stated evidential base — “on every run”, “from either layer”, “across the figures here”, “which run from X to Y” — rather than to narrow the claim. Widening requires a population. The population gets asserted, from recall of an adjacent document, and the next round finds it does not hold.</p>
+<p><strong>Tell: the fix adds a quantifier the previous version did not have.</strong> For each one, name the population, and say whether it is enumerable from the artifact in front of you. If it is not, you have replaced an under-evidenced claim with an unfalsifiable one.</p>
+<p>Measured 2026-09-01 in flooded#52 — a four-paragraph prose diff to a shipped reference memo took <strong>six review rounds, 36 findings, 14 of them bugs</strong>. Every round’s finding was about a <em>number</em>; every round’s fix was correct about the number and introduced a new quantifier. Across rounds 4–6, <strong>every widening broke or was under-justified; every narrowing held</strong> — including one round-5 fix that correctly narrowed a licence and, in the same sentence, asserted a fresh absolute (“do not move with the fix at all”) that measurement then falsified.</p>
+<p>Root cause is worth naming because it predicts where this happens: the artifact’s figures sat on a ragged dataset × resolution × lineage × clipped/raw grid that no dataset filled, so “across the figures here” quantified over holes as much as cells. Any document whose values come from several partial runs has this shape.</p>
+<p><strong>Terminate it by enumeration, not by another round.</strong> The candidate set is closed — it is every quantifier in the passage — so sweep them mechanically and work each one. What ended it here was reproducing the old behaviour exactly on current code (the defect was a constant factor on one term, so setting that term to <code>4 × 3.5926</code> returned the historical cell count to the digit) and measuring every row of the consumer’s own table, which turned an asserted population into a finite measured one.</p>
+<p>Then state the residual precisely. “The channel-buffer half of this clause is vacuous, because the consumer publishes no channel-buffer-derived row” is definitional and ends the sweep. A residual you can only call unlikely means there is another instance.</p>
+</div>
 </div>
 </div>
 <div class="section level1">
@@ -2248,16 +2425,16 @@ $ git status --porcelain --untracked-files=no
 </tr><tr><td><code>search.json</code></td>
 <td>the full-text index, containing the text</td>
 </tr></tbody></table><p>Deleting <code>docs/CLAUDE.html</code> after the build leaves the other two. It looks like a fix and achieves nothing. Remove the file from the CI checkout <strong>before</strong> <code>build_site()</code> runs:</p>
-<div class="sourceCode" id="cb80"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb80-1"><a href="#cb80-1" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Keep internal notes out of the published site</span></span>
-<span id="cb80-2"><a href="#cb80-2" tabindex="-1"></a><span class="at">  </span><span class="fu">run</span><span class="kw">:</span><span class="at"> rm -f CLAUDE.md</span></span></code></pre></div>
+<div class="sourceCode" id="cb83"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb83-1"><a href="#cb83-1" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Keep internal notes out of the published site</span></span>
+<span id="cb83-2"><a href="#cb83-2" tabindex="-1"></a><span class="at">  </span><span class="fu">run</span><span class="kw">:</span><span class="at"> rm -f CLAUDE.md</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="gate-on-a-declared-allowlist">Gate on a declared allowlist<a class="anchor" aria-label="anchor" href="#gate-on-a-declared-allowlist"></a></h3>
 <p>Each repo states which extra root pages it <em>intends</em> to publish. Anything else fails the build, so a new root markdown file cannot leak silently:</p>
-<div class="sourceCode" id="cb81"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb81-1"><a href="#cb81-1" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Fail if an unexpected page reached the site</span></span>
-<span id="cb81-2"><a href="#cb81-2" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
-<span id="cb81-3"><a href="#cb81-3" tabindex="-1"></a>    allowed="404 authors index LICENSE LICENSE-text"   # + declared extras</span>
-<span id="cb81-4"><a href="#cb81-4" tabindex="-1"></a>    ...</span></code></pre></div>
+<div class="sourceCode" id="cb84"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb84-1"><a href="#cb84-1" tabindex="-1"></a><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> Fail if an unexpected page reached the site</span></span>
+<span id="cb84-2"><a href="#cb84-2" tabindex="-1"></a><span class="fu">  run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb84-3"><a href="#cb84-3" tabindex="-1"></a>    allowed="404 authors index LICENSE LICENSE-text"   # + declared extras</span>
+<span id="cb84-4"><a href="#cb84-4" tabindex="-1"></a>    ...</span></code></pre></div>
 <p>Add to <code>allowed</code> only after deciding the page should be public. <code>link</code> publishes <code>NOTICE</code> and <code>RUNBOOK</code> deliberately — it is a public repo and both are genuine documentation. That is the decision the allowlist is meant to record.</p>
 <p>Test the gate against <strong>both</strong> known answers before shipping it: it must exit non-zero on a site that does contain the file, and zero on one that does not. A guard that only ever returns one value is indistinguishable from a broken one.</p>
 </div>
@@ -2280,7 +2457,7 @@ $ git status --porcelain --untracked-files=no
 <li>
 <strong>hand-added assets</strong> not produced by the build. Favicons and web manifests under <code>pkgdown/favicon/</code> <em>are</em> produced by the build and are safe.</li>
 </ul><p>Use <code>clean-exclude</code> for anything that must survive.</p>
-<div class="sourceCode" id="cb82"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb82-1"><a href="#cb82-1" tabindex="-1"></a><span class="ex">gh</span> api <span class="st">"repos/OWNER/REPO/contents?ref=gh-pages"</span> <span class="at">--jq</span> <span class="st">'.[] | "\(.type) \(.name)"'</span></span></code></pre></div>
+<div class="sourceCode" id="cb85"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb85-1"><a href="#cb85-1" tabindex="-1"></a><span class="ex">gh</span> api <span class="st">"repos/OWNER/REPO/contents?ref=gh-pages"</span> <span class="at">--jq</span> <span class="st">'.[] | "\(.type) \(.name)"'</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -2345,14 +2522,14 @@ $ git status --porcelain --untracked-files=no
 <p>Debugging and benchmarking sessions are systematic investigation: a stated unknown, an experiment, a number, a conclusion, and usually two or three informative dead ends. That is SRED evidence, and it scatters — into PR bodies, issue comments, and log files whose names encode a timestamp and nothing else. In six months the chain <em>we did not know X, we measured Y, therefore Z</em> survives only in a chat transcript.</p>
 <p><strong>The archive README is where that chain lives.</strong> Not a separate run record: the PWF triple already holds every part of it — the question in <code>task_plan.md</code>’s frame, the method in <code>progress.md</code>, the numbers in <code>findings.md</code>, the dead ends in its “Errors Encountered” table. A second document would restate all of it and be half-populated. The README is the index over them.</p>
 <p>So an archive README for work that produced measurements carries two more sections:</p>
-<div class="sourceCode" id="cb83"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb83-1"><a href="#cb83-1" tabindex="-1"></a><span class="fu">## Measurement</span></span>
-<span id="cb83-2"><a href="#cb83-2" tabindex="-1"></a></span>
-<span id="cb83-3"><a href="#cb83-3" tabindex="-1"></a>m1 0.0391 vs cypher 0.0872 min/1k segments — hosts are 2.23x apart.</span>
-<span id="cb83-4"><a href="#cb83-4" tabindex="-1"></a>Moved the provincial estimate 5.0 h -&gt; 4.3 h and changed how work packs across machines.</span>
-<span id="cb83-5"><a href="#cb83-5" tabindex="-1"></a></span>
-<span id="cb83-6"><a href="#cb83-6" tabindex="-1"></a><span class="fu">## Evidence</span></span>
-<span id="cb83-7"><a href="#cb83-7" tabindex="-1"></a></span>
-<span id="cb83-8"><a href="#cb83-8" tabindex="-1"></a><span class="in">`data-raw/logs/study_area_run/20260831_19*`</span> — four spins, one defect each.</span></code></pre></div>
+<div class="sourceCode" id="cb86"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb86-1"><a href="#cb86-1" tabindex="-1"></a><span class="fu">## Measurement</span></span>
+<span id="cb86-2"><a href="#cb86-2" tabindex="-1"></a></span>
+<span id="cb86-3"><a href="#cb86-3" tabindex="-1"></a>m1 0.0391 vs cypher 0.0872 min/1k segments — hosts are 2.23x apart.</span>
+<span id="cb86-4"><a href="#cb86-4" tabindex="-1"></a>Moved the provincial estimate 5.0 h -&gt; 4.3 h and changed how work packs across machines.</span>
+<span id="cb86-5"><a href="#cb86-5" tabindex="-1"></a></span>
+<span id="cb86-6"><a href="#cb86-6" tabindex="-1"></a><span class="fu">## Evidence</span></span>
+<span id="cb86-7"><a href="#cb86-7" tabindex="-1"></a></span>
+<span id="cb86-8"><a href="#cb86-8" tabindex="-1"></a><span class="in">`data-raw/logs/study_area_run/20260831_19*`</span> — four spins, one defect each.</span></code></pre></div>
 <p>Three rules on those sections:</p>
 <ul><li>
 <strong>Numbers carry units, and say what changed because of them.</strong> A measurement nobody acted on is still worth recording if it turned an assumption into a number — say that too. “Confirmed the expected” is a real outcome.</li>
@@ -2372,40 +2549,40 @@ $ git status --porcelain --untracked-files=no
 <div class="section level3">
 <h3 id="task_planmd">task_plan.md<a class="anchor" aria-label="anchor" href="#task_planmd"></a></h3>
 <p>Phases with checkboxes. This is the core tracking file.</p>
-<div class="sourceCode" id="cb84"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb84-1"><a href="#cb84-1" tabindex="-1"></a><span class="fu"># Task: &lt;issue title&gt; (#&lt;N&gt;)</span></span>
-<span id="cb84-2"><a href="#cb84-2" tabindex="-1"></a></span>
-<span id="cb84-3"><a href="#cb84-3" tabindex="-1"></a><span class="dt">&lt;</span><span class="kw">issue</span><span class="ot"> body </span><span class="er">—</span><span class="ot"> Problem section if present</span><span class="er">,</span><span class="ot"> otherwise first paragraph</span><span class="dt">&gt;</span></span>
-<span id="cb84-4"><a href="#cb84-4" tabindex="-1"></a></span>
-<span id="cb84-5"><a href="#cb84-5" tabindex="-1"></a><span class="fu">## Phase 1: [Name]</span></span>
-<span id="cb84-6"><a href="#cb84-6" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Task description</span>
-<span id="cb84-7"><a href="#cb84-7" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Another task</span>
-<span id="cb84-8"><a href="#cb84-8" tabindex="-1"></a></span>
-<span id="cb84-9"><a href="#cb84-9" tabindex="-1"></a><span class="fu">## Phase 2: [Name]</span></span>
-<span id="cb84-10"><a href="#cb84-10" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Task description</span></code></pre></div>
+<div class="sourceCode" id="cb87"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb87-1"><a href="#cb87-1" tabindex="-1"></a><span class="fu"># Task: &lt;issue title&gt; (#&lt;N&gt;)</span></span>
+<span id="cb87-2"><a href="#cb87-2" tabindex="-1"></a></span>
+<span id="cb87-3"><a href="#cb87-3" tabindex="-1"></a><span class="dt">&lt;</span><span class="kw">issue</span><span class="ot"> body </span><span class="er">—</span><span class="ot"> Problem section if present</span><span class="er">,</span><span class="ot"> otherwise first paragraph</span><span class="dt">&gt;</span></span>
+<span id="cb87-4"><a href="#cb87-4" tabindex="-1"></a></span>
+<span id="cb87-5"><a href="#cb87-5" tabindex="-1"></a><span class="fu">## Phase 1: [Name]</span></span>
+<span id="cb87-6"><a href="#cb87-6" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Task description</span>
+<span id="cb87-7"><a href="#cb87-7" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Another task</span>
+<span id="cb87-8"><a href="#cb87-8" tabindex="-1"></a></span>
+<span id="cb87-9"><a href="#cb87-9" tabindex="-1"></a><span class="fu">## Phase 2: [Name]</span></span>
+<span id="cb87-10"><a href="#cb87-10" tabindex="-1"></a><span class="ss">- </span><span class="va">[ ]</span> Task description</span></code></pre></div>
 <p>Mark tasks done as they’re completed: <code>- [x] Task description</code></p>
 </div>
 <div class="section level3">
 <h3 id="findingsmd">findings.md<a class="anchor" aria-label="anchor" href="#findingsmd"></a></h3>
 <p>Append-only research log. Discoveries, technical analysis, things learned.</p>
-<div class="sourceCode" id="cb85"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb85-1"><a href="#cb85-1" tabindex="-1"></a><span class="fu"># Findings</span></span>
-<span id="cb85-2"><a href="#cb85-2" tabindex="-1"></a></span>
-<span id="cb85-3"><a href="#cb85-3" tabindex="-1"></a><span class="fu">## [Topic]</span></span>
-<span id="cb85-4"><a href="#cb85-4" tabindex="-1"></a><span class="co">[</span><span class="ot">What was found, with source/date</span><span class="co">]</span></span>
-<span id="cb85-5"><a href="#cb85-5" tabindex="-1"></a></span>
-<span id="cb85-6"><a href="#cb85-6" tabindex="-1"></a><span class="fu">## Errors Encountered</span></span>
-<span id="cb85-7"><a href="#cb85-7" tabindex="-1"></a></span>
-<span id="cb85-8"><a href="#cb85-8" tabindex="-1"></a><span class="pp">|</span> Error <span class="pp">|</span> Resolution <span class="pp">|</span></span>
-<span id="cb85-9"><a href="#cb85-9" tabindex="-1"></a><span class="pp">|-------|------------|</span></span></code></pre></div>
+<div class="sourceCode" id="cb88"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb88-1"><a href="#cb88-1" tabindex="-1"></a><span class="fu"># Findings</span></span>
+<span id="cb88-2"><a href="#cb88-2" tabindex="-1"></a></span>
+<span id="cb88-3"><a href="#cb88-3" tabindex="-1"></a><span class="fu">## [Topic]</span></span>
+<span id="cb88-4"><a href="#cb88-4" tabindex="-1"></a><span class="co">[</span><span class="ot">What was found, with source/date</span><span class="co">]</span></span>
+<span id="cb88-5"><a href="#cb88-5" tabindex="-1"></a></span>
+<span id="cb88-6"><a href="#cb88-6" tabindex="-1"></a><span class="fu">## Errors Encountered</span></span>
+<span id="cb88-7"><a href="#cb88-7" tabindex="-1"></a></span>
+<span id="cb88-8"><a href="#cb88-8" tabindex="-1"></a><span class="pp">|</span> Error <span class="pp">|</span> Resolution <span class="pp">|</span></span>
+<span id="cb88-9"><a href="#cb88-9" tabindex="-1"></a><span class="pp">|-------|------------|</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="progressmd">progress.md<a class="anchor" aria-label="anchor" href="#progressmd"></a></h3>
 <p>Session entries with commit references.</p>
-<div class="sourceCode" id="cb86"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb86-1"><a href="#cb86-1" tabindex="-1"></a><span class="fu"># Progress</span></span>
-<span id="cb86-2"><a href="#cb86-2" tabindex="-1"></a></span>
-<span id="cb86-3"><a href="#cb86-3" tabindex="-1"></a><span class="fu">## Session YYYY-MM-DD</span></span>
-<span id="cb86-4"><a href="#cb86-4" tabindex="-1"></a><span class="ss">- </span>Completed: <span class="co">[</span><span class="ot">items</span><span class="co">]</span></span>
-<span id="cb86-5"><a href="#cb86-5" tabindex="-1"></a><span class="ss">- </span>Commits: <span class="co">[</span><span class="ot">refs</span><span class="co">]</span></span>
-<span id="cb86-6"><a href="#cb86-6" tabindex="-1"></a><span class="ss">- </span>Next: <span class="co">[</span><span class="ot">items</span><span class="co">]</span></span></code></pre></div>
+<div class="sourceCode" id="cb89"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb89-1"><a href="#cb89-1" tabindex="-1"></a><span class="fu"># Progress</span></span>
+<span id="cb89-2"><a href="#cb89-2" tabindex="-1"></a></span>
+<span id="cb89-3"><a href="#cb89-3" tabindex="-1"></a><span class="fu">## Session YYYY-MM-DD</span></span>
+<span id="cb89-4"><a href="#cb89-4" tabindex="-1"></a><span class="ss">- </span>Completed: <span class="co">[</span><span class="ot">items</span><span class="co">]</span></span>
+<span id="cb89-5"><a href="#cb89-5" tabindex="-1"></a><span class="ss">- </span>Commits: <span class="co">[</span><span class="ot">refs</span><span class="co">]</span></span>
+<span id="cb89-6"><a href="#cb89-6" tabindex="-1"></a><span class="ss">- </span>Next: <span class="co">[</span><span class="ot">items</span><span class="co">]</span></span></code></pre></div>
 <!-- The Reboot Test and the error ledger below are adapted from -->
 <!-- OthmanAdi/planning-with-files (MIT). Soul does not install or invoke that -->
 <!-- plugin — the useful parts are carried here as text. Adapted 2026-08-26. -->
@@ -2444,7 +2621,7 @@ $ git status --porcelain --untracked-files=no
 <p><strong><code>planning/active/</code> must be tracked, not gitignored.</strong> The atomic-commit rule above requires each commit to carry its own checkbox flip in <code>task_plan.md</code>; an ignored <code>active/</code> drops it silently, so <code>git log -- planning/</code> shows archives appearing fully-formed with no history behind them. In-flight PWF also stops surviving a move between machines.</p>
 <p>The failure is quiet in both directions. <code>git add planning/</code> reports nothing and exits 0 on an ignored path, and files tracked <em>before</em> the rule existed keep being tracked — including through a <code>git mv</code> into the ignored directory. So a repo can look like it is working right up until the first genuinely new PWF file, which simply never appears in a commit.</p>
 <p>Check rather than assume:</p>
-<div class="sourceCode" id="cb88"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb88-1"><a href="#cb88-1" tabindex="-1"></a><span class="fu">git</span> check-ignore <span class="at">-v</span> planning/active/task_plan.md   <span class="co"># expect no output</span></span></code></pre></div>
+<div class="sourceCode" id="cb91"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb91-1"><a href="#cb91-1" tabindex="-1"></a><span class="fu">git</span> check-ignore <span class="at">-v</span> planning/active/task_plan.md   <span class="co"># expect no output</span></span></code></pre></div>
 <p>Found 2026-08-24 in gq, where the rule dated from the scaffold commit and the #17 files had only survived because they predated their move into that directory. gq and roli were the only 2 of 32 repos carrying it; roli still does.</p>
 </div>
 <div class="section level2">
@@ -2459,11 +2636,11 @@ $ git status --porcelain --untracked-files=no
 </ul><div class="section level3">
 <h3 id="log-the-errors-that-cost-a-retry">Log the errors that cost a retry<a class="anchor" aria-label="anchor" href="#log-the-errors-that-cost-a-retry"></a></h3>
 <p>An error that took more than one attempt to get past goes in <code>findings.md</code>, so one task does not hit the same wall twice:</p>
-<div class="sourceCode" id="cb89"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb89-1"><a href="#cb89-1" tabindex="-1"></a><span class="fu">## Errors Encountered</span></span>
-<span id="cb89-2"><a href="#cb89-2" tabindex="-1"></a></span>
-<span id="cb89-3"><a href="#cb89-3" tabindex="-1"></a><span class="pp">|</span> Error <span class="pp">|</span> Resolution <span class="pp">|</span></span>
-<span id="cb89-4"><a href="#cb89-4" tabindex="-1"></a><span class="pp">|-------|------------|</span></span>
-<span id="cb89-5"><a href="#cb89-5" tabindex="-1"></a><span class="pp">|</span> <span class="in">`fatal: Unimplemented pathspec magic '_'`</span> <span class="pp">|</span> Long-form <span class="in">`:(exclude)path`</span> <span class="pp">|</span></span></code></pre></div>
+<div class="sourceCode" id="cb92"><pre class="sourceCode markdown"><code class="sourceCode markdown"><span id="cb92-1"><a href="#cb92-1" tabindex="-1"></a><span class="fu">## Errors Encountered</span></span>
+<span id="cb92-2"><a href="#cb92-2" tabindex="-1"></a></span>
+<span id="cb92-3"><a href="#cb92-3" tabindex="-1"></a><span class="pp">|</span> Error <span class="pp">|</span> Resolution <span class="pp">|</span></span>
+<span id="cb92-4"><a href="#cb92-4" tabindex="-1"></a><span class="pp">|-------|------------|</span></span>
+<span id="cb92-5"><a href="#cb92-5" tabindex="-1"></a><span class="pp">|</span> <span class="in">`fatal: Unimplemented pathspec magic '_'`</span> <span class="pp">|</span> Long-form <span class="in">`:(exclude)path`</span> <span class="pp">|</span></span></code></pre></div>
 <p>That row is also what graduation looks like: it began as one task’s blocker and now lives in <code>code-check.md</code> as a general rule about pathspec magic. Most rows never make that trip and should not — the ledger’s job is to stop one task repeating itself.</p>
 <p>When a failure does generalize, it graduates to the convention that owns its class: <code>code-check.md</code> for a bug class in a diff (or <code>code-check-infra.md</code> when it is specific to provisioning), <code>ci-monitoring.md</code> for CI behaviour, the domain convention otherwise.</p>
 </div>
@@ -2493,7 +2670,7 @@ $ git status --porcelain --untracked-files=no
 <li><p>Prefix column name vectors with <code>cols_</code> for discoverability in the environment pane: <code>cols_all</code>, <code>cols_carry</code>, <code>cols_split</code>, <code>cols_writable</code>. Same principle for other grouped vectors (<code>params_</code>, <code>tbl_</code>, etc.)</p></li>
 <li>
 <p>For SQL DDL+INSERT pairs that share a schema, use a single named vector as the source of truth. Both <code>CREATE TABLE</code> and <code>INSERT (cols) SELECT cols</code> derive their column lists from the same <code>cols_*</code> vector. Avoids drift between table shape and write projection — when columns change, you edit one place. Example:</p>
-<div class="sourceCode" id="cb90"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb93"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cols_streams</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>  id_segment           <span class="op">=</span> <span class="st">"integer NOT NULL"</span>,</span>
 <span>  watershed_group_code <span class="op">=</span> <span class="st">"varchar(4) NOT NULL"</span>,</span>
@@ -2541,7 +2718,7 @@ $ git status --porcelain --untracked-files=no
 <li><p>Tests must pass before closing the function’s issue</p></li>
 <li>
 <p>Always grep for errors in the same command as the test run to avoid running twice:</p>
-<div class="sourceCode" id="cb92"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb92-1"><a href="#cb92-1" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span> <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-E</span> <span class="st">"(FAIL|ERROR|PASS)"</span> <span class="kw">|</span> <span class="fu">tail</span> <span class="at">-5</span></span></code></pre></div>
+<div class="sourceCode" id="cb95"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb95-1"><a href="#cb95-1" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span> <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-E</span> <span class="st">"(FAIL|ERROR|PASS)"</span> <span class="kw">|</span> <span class="fu">tail</span> <span class="at">-5</span></span></code></pre></div>
 <p>For error context: <code>grep -E "(ERROR:|FAIL )" -A 10 | head -25</code></p>
 </li>
 </ul><div class="section level3">
@@ -2594,7 +2771,7 @@ $ git status --porcelain --untracked-files=no
 <p>Run <code>lintr::lint_package()</code> before committing R package code. Fix all warnings — every lint should be worth fixing.</p>
 <div class="section level3">
 <h3 id="recommended-lintr-config">Recommended .lintr config<a class="anchor" aria-label="anchor" href="#recommended-lintr-config"></a></h3>
-<div class="sourceCode" id="cb93"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb96"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">linters</span><span class="op">:</span> <span class="fu">linters_with_defaults</span><span class="op">(</span></span>
 <span>    <span class="fu">line_length_linter</span><span class="op">(</span><span class="fl">120</span><span class="op">)</span>,</span>
 <span>    <span class="fu">object_name_linter</span><span class="op">(</span>styles <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"snake_case"</span>, <span class="st">"dotted.case"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -2632,18 +2809,18 @@ $ git status --porcelain --untracked-files=no
 <div class="section level3">
 <h3 id="branch-protection">Branch protection<a class="anchor" aria-label="anchor" href="#branch-protection"></a></h3>
 <p>Protect main from deletion and force pushes:</p>
-<div class="sourceCode" id="cb94"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb94-1"><a href="#cb94-1" tabindex="-1"></a><span class="ex">gh</span> api repos/OWNER/REPO/rulesets <span class="at">--method</span> POST <span class="at">--input</span> <span class="at">-</span> <span class="op">&lt;&lt;'EOF'</span></span>
-<span id="cb94-2"><a href="#cb94-2" tabindex="-1"></a><span class="st">{</span></span>
-<span id="cb94-3"><a href="#cb94-3" tabindex="-1"></a><span class="st">  "name": "Protect main",</span></span>
-<span id="cb94-4"><a href="#cb94-4" tabindex="-1"></a><span class="st">  "target": "branch",</span></span>
-<span id="cb94-5"><a href="#cb94-5" tabindex="-1"></a><span class="st">  "enforcement": "active",</span></span>
-<span id="cb94-6"><a href="#cb94-6" tabindex="-1"></a><span class="st">  "bypass_actors": [</span></span>
-<span id="cb94-7"><a href="#cb94-7" tabindex="-1"></a><span class="st">    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }</span></span>
-<span id="cb94-8"><a href="#cb94-8" tabindex="-1"></a><span class="st">  ],</span></span>
-<span id="cb94-9"><a href="#cb94-9" tabindex="-1"></a><span class="st">  "conditions": { "ref_name": { "include": ["refs/heads/main"], "exclude": [] } },</span></span>
-<span id="cb94-10"><a href="#cb94-10" tabindex="-1"></a><span class="st">  "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ]</span></span>
-<span id="cb94-11"><a href="#cb94-11" tabindex="-1"></a><span class="st">}</span></span>
-<span id="cb94-12"><a href="#cb94-12" tabindex="-1"></a><span class="op">EOF</span></span></code></pre></div>
+<div class="sourceCode" id="cb97"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb97-1"><a href="#cb97-1" tabindex="-1"></a><span class="ex">gh</span> api repos/OWNER/REPO/rulesets <span class="at">--method</span> POST <span class="at">--input</span> <span class="at">-</span> <span class="op">&lt;&lt;'EOF'</span></span>
+<span id="cb97-2"><a href="#cb97-2" tabindex="-1"></a><span class="st">{</span></span>
+<span id="cb97-3"><a href="#cb97-3" tabindex="-1"></a><span class="st">  "name": "Protect main",</span></span>
+<span id="cb97-4"><a href="#cb97-4" tabindex="-1"></a><span class="st">  "target": "branch",</span></span>
+<span id="cb97-5"><a href="#cb97-5" tabindex="-1"></a><span class="st">  "enforcement": "active",</span></span>
+<span id="cb97-6"><a href="#cb97-6" tabindex="-1"></a><span class="st">  "bypass_actors": [</span></span>
+<span id="cb97-7"><a href="#cb97-7" tabindex="-1"></a><span class="st">    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }</span></span>
+<span id="cb97-8"><a href="#cb97-8" tabindex="-1"></a><span class="st">  ],</span></span>
+<span id="cb97-9"><a href="#cb97-9" tabindex="-1"></a><span class="st">  "conditions": { "ref_name": { "include": ["refs/heads/main"], "exclude": [] } },</span></span>
+<span id="cb97-10"><a href="#cb97-10" tabindex="-1"></a><span class="st">  "rules": [ { "type": "deletion" }, { "type": "non_fast_forward" } ]</span></span>
+<span id="cb97-11"><a href="#cb97-11" tabindex="-1"></a><span class="st">}</span></span>
+<span id="cb97-12"><a href="#cb97-12" tabindex="-1"></a><span class="op">EOF</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="scaffold-checklist">Scaffold checklist<a class="anchor" aria-label="anchor" href="#scaffold-checklist"></a></h3>
@@ -2729,11 +2906,11 @@ $ git status --porcelain --untracked-files=no
 <h2 id="in-reports-bookdown">In Reports (bookdown)<a class="anchor" aria-label="anchor" href="#in-reports-bookdown"></a></h2>
 <div class="section level3">
 <h3 id="bibliography-generation">Bibliography generation<a class="anchor" aria-label="anchor" href="#bibliography-generation"></a></h3>
-<div class="sourceCode" id="cb95"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb95-1"><a href="#cb95-1" tabindex="-1"></a><span class="co"># index.Rmd — dynamic bib from Zotero via Better BibTeX</span></span>
-<span id="cb95-2"><a href="#cb95-2" tabindex="-1"></a><span class="fu">bibliography</span><span class="kw">:</span><span class="at"> </span><span class="st">"`r rbbt::bbt_write_bib('references.bib', overwrite = TRUE)`"</span></span></code></pre></div>
+<div class="sourceCode" id="cb98"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb98-1"><a href="#cb98-1" tabindex="-1"></a><span class="co"># index.Rmd — dynamic bib from Zotero via Better BibTeX</span></span>
+<span id="cb98-2"><a href="#cb98-2" tabindex="-1"></a><span class="fu">bibliography</span><span class="kw">:</span><span class="at"> </span><span class="st">"`r rbbt::bbt_write_bib('references.bib', overwrite = TRUE)`"</span></span></code></pre></div>
 <p><code>rbbt</code> pulls from BBT, which syncs with Zotero. Edit references in Zotero → rebuild report → bibliography updates.</p>
 <p><strong>Library targeting:</strong> rbbt must know which Zotero library to search. This is set globally in <code>~/.Rprofile</code>:</p>
-<div class="sourceCode" id="cb96"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb99"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># default library — NewGraphEnvironment group (libraryID 9, group 4733734)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>rbbt.default.library_id <span class="op">=</span> <span class="fl">9</span><span class="op">)</span></span></code></pre></div>
 <p>Without this option, rbbt searches only the personal library (libraryID 1) and won’t find group library references. The library IDs map to Zotero’s internal numbering — use <code>/zotero-lookup</code> with <code>SELECT DISTINCT libraryID FROM citationkey</code> against the BBT database to discover available libraries.</p>
