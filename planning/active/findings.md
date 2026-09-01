@@ -227,6 +227,38 @@ so an anchored `^> Range:` pattern would have matched nothing and reported every
 arm as 0 requests — which reads as a spectacular result rather than a broken
 grep. The committed counter matches `fixed = TRUE` and unanchored.
 
+## Phase 1 — predicted chunk skip, recorded BEFORE the arms returned
+
+`filter_geom` skips a chunk only when the chunk does not intersect the polygon at
+all, so the achievable reduction is computable from the geometry alone. Written
+down first so the observed counts can be **reconciled against an expectation**
+rather than simply believed (`scratchpad/chunk_predict.R`):
+
+```
+== pad 2 px : cube 330 x 318 px ==
+chunk 1024 px (10240 m):   1 chunks,   1 intersect -> read 100.0% (skip   0.0%)
+chunk  256 px ( 2560 m):   4 chunks,   4 intersect -> read 100.0% (skip   0.0%)
+chunk  128 px ( 1280 m):   9 chunks,   8 intersect -> read  88.9% (skip  11.1%)
+chunk   64 px (  640 m):  30 chunks,  22 intersect -> read  73.3% (skip  26.7%)
+```
+
+Predictions, against arm A's measured 462 range requests:
+
+| arm | chunking | predicted requests |
+|---|---|---|
+| B_fg_default | 256 px (gdalcubes' default) | ~462 — **no gain** |
+| C_fg_128 | 128 px | ~411 |
+| C_fg_64 | 64 px | ~339 |
+
+So the ceiling on this AOI is ~1.4×, against the ~10× the issue claims from the
+0.102 area ratio. The area ratio is the wrong bound: the read is chunk-granular,
+and a corridor touches most chunks at any size gdalcubes permits.
+
+`tile_size = 640` (arm D) skips the same 26.7% of ground, but rebuilds an image
+collection and reopens the COGs **per tile**, so it may cost *more* requests than
+C_fg_64 for the same skip. If so, that — not raw speed — is filter_geom's real
+argument over tiling.
+
 ## Phase 1 — network arm results
 
 _pending — `data-raw/logs/benchmark_filter_geom/summary.csv`_
