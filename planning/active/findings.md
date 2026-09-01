@@ -261,7 +261,89 @@ argument over tiling.
 
 ## Phase 1 — network arm results
 
-_pending — `data-raw/logs/benchmark_filter_geom/summary.csv`_
+### Prediction met exactly: default chunking buys nothing
+
+| arm | predicted req | **observed req** | wall clock | non-NA cells |
+|---|---|---|---|---|
+| A_bbox_mask (today) | — (baseline) | **462** | 236.8 s | 49,244 |
+| B_fg_default | ~462 (0% skip) | **462** | 236.9 s | 41,608 |
+
+Requests identical, wall clock identical to 0.1 s. `filter_geom` at gdalcubes'
+default chunking is a **no-op for cost** — as predicted from the 2 × 2 chunk grid,
+now confirmed against live COGs rather than inferred.
+
+### The finding that changes the issue: `terra::mask()` is `touches = TRUE`
+
+Arm B returns **41,608** non-NA cells against arm A's **49,244** — a **−15.5%**
+change in the analysed footprint, from a run that was supposed to differ only in
+where the clip happened.
+
+Cause, verified directly against terra 1.9.x:
+
+```
+mask() default   : 150        <- touches = TRUE
+mask(touches=F)  : 122
+mask(touches=T)  : 150
+true polygon area: 123.4 cells
+```
+
+`terra::mask()` defaults to **`touches = TRUE`** (every cell the polygon touches),
+while `filter_geom` rasterizes at **cell centre**. They are not the same clip.
+
+**So issue #47's central proposal — "drop the now-redundant output-side
+`terra::mask()`" — is not a redundancy removal. It is a silent methodology change
+that shrinks every reported hectare number by 3–16%.** floodplains judges parity
+at ±1 ha on 943 ha (0.1%); this is 30–150× that tolerance.
+
+Two consequences beyond #47:
+
+- `R/dft_stac_cube.R:364-366` documents the clip as "Cells whose centre falls
+  outside the polygon become `NA`". That is **wrong today**, independent of this
+  issue.
+- The offline test at `tests/testthat/test-dft_stac_cube.R:116-138` cannot catch
+  it: its polygon is axis-aligned on a cell boundary, where both rules agree. A
+  fixture that cannot reach the failure mode.
+
+### The redesign this forces
+
+Do **not** drop `stac_cube_clip()`. Instead hand `filter_geom` a polygon
+**buffered by `res`** (any buffer ≥ `res·√2/2` makes its cell-centre footprint a
+guaranteed superset of `touches = TRUE`), and keep `terra::mask()` to trim back.
+`filter_geom` then becomes purely a read-bound, output is byte-identical, and
+**the cache key needs no change** — so the frozen `638a2be11fdf` stays frozen and
+no existing `cube_<key>.tif` is orphaned (each costs 10–30 min to re-stream).
+
+Padding must be a multiple of `res`, or the cube stops being co-lattice with the
+unpadded one — reintroducing the sub-pixel offset #38 documented for tiling. Arm
+B's extent confirms the padding is applied and that a crop-back is required:
+`A = [683392, 686652]`, `B = [683372, 686672]`.
+
+### A live defect found while reviewing, independent of #47
+
+`tests/testthat/test-dft_stac_cube.R:219-242`, the network smoke test, **passes on
+an all-NA cube** — the exact failure mode #32 exists to prevent:
+
+```r
+fully_na <- mean(rowSums(!is.na(terra::values(cube))) == 0)
+expect_gt(fully_na, 0.5)     # an all-NA cube gives 1.0 -> PASSES
+```
+
+`nlyr == 3`, `!anyNA(time)` and the cache-file assertion are all satisfied too. So
+every assertion in drift's only end-to-end cube test is satisfied by a cube
+containing no data. Issue #47 asks for "a smoke test must assert non-NA coverage
+inside the polygon, not merely that it returns" — drift does not have one today.
+
+### The rival hypothesis, currently untested
+
+`grep -rn gdalcubes_options R/` returns **zero hits**: the package never sets
+`gdalcubes_options(parallel =)`, so every fetch runs single-threaded. Only
+`data-raw/example_aoi.R:25` sets it, and that is not a code path any user reaches.
+
+This matters twice over, because `default_chunksize()` reads `.pkgenv$parallel`:
+`parallel = 8` gives `target_nchunks_space = 16`, i.e. **finer chunks for free**
+*and* concurrent reads. If `A + parallel` beats the best `filter_geom` arm, #47 is
+moot and the answer is one line with no fork, no probe, and no cache question.
+It must be in the same table or the comparison is unfair to the status quo.
 
 ## Errors Encountered
 
