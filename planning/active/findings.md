@@ -159,7 +159,80 @@ per-tile round trips. `filter_geom`'s advantages over it are structural — one 
 `terra::merge`, no sub-pixel offset, and it subsumes the output clip. Whether those are worth two code
 paths is what Phase 1 decides.
 
+## Phase 1 — offline results (2026-09-01)
+
+Script: `scratchpad/p1_offline.R`, run against the installed fork
+(`RemoteSha 8bad203`).
+
+### (a) The fork clears the upstream reproducer
+
+```
+=== (a) upstream #110 reproducer ===
+plain cube written ok
+filter_geom write: returned
+```
+
+CRAN 0.7.4 segfaults on that exact call. So the fork is usable **today** —
+nothing about adopting it waits on `appelmar/gdalcubes#111` merging.
+
+### (b) Both failure modes are detectable by values
+
+```
+cells: 40000  non-NA: 10000  NA: 30000
+inside  box: non-NA = 10000 / 10000
+outside box: non-NA =     0 / 30000
+VERDICT non-NA-inside: TRUE
+VERDICT NA-outside   : TRUE
+```
+
+The clip is exact — every cell inside the rectangle carries a value and every
+cell outside is `NA`. This is what makes a two-sided assertion possible:
+`inside_nonna > 0` kills the all-NA mode, `outside_na > 0` kills a `filter_geom`
+that ran but clipped nothing. A one-sided "did it error?" probe sees neither.
+
+### (c) The polygon must be strictly interior — drift's never is
+
+```
+pad = 0 px (   0 m): ERROR: Polygon must be located completely within the data cube
+pad = 1 px (  10 m): ok  (non-NA 14400 / 14884)
+pad = 2 px (  20 m): ok  (non-NA 14400 / 15376)
+pad = 3 px (  30 m): ok  (non-NA 14400 / 15876)
+pad = 5 px (  50 m): ok  (non-NA 14400 / 16900)
+```
+
+Confirms the constructor hazard read out of `filter_geom.cpp`. drift's cube
+extent **is** `st_bbox(aoi_target)` (`R/dft_stac_cube.R:329-332`), so a naive
+`filter_geom(cube, aoi_target)` would have thrown on **every** call — the
+gdalcubes ~0.5 px extent enlargement is not enough to save it. One pixel of
+padding suffices; the plan uses **2** for margin.
+
+Note the clipped cell count is `14400` at every pad — 120 × 120 px for a 1200 m
+polygon at `res = 10`. The clip is pad-independent, so padding costs only the
+skirt, which is cropped back off.
+
+### Instrument check before trusting any count
+
+Per the convention that an empty search proves nothing: the range-request
+counter was positively controlled against a live log before any arm was read.
+
+```
+range-request lines: 128
+Range: bytes=0-16383
+Range: bytes=3073252-3099210
+Range: bytes=3302374-3322569
+```
+
+GDAL emits the header **unprefixed** (via its own logger, not raw curl's `> `),
+so an anchored `^> Range:` pattern would have matched nothing and reported every
+arm as 0 requests — which reads as a spectacular result rather than a broken
+grep. The committed counter matches `fixed = TRUE` and unanchored.
+
+## Phase 1 — network arm results
+
+_pending — `data-raw/logs/benchmark_filter_geom/summary.csv`_
+
 ## Errors Encountered
 
 | Error | Resolution |
 |-------|------------|
+| `Polygon must be located completely within the data cube` from `filter_geom()` | Pad the `cube_view` extent so the AOI is strictly interior; 1 px suffices, drift uses 2. Measured, not guessed — see (c) above. |

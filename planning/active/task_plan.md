@@ -34,9 +34,9 @@ post-read mask, with a follow-up issue carrying the measured numbers.
 New `data-raw/benchmark_filter_geom.R` (matches the existing `data-raw/benchmark_transition_oom.R`
 family). No package API changes in this phase.
 
-- [ ] Reproduce `appelmar/gdalcubes#110`'s offline repro on the installed fork; confirm it succeeds **and**
+- [x] Reproduce `appelmar/gdalcubes#110`'s offline repro on the installed fork; confirm it succeeds **and**
       that the broken mode is distinguishable by values (non-NA inside, NA outside)
-- [ ] Establish the extent padding needed so `aoi_target` is strictly interior to drift's `bbox_ext`
+- [x] Establish the extent padding needed so `aoi_target` is strictly interior to drift's `bbox_ext`
       (`R/dft_stac_cube.R:329-332`) — find the minimum that avoids the `within` throw, in pixels of `res`
 - [ ] Benchmark arms on the packaged Neexdzii AOI **and** one large real floodplain AOI (magnitude is
       dataset-specific; the fixture is not the case anyone cares about):
