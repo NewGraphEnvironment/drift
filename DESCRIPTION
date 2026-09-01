@@ -24,6 +24,7 @@ Depends:
 Imports:
     cli,
     dplyr,
+    parallel,
     rappdirs,
     rlang,
     rstac,
@@ -45,7 +46,7 @@ Suggests:
     leaflet.extras,
     mapgl,
     rmarkdown,
-    testthat (>= 3.0.0),
+    testthat (>= 3.2.0),
     tidyr,
     tidyterra,
     tmap

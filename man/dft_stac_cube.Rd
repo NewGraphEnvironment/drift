@@ -19,6 +19,7 @@ dft_stac_cube(
   months = NULL,
   mask_values = NULL,
   tile_size = NULL,
+  parallel = NULL,
   cache_dir = NULL,
   force = FALSE,
   sign_fn = rstac::sign_planetary_computer()
@@ -88,10 +89,30 @@ cost more per-tile round trips; there is no auto-tuning. The cube always caches
 a \code{.tif} either way; a tiled read keys distinctly (see the caching note above),
 so untiled caches are untouched and \code{tile_size = NULL} is byte-for-byte the
 previous behavior. This is the continuous-path twin of \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}'s
-\code{tile_size} — the \code{filter_geom}-independent way to bound the read. Because the
+\code{tile_size}. Benchmarked against the alternatives on the packaged AOI
+(drift#47) it is the \strong{slowest} option — 1263.6 s and 3213 range requests
+against an untiled 236.8 s / 462, because every tile rebuilds the image
+collection and reopens the COGs — so prefer \code{parallel} for speed and reach
+for \code{tile_size} only when peak memory, not wall clock, is the constraint.
+Because the
 cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
 cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
 that is sub-pixel-offset from — not pixel-identical to — the untiled cube.}
+
+\item{parallel}{Integer, or \code{NULL} (default) to auto-detect as
+\code{min(4, cores - 1)}, flooring to 1 where the core count is undetectable.
+Number of gdalcubes worker processes used for the read. The COG stream is the
+dominant cost and it parallelizes well: measured on the packaged AOI, a
+4-month monthly kNDVI cube took 236.8 s at \code{parallel = 1}, 115.8 s at 4 and
+96.0 s at 8 — and the output is \strong{byte-identical} at every setting
+(correlation 1.000, max absolute difference 0), so this is a pure cost knob
+and does not enter the cache key. Capped at 4 by default rather than the
+full core count because each worker holds chunks in memory; raise it on a
+machine with headroom, or set \code{1} for the previous single-threaded
+behaviour. Prior to v0.9.0 drift never called
+\code{\link[gdalcubes:gdalcubes_options]{gdalcubes::gdalcubes_options()}} at all, so every fetch ran single-threaded
+— and, because gdalcubes derives its default chunk size from this value,
+with the coarsest possible chunking (drift#47).}
 
 \item{cache_dir}{Character. Cache directory. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
