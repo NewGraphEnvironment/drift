@@ -1,14 +1,21 @@
 # gdalcubes + Planetary Computer Sentinel-2 gotchas
 
-Non-obvious gdalcubes 0.7.3 + Microsoft Planetary Computer Sentinel-2 gotchas hit
-building `dft_stac_cube()` / `dft_rast_break()` / `dft_rast_trend()` (#30). All
-verified by running code on gdalcubes 0.7.3 / rstac 1.0.1 / terra 1.9.11 /
-bfast 1.7.2.
+Non-obvious gdalcubes + Microsoft Planetary Computer Sentinel-2 gotchas hit
+building `dft_stac_cube()` / `dft_rast_break()` / `dft_rast_trend()`.
+
+Provenance, because it is now mixed: the #30-era bullets were verified on
+**gdalcubes 0.7.3** / rstac 1.0.1 / terra 1.9.11 / bfast 1.7.2. The `filter_geom`,
+`parallel` and `tile_size` measurements (#47, 2026-09-01) were taken on
+**gdalcubes 0.7.4** — specifically `NewGraphEnvironment/gdalcubes@newgraph`
+(`8bad203`), which is 0.7.4 plus the `filter_geom` segfault fix — with terra
+1.9.34. Each bullet says which.
 
 - **`gdalcubes::filter_geom()` is not worth using — now for measured reasons, not
-  because it crashes (#47).** The segfault below is genuinely fixed in
-  `NewGraphEnvironment/gdalcubes@newgraph` (`8bad203`), which clears the upstream
-  reproducer. Do NOT reach for it anyway. Three findings, all measured on the
+  because it crashes (#47).** The original defect was a segfault in the compute
+  worker (`gc_exec_worker`, `address 0x120`) or, intermittently, a silent all-NA
+  cube; that is genuinely fixed in `NewGraphEnvironment/gdalcubes@newgraph`
+  (`8bad203`), which clears the upstream reproducer in `appelmar/gdalcubes#110`.
+  Do NOT reach for it anyway. Three findings, all measured on the
   packaged AOI with `CPL_CURL_VERBOSE` request counts
   (`data-raw/benchmark_filter_geom.R`, `data-raw/logs/benchmark_filter_geom/`):
   - **It skips whole CHUNKS, not pixels**, and `gdalcubes:::default_chunksize()`
@@ -19,8 +26,9 @@ bfast 1.7.2.
   - **Forcing chunking finer costs more than it saves.** Sentinel-2 L2A COGs are
     `Block=512x512`; a 64 px chunk sits inside one source block, so the same
     bytes are refetched per chunk. 64 px and 128 px chunking both measured
-    **693 requests / ~345 s — 1.5x the requests and ~47% slower** — to skip 27%
-    of the ground. The AOI/bbox area ratio (0.102) is the wrong bound: the read
+    **693 requests / ~345 s — 1.5x the requests and ~47% slower** — to skip 26.7%
+    of the ground (predicted by `data-raw/benchmark_filter_geom_chunkskip.R`;
+    the gap between that prediction and the wire is the whole finding). The AOI/bbox area ratio (0.102) is the wrong bound: the read
     is chunk-granular and the cost is COG-block-granular.
   - **It clips at CELL CENTRE where `terra::mask()` is `touches = TRUE`.**
     Swapping them shrinks the analysed footprint by **15.5%** (49,244 -> 41,608

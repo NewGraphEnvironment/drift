@@ -39,8 +39,14 @@
 #'   `dt` window (default `"median"`).
 #' @param resampling Character. Spatial resampling (default `"bilinear"`).
 #' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
-#'   polygon with `terra::mask()` (cells outside → `NA` on every layer), so
-#'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. Set
+#'   polygon with `terra::mask()`, so
+#'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. The
+#'   clip keeps every cell the polygon **touches** — `terra::mask()` defaults to
+#'   `touches = TRUE` — so it is inclusive at the boundary by up to one cell,
+#'   deliberately, so a thin corridor is not eroded. Cells the polygon does not
+#'   touch become `NA` on every layer. That is a *different* rule from a
+#'   cell-centre clip, and worth 15.5% of the analysed footprint on the packaged
+#'   AOI (#47), so it matters to anything reporting boundary hectares. Set
 #'   `FALSE` to keep the wider extent (e.g. for surrounding context, or to mask
 #'   later with a different polygon). This clips the *output* — with the default
 #'   `tile_size = NULL` the full bbox of COGs is still streamed either way, so
@@ -104,8 +110,9 @@
 #'
 #' @return A [terra::SpatRaster] index stack — one layer per time step, with a
 #'   time value per layer — cached as a GeoTIFF. By default (`clip = TRUE`) the
-#'   stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
-#'   `NA`), so the reduced raster from [dft_rast_break()] is already polygon-tight;
+#'   stack is clipped to the AOI polygon (cloud-masked; every cell the polygon
+#'   touches is kept, cells it does not touch are `NA` — see `clip`), so the
+#'   reduced raster from [dft_rast_break()] is already polygon-tight;
 #'   pass `clip = FALSE` for the full AOI **bounding box** (or, with `tile_size`
 #'   set, the AOI-intersecting tile union). For sources with a
 #'   reflectance-offset baseline boundary (Sentinel-2), items are split at the
@@ -315,7 +322,7 @@ dft_stac_cube <- function(aoi,
   # default, and fine enough to break alignment with the COGs' 512x512 blocks
   # when forced down. Benchmarked on the packaged AOI: default chunking 462
   # requests / 236.9 s against the bbox baseline's 462 / 236.8 s, and 64 px
-  # chunking 693 / 348.2 s — 1.5x the requests to save 27% of the ground.
+  # chunking 693 / 348.2 s — 1.5x the requests to save 26.7% of the ground.
   # It also clips at CELL CENTRE where terra::mask() is touches = TRUE, so
   # swapping them would silently shrink the analysed footprint by 15.5%.
   # See data-raw/benchmark_filter_geom.R and inst/notes/gdalcubes-pc-gotchas.md.
@@ -460,7 +467,14 @@ cube_parallel_check <- function(parallel) {
       "i" = "Use {.code NULL} to auto-detect, or an integer such as {.val {4L}}."
     ))
   }
-  if (!is.numeric(parallel) || parallel < 1 || parallel != trunc(parallel)) {
+  # `is.finite` and the integer ceiling BEFORE as.integer(): `trunc(Inf) == Inf`
+  # and `Inf < 1` is FALSE, so Inf and anything >= 2^31 would clear a
+  # whole-number test and then coerce to NA_integer_ — turning a validator into
+  # a source of NA. That NA reaches gdalcubes_options() and dies as
+  # "parallel >= 1 is not TRUE", naming neither this argument nor the caller.
+  if (!is.numeric(parallel) || !is.finite(parallel) ||
+        parallel < 1 || parallel > .Machine$integer.max ||
+        parallel != trunc(parallel)) {
     cli::cli_abort(c(
       "{.arg parallel} must be a single whole number >= 1, or {.code NULL} to auto-detect.",
       "x" = "Got {.obj_type_friendly {parallel}}."

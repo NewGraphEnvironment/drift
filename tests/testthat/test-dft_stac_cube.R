@@ -156,8 +156,28 @@ test_that("cube_parallel_check floors to 1 when the core count is undetectable",
   # detectCores() is documented to return NA where it cannot determine the
   # count. Propagating that into gdalcubes_options() would abort the fetch, so
   # an auto default must degrade to slow rather than to broken.
+  #
+  # PREMISE: the auto value is max(1, min(4, cores - 1)), which is ALREADY 1 on a
+  # 1- or 2-core machine — precisely the container class this guard exists for.
+  # There the mocked and unmocked answers coincide, so the mock could fail to
+  # take (or be deleted) and the test would still pass. Skip rather than assert
+  # nothing.
+  before <- drift:::cube_parallel_check(NULL)
+  skip_if(before == 1L, "machine's auto value is already 1 — the mock is indistinguishable here")
+
   local_mocked_bindings(detectCores = function(...) NA_integer_, .package = "parallel")
   expect_identical(drift:::cube_parallel_check(NULL), 1L)
+})
+
+test_that("cube_parallel_check rejects non-finite and out-of-integer-range input", {
+  # Inf clears a naive whole-number test (trunc(Inf) == Inf, Inf < 1 is FALSE)
+  # and >= 2^31 clears it outright; both then coerce to NA_integer_, so a
+  # validator would RETURN NA and hand it to gdalcubes_options().
+  expect_identical(trunc(Inf), Inf)                     # premise: the trap is real
+  expect_true(is.na(suppressWarnings(as.integer(1e10))))
+  for (bad in list(Inf, 1e10, 2147483648, -Inf, NaN)) {
+    expect_error(drift:::cube_parallel_check(bad), "whole number")
+  }
 })
 
 test_that("cube_parallel_check passes explicit values through and rejects junk", {

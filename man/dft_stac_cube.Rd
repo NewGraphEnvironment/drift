@@ -52,8 +52,14 @@ must agree with.}
 \item{resampling}{Character. Spatial resampling (default \code{"bilinear"}).}
 
 \item{clip}{Logical. When \code{TRUE} (default), clip the returned stack to the AOI
-polygon with \code{terra::mask()} (cells outside → \code{NA} on every layer), so
-\code{\link[=dft_rast_break]{dft_rast_break()}} / \code{\link[=dft_rast_trend]{dft_rast_trend()}} reduce only in-polygon pixels. Set
+polygon with \code{terra::mask()}, so
+\code{\link[=dft_rast_break]{dft_rast_break()}} / \code{\link[=dft_rast_trend]{dft_rast_trend()}} reduce only in-polygon pixels. The
+clip keeps every cell the polygon \strong{touches} — \code{terra::mask()} defaults to
+\code{touches = TRUE} — so it is inclusive at the boundary by up to one cell,
+deliberately, so a thin corridor is not eroded. Cells the polygon does not
+touch become \code{NA} on every layer. That is a \emph{different} rule from a
+cell-centre clip, and worth 15.5\% of the analysed footprint on the packaged
+AOI (#47), so it matters to anything reporting boundary hectares. Set
 \code{FALSE} to keep the wider extent (e.g. for surrounding context, or to mask
 later with a different polygon). This clips the \emph{output} — with the default
 \code{tile_size = NULL} the full bbox of COGs is still streamed either way, so
@@ -126,8 +132,9 @@ with the coarsest possible chunking (drift#47).}
 \value{
 A \link[terra:SpatRaster-class]{terra::SpatRaster} index stack — one layer per time step, with a
 time value per layer — cached as a GeoTIFF. By default (\code{clip = TRUE}) the
-stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
-\code{NA}), so the reduced raster from \code{\link[=dft_rast_break]{dft_rast_break()}} is already polygon-tight;
+stack is clipped to the AOI polygon (cloud-masked; every cell the polygon
+touches is kept, cells it does not touch are \code{NA} — see \code{clip}), so the
+reduced raster from \code{\link[=dft_rast_break]{dft_rast_break()}} is already polygon-tight;
 pass \code{clip = FALSE} for the full AOI \strong{bounding box} (or, with \code{tile_size}
 set, the AOI-intersecting tile union). For sources with a
 reflectance-offset baseline boundary (Sentinel-2), items are split at the
