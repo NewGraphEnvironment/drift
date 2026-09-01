@@ -111,8 +111,13 @@ test_that("stac_cube_cache_key ignores sf attribute columns", {
 })
 
 # stac_cube_clip(): the AOI-polygon clip that replaces gdalcubes::filter_geom
-# (#32). Network-free — a synthetic stack + a half-covering polygon. Cells whose
-# centre is outside the polygon become NA on every layer; nlyr is preserved.
+# (#32). Network-free — a synthetic stack + a half-covering polygon. Cells the
+# polygon does not touch become NA on every layer; nlyr is preserved.
+#
+# NOTE this fixture cannot distinguish `touches = TRUE` from cell-centre: the
+# polygon is axis-aligned on a cell boundary, where the two rules agree. That is
+# what the irregular-polygon test below is for — see #47, where the difference
+# turned out to be 15.5% of the analysed footprint.
 test_that("stac_cube_clip masks cells outside the AOI polygon on every layer", {
   r <- terra::rast(nrows = 10, ncols = 10, xmin = 0, xmax = 10,
                    ymin = 0, ymax = 10, crs = "EPSG:32609", nlyrs = 2)
@@ -132,6 +137,131 @@ test_that("stac_cube_clip masks cells outside the AOI polygon on every layer", {
   inside <- terra::xyFromCell(out, seq_len(terra::ncell(out)))[, 1] < 5
   expect_true(all(!is.na(vals[inside, ])))    # inside polygon: retained
   expect_true(all(is.na(vals[!inside, ])))    # outside polygon: NA
+})
+
+# cube_parallel_check(): resolves the gdalcubes worker count (#47). drift never
+# called gdalcubes_options() before v0.9.0, so every cube read ran
+# single-threaded by accident rather than by choice — measured 2.05x slower at
+# 4 workers and 2.47x at 8, with byte-identical output.
+
+test_that("cube_parallel_check auto-detects a capped, >= 1 worker count", {
+  n <- drift:::cube_parallel_check(NULL)
+  expect_length(n, 1L)
+  expect_type(n, "integer")
+  expect_gte(n, 1L)
+  expect_lte(n, 4L)          # capped: workers hold chunks, drift has OOM history
+})
+
+test_that("cube_parallel_check floors to 1 when the core count is undetectable", {
+  # detectCores() is documented to return NA where it cannot determine the
+  # count. Propagating that into gdalcubes_options() would abort the fetch, so
+  # an auto default must degrade to slow rather than to broken.
+  #
+  # PREMISE: the auto value is max(1, min(4, cores - 1)), which is ALREADY 1 on a
+  # 1- or 2-core machine — precisely the container class this guard exists for.
+  # There the mocked and unmocked answers coincide, so the mock could fail to
+  # take (or be deleted) and the test would still pass. Skip rather than assert
+  # nothing.
+  before <- drift:::cube_parallel_check(NULL)
+  skip_if(before == 1L, "machine's auto value is already 1 — the mock is indistinguishable here")
+
+  local_mocked_bindings(detectCores = function(...) NA_integer_, .package = "parallel")
+  expect_identical(drift:::cube_parallel_check(NULL), 1L)
+})
+
+test_that("cube_parallel_check honours a deliberate session-level parallel", {
+  # gdalcubes ships parallel = 1, so anything above that was set on purpose.
+  # Overriding it with our cap would silently halve the throughput the caller
+  # asked for, and the session restore would hide it afterwards.
+  expect_identical(drift:::cube_parallel_check(NULL, session = 8), 8L)
+  expect_identical(drift:::cube_parallel_check(NULL, session = 16), 16L)
+  # 1 is gdalcubes' own default, not a choice, so auto still applies
+  auto <- drift:::cube_parallel_check(NULL, session = 1)
+  expect_identical(auto, drift:::cube_parallel_check(NULL))
+  # an explicit argument always outranks the session
+  expect_identical(drift:::cube_parallel_check(2, session = 8), 2L)
+  # and a junk session value must not leak through as the answer
+  for (bad in list(NA, NULL, "8", c(2, 3))) {
+    expect_identical(drift:::cube_parallel_check(NULL, session = bad), auto)
+  }
+})
+
+test_that("cube_check_nonempty aborts only when NOTHING is present", {
+  r <- terra::rast(nrows = 4, ncols = 4, nlyrs = 3, crs = "EPSG:32609")
+
+  terra::values(r) <- NA_real_
+  expect_error(drift:::cube_check_nonempty(r, "coll", "d", cached = FALSE),
+               "no data on any layer")
+  # the cached-path message must tell the reader how to recover, since nothing
+  # will ever regenerate the file under force = FALSE
+  expect_error(drift:::cube_check_nonempty(r, "coll", "d", cached = TRUE),
+               "force = TRUE|Delete the cached")
+
+  # one non-NA cell anywhere is enough — an individual empty LAYER is documented
+  # `months` behaviour, and aborting on it would break the packaged example
+  v <- matrix(NA_real_, nrow = terra::ncell(r), ncol = 3)
+  v[1, 2] <- 1
+  terra::values(r) <- v
+  expect_silent(drift:::cube_check_nonempty(r, "coll", "d", cached = FALSE))
+  expect_identical(sum(terra::global(r, "notNA")$notNA), 1)   # premise
+})
+
+test_that("cube_parallel_check rejects non-finite and out-of-integer-range input", {
+  # Inf clears a naive whole-number test (trunc(Inf) == Inf, Inf < 1 is FALSE)
+  # and >= 2^31 clears it outright; both then coerce to NA_integer_, so a
+  # validator would RETURN NA and hand it to gdalcubes_options().
+  expect_identical(trunc(Inf), Inf)                     # premise: the trap is real
+  expect_true(is.na(suppressWarnings(as.integer(1e10))))
+  for (bad in list(Inf, 1e10, 2147483648, -Inf, NaN)) {
+    expect_error(drift:::cube_parallel_check(bad), "whole number")
+  }
+})
+
+test_that("cube_parallel_check passes explicit values through and rejects junk", {
+  expect_identical(drift:::cube_parallel_check(1), 1L)
+  expect_identical(drift:::cube_parallel_check(8), 8L)
+  expect_identical(drift:::cube_parallel_check(8.0), 8L)
+  for (bad in list(0, -1, NA, "four", c(1, 2), numeric(0), 8.7)) {
+    expect_error(drift:::cube_parallel_check(bad), "whole number")
+  }
+})
+
+test_that("cube_parallel_check refuses a logical rather than coercing it to 1", {
+  # gdalcubes' own idiom is `parallel = TRUE` meaning "all cores", and
+  # as.integer(TRUE) is 1 — so coercing would hand a caller who asked for every
+  # core the single-threaded path, silently, and the fetch would just be slow.
+  expect_identical(as.integer(TRUE), 1L)              # premise: the trap is real
+  expect_error(drift:::cube_parallel_check(TRUE), "not a flag")
+  expect_error(drift:::cube_parallel_check(FALSE), "not a flag")
+})
+
+# The rule stac_cube_clip() actually implements, pinned. terra::mask() defaults
+# to `touches = TRUE` — every cell the polygon touches is kept — NOT cell-centre.
+# The distinction is invisible on an axis-aligned fixture and worth 15.5% of the
+# analysed footprint on a real AOI (#47), so it is asserted on a polygon that can
+# tell the two apart: fractional coordinates, no edge parallel to the grid.
+test_that("stac_cube_clip keeps every cell the polygon TOUCHES, not cell centres", {
+  r <- terra::rast(nrows = 20, ncols = 20, xmin = 0, xmax = 20,
+                   ymin = 0, ymax = 20, crs = "EPSG:32609")
+  terra::values(r) <- 1
+  aoi <- sf::st_sfc(
+    sf::st_polygon(list(rbind(
+      c(3.4, 3.6), c(15.2, 5.1), c(16.7, 14.3), c(6.8, 16.9), c(3.4, 3.6)
+    ))),
+    crs = 32609
+  )
+  n <- function(x) sum(!is.na(terra::values(x)))
+
+  # PREMISE, asserted beside the property: this fixture must be able to separate
+  # the two rules, or the test below passes for nothing. If terra ever changes
+  # its default, this line fails and names the real cause instead of blaming drift.
+  centre <- n(terra::mask(r, terra::vect(aoi), touches = FALSE))
+  touch <- n(terra::mask(r, terra::vect(aoi), touches = TRUE))
+  expect_gt(touch, centre)
+
+  got <- n(drift:::stac_cube_clip(r, aoi))
+  expect_identical(got, touch)                # inclusive at the boundary
+  expect_gt(got, centre)                      # and strictly more than cell-centre
 })
 
 # mosaic_stacks(): the in-memory, multi-layer merge that reassembles per-tile
@@ -232,10 +362,45 @@ test_that("dft_stac_cube fetches an index stack end-to-end", {
   expect_s4_class(cube, "SpatRaster")
   expect_equal(terra::nlyr(cube), 3)                 # 3 monthly layers
   expect_false(anyNA(terra::time(cube)))             # time set per layer
-  # default clip = TRUE clips to the AOI polygon: for this thin reach
-  # (area / bbox ~= 0.105) most bbox cells are fully NA across all layers
-  fully_na <- mean(rowSums(!is.na(terra::values(cube))) == 0)
-  expect_gt(fully_na, 0.5)
+
+  # The assertion this replaced was `mean(rowSums(!is.na(values)) == 0) > 0.5`,
+  # which an ALL-NA cube satisfies with 1.0 — as it does nlyr, time, and the
+  # cache check below. Every assertion in drift's only end-to-end cube test was
+  # passed by a cube containing no data, i.e. by exactly the gdalcubes
+  # filter_geom failure mode #32 exists to prevent (#47).
+  # Derive the in-polygon cell set from the GEOMETRY against the cube's grid,
+  # never from the cube's own values: masking the cube to find its valid cells
+  # makes the oracle agree with whatever the cube contains, so an all-NA cube
+  # would yield an empty "inside" and a trivially-true "outside".
+  aoi_t <- sf::st_transform(aoi, terra::crs(cube))
+  inpoly <- !is.na(terra::values(
+    terra::rasterize(terra::vect(aoi_t), terra::subset(cube, 1), touches = TRUE)
+  ))[, 1]
+  expect_gt(sum(inpoly), 0)                          # premise: the grid meets the AOI
+  expect_gt(sum(!inpoly), 0)                         # premise: and extends beyond it
+  vals <- terra::values(cube)
+
+  # there IS data inside the polygon — kills the all-NA cube
+  expect_gt(sum(!is.na(vals[inpoly, , drop = FALSE])), 0)
+  # and on EVERY layer — a global sum passes when one month survived and the
+  # rest are empty, which dft_rast_break()'s `rowSums(!is.na) >= min_obs` gate
+  # would silently drop rather than report.
+  # Valid here only because this call passes NO `months` filter and every month
+  # of the window is inside it, so every layer is expected to carry data. Do NOT
+  # copy this assertion into a `months`-filtered call: filtered-out months are
+  # all-NA BY DESIGN, which is what keeps the series regular for bfast.
+  expect_true(all(colSums(!is.na(vals[inpoly, , drop = FALSE])) > 0))
+  # EVERY cell outside the polygon is NA — kills a clip that did nothing.
+  # `sum(is.na(outside)) > 0` would NOT: cloud masking leaves NAs outside the
+  # polygon in an unclipped cube too, so it passes on the broken case (measured).
+  # `all()` is safe because terra::mask(touches = TRUE) and
+  # terra::rasterize(touches = TRUE) agree cell-for-cell — verified over 40
+  # random irregular polygons, 0 disagreements — so `inpoly` is exactly the set
+  # the clip keeps.
+  expect_true(all(is.na(vals[!inpoly, , drop = FALSE])))
+  # and coverage is not one surviving pixel. Loose on purpose: cloud masking
+  # legitimately removes a lot, so this guards the degenerate case, not quality.
+  expect_lt(mean(is.na(vals[inpoly, , drop = FALSE])), 0.9)
   # second call hits the cache (one cube_<key>.tif under the source dir)
   expect_length(list.files(file.path(cache, "sentinel-2-l2a"),
                            pattern = "^cube_.*\\.tif$"), 1)

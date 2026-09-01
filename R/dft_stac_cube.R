@@ -39,8 +39,14 @@
 #'   `dt` window (default `"median"`).
 #' @param resampling Character. Spatial resampling (default `"bilinear"`).
 #' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
-#'   polygon with `terra::mask()` (cells outside → `NA` on every layer), so
-#'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. Set
+#'   polygon with `terra::mask()`, so
+#'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. The
+#'   clip keeps every cell the polygon **touches** — `terra::mask()` defaults to
+#'   `touches = TRUE` — so it is inclusive at the boundary by up to one cell,
+#'   deliberately, so a thin corridor is not eroded. Cells the polygon does not
+#'   touch become `NA` on every layer. That is a *different* rule from a
+#'   cell-centre clip, and worth 15.5% of the analysed footprint on the packaged
+#'   AOI (#47), so it matters to anything reporting boundary hectares. Set
 #'   `FALSE` to keep the wider extent (e.g. for surrounding context, or to mask
 #'   later with a different polygon). This clips the *output* — with the default
 #'   `tile_size = NULL` the full bbox of COGs is still streamed either way, so
@@ -72,10 +78,33 @@
 #'   a `.tif` either way; a tiled read keys distinctly (see the caching note above),
 #'   so untiled caches are untouched and `tile_size = NULL` is byte-for-byte the
 #'   previous behavior. This is the continuous-path twin of [dft_stac_fetch()]'s
-#'   `tile_size` — the `filter_geom`-independent way to bound the read. Because the
+#'   `tile_size`. Benchmarked against the alternatives on the packaged AOI
+#'   (drift#47) it is the **slowest** option — 1263.6 s and 3213 range requests
+#'   against an untiled 236.8 s / 462, because every tile rebuilds the image
+#'   collection and reopens the COGs — so prefer `parallel` for speed and reach
+#'   for `tile_size` only when peak memory, not wall clock, is the constraint.
+#'   Because the
 #'   cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
 #'   cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
 #'   that is sub-pixel-offset from — not pixel-identical to — the untiled cube.
+#' @param parallel Integer, or `NULL` (default) to auto-detect as
+#'   `min(4, cores - 1)`, flooring to 1 where the core count is undetectable.
+#'   Number of gdalcubes worker processes used for the read. The COG stream is the
+#'   dominant cost and it parallelizes well: measured on the packaged AOI, a
+#'   4-month monthly kNDVI cube took 236.8 s at `parallel = 1`, 115.8 s at 4 and
+#'   96.0 s at 8 — and the output is **byte-identical** at every setting
+#'   (correlation 1.000, max absolute difference 0), so this is a pure cost knob
+#'   and does not enter the cache key. Capped at 4 by default rather than the
+#'   full core count because each worker holds chunks in memory; raise it on a
+#'   machine with headroom, or set `1` for the previous single-threaded
+#'   behaviour. Prior to v0.9.0 drift never called
+#'   [gdalcubes::gdalcubes_options()] at all, so every fetch ran single-threaded
+#'   (drift#47). gdalcubes also derives its default chunk size from this value,
+#'   so raising it makes chunks finer as a side effect — measured in isolation on
+#'   this AOI that is a *cost* (343.7 s / 693 requests at 128 px against 236.9 s
+#'   / 462 at the default), so the speedup is attributable to concurrency. When
+#'   `NULL` and a session-level [gdalcubes::gdalcubes_options()] `parallel` above
+#'   1 is already set, that value is honoured rather than overridden.
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
 #'   [dft_cache_path()].
 #' @param force Logical. Re-fetch even if cached, overwriting the cached raster
@@ -85,8 +114,9 @@
 #'
 #' @return A [terra::SpatRaster] index stack — one layer per time step, with a
 #'   time value per layer — cached as a GeoTIFF. By default (`clip = TRUE`) the
-#'   stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
-#'   `NA`), so the reduced raster from [dft_rast_break()] is already polygon-tight;
+#'   stack is clipped to the AOI polygon (cloud-masked; every cell the polygon
+#'   touches is kept, cells it does not touch are `NA` — see `clip`), so the
+#'   reduced raster from [dft_rast_break()] is already polygon-tight;
 #'   pass `clip = FALSE` for the full AOI **bounding box** (or, with `tile_size`
 #'   set, the AOI-intersecting tile union). For sources with a
 #'   reflectance-offset baseline boundary (Sentinel-2), items are split at the
@@ -126,10 +156,25 @@ dft_stac_cube <- function(aoi,
                           months = NULL,
                           mask_values = NULL,
                           tile_size = NULL,
+                          parallel = NULL,
                           cache_dir = NULL,
                           force = FALSE,
                           sign_fn = rstac::sign_planetary_computer()) {
   rlang::check_installed("gdalcubes", reason = "to fetch STAC cubes")
+
+  # gdalcubes worker processes for the read. drift never set this before v0.9.0,
+  # so every fetch ran single-threaded — not a considered choice, just the
+  # consequence of never calling gdalcubes_options(). Measured 2.05x at 4 and
+  # 2.47x at 8 on the packaged AOI, with byte-identical output at every setting
+  # (drift#47), so it is a pure cost knob and stays out of the cache key.
+  # The gain is CONCURRENCY, not the finer chunking it also causes: arms that
+  # isolate chunk size at parallel = 1 measured finer chunks 45% SLOWER.
+  # Restored on exit so the caller's gdalcubes session is untouched, matching
+  # the GDAL config handling below.
+  old_parallel <- gdalcubes::gdalcubes_options()$parallel
+  parallel <- cube_parallel_check(parallel, session = old_parallel)
+  gdalcubes::gdalcubes_options(parallel = parallel)
+  on.exit(gdalcubes::gdalcubes_options(parallel = old_parallel), add = TRUE)
 
   # GDAL cloud-read tuning for /vsicurl COG streaming (biggest win:
   # DISABLE_READDIR_ON_OPEN avoids a remote directory listing on every open).
@@ -219,6 +264,12 @@ dft_stac_cube <- function(aoi,
   if (!force && file.exists(cache_file)) {
     message("  cube: cached")
     r <- terra::rast(cache_file)
+    # Guard the READ path too, not only the write. A cube written by an earlier
+    # version could be all-NA — drift's end-to-end test passed on exactly that
+    # (#47) — and the cache key is unchanged, so upgrading does not invalidate
+    # it. Without this the empty cube is served silently and, under
+    # `force = FALSE`, permanently.
+    cube_check_nonempty(r, cfg$collection, datetime, cached = TRUE)
     terra::time(r) <- month_times(terra::nlyr(r))
     return(r)
   }
@@ -273,11 +324,20 @@ dft_stac_cube <- function(aoi,
 
   # Build the masked index cube for one item subset with one offset over a given
   # cube_view, materialize it, and read it back as a terra stack. The cube spans
-  # the view's extent: gdalcubes::filter_geom() to clip to the polygon yields an
-  # all-NA cube (and can crash the compute worker) on the pinned build, so we mask
-  # clouds here and clip the assembled stack to the AOI polygon afterward with
-  # terra::mask() (see stac_cube_clip, #32), as dft_stac_fetch() does — never
-  # filter_geom().
+  # the view's extent; the AOI clip happens on the output via terra::mask()
+  # (stac_cube_clip, #32), as dft_stac_fetch() does — not gdalcubes::filter_geom().
+  #
+  # That is now a MEASURED choice rather than a workaround (#47). The segfault
+  # was fixed in NewGraphEnvironment/gdalcubes@newgraph, so filter_geom is
+  # available; it is simply not worth using. It skips whole CHUNKS, and gdalcubes
+  # clamps a chunk edge to [64, 1024] px — coarse enough to skip nothing at the
+  # default, and fine enough to break alignment with the COGs' 512x512 blocks
+  # when forced down. Benchmarked on the packaged AOI: default chunking 462
+  # requests / 236.9 s against the bbox baseline's 462 / 236.8 s, and 64 px
+  # chunking 693 / 348.2 s — 1.5x the requests to save 26.7% of the ground.
+  # It also clips at CELL CENTRE where terra::mask() is touches = TRUE, so
+  # swapping them would silently shrink the analysed footprint by 15.5%.
+  # See data-raw/benchmark_filter_geom.R and inst/notes/gdalcubes-pc-gotchas.md.
   build_index_stack <- function(features, offset_use, v) {
     img_col <- gdalcubes::stac_image_collection(
       features, asset_names = c(band_assets, mask_asset)
@@ -343,12 +403,26 @@ dft_stac_cube <- function(aoi,
     stk <- mosaic_stacks(tile_stacks)
   }
 
-  # Restore the AOI-polygon clip removed in #30: mask the assembled stack (never
-  # gdalcubes::filter_geom, which segfaults on the pinned build). Out-of-polygon
-  # cells become NA on every layer, so dft_rast_break()/dft_rast_trend() skip them
-  # via their `rowSums(!is.na) >= min_obs` gate. `mask` preserves nlyr and time is
-  # set below, so the cached tif — and the cache-read path — need no other change.
+  # Restore the AOI-polygon clip removed in #30: mask the assembled stack. Cells
+  # the polygon does not touch become NA on every layer (terra::mask() defaults
+  # to touches = TRUE, so the boundary is inclusive by up to one cell), so
+  # dft_rast_break()/dft_rast_trend() skip them via their
+  # `rowSums(!is.na) >= min_obs` gate. `mask` preserves nlyr and time is set
+  # below, so the cached tif — and the cache-read path — need no other change.
   if (isTRUE(clip)) stk <- stac_cube_clip(stk, aoi_target)
+
+  # Post-condition before anything is cached: a cube with no data at all is the
+  # gdalcubes all-NA failure mode (#32/#47), and it is SILENT — nothing upstream
+  # raises, and a cached empty cube is then served for every later call with the
+  # same key. Cheap to check, and the only place it can be caught on the real
+  # network path rather than in a fixture.
+  #
+  # The whole stack, NOT layer 1: an individual layer being empty is DOCUMENTED
+  # behaviour, not a fault. `months` keeps the series regular by leaving months
+  # with no retained scenes as NA, so the packaged `months = 6:9` example has
+  # eight all-NA layers and January first. Checking layer 1 would abort the
+  # vignette's own call after the full COG stream.
+  cube_check_nonempty(stk, cfg$collection, datetime, cached = FALSE)
 
   terra::time(stk) <- month_times(terra::nlyr(stk))
   names(stk) <- rep(index, terra::nlyr(stk))
@@ -357,14 +431,126 @@ dft_stac_cube <- function(aoi,
 }
 
 
+#' Abort on a cube with no data anywhere
+#'
+#' The gdalcubes all-`NA` failure mode (#32/#47) is SILENT — nothing upstream
+#' raises. Applied on BOTH the write path and the cache-read path: a cube
+#' written by an earlier version can be all-`NA`, and the cache key is unchanged,
+#' so nothing would ever regenerate it under `force = FALSE`.
+#'
+#' Tests the whole stack, never a single layer: an individual layer being empty
+#' is documented `months` behaviour (months with no retained scenes stay `NA` so
+#' the series remains regular for bfast), so a per-layer test would abort the
+#' packaged `months = 6:9` example.
+#'
+#' `terra::global()` reduces chunk-wise, so this does not materialise the stack —
+#' the same reason `dft_rast_transition()` avoids `terra::values()` (#34).
+#' @noRd
+cube_check_nonempty <- function(stk, collection, datetime, cached) {
+  if (sum(terra::global(stk, "notNA")$notNA) > 0) return(invisible(stk))
+  cli::cli_abort(c(
+    "The {if (cached) 'cached' else 'assembled'} cube has no data on any layer.",
+    "i" = "Every cell is {.val NA} on all {terra::nlyr(stk)} layers. This is \\
+           either the gdalcubes all-{.val NA} failure mode, or the AOI does \\
+           not overlap {.val {collection}} for {.val {datetime}}.",
+    "i" = if (cached) {
+      "Delete the cached {.file .tif} under {.fn dft_cache_path}, or re-run with \\
+       {.code force = TRUE}, to rebuild it."
+    } else {
+      "Nothing was cached. Check the AOI, {.arg datetime} and {.arg months}."
+    }
+  ))
+}
+
+
+#' Resolve the gdalcubes worker count for a cube read
+#'
+#' `NULL` means auto: `min(4, cores - 1)`, capped at 4 rather than the full core
+#' count because each gdalcubes worker holds chunks in memory and drift has hit
+#' OOM on large AOIs before (#27, #34). Measured on the packaged AOI, 4 workers
+#' gave 2.05x and 8 gave 2.47x, so the last 20% costs double the memory.
+#'
+#' `parallel::detectCores()` returns `NA` when it cannot determine the count
+#' (documented behaviour, seen in some containers), so the auto path floors to 1
+#' rather than propagating `NA` into `gdalcubes_options()` — an auto default that
+#' errors on an unusual machine is worse than a slow one.
+#' @noRd
+cube_parallel_check <- function(parallel, session = 1L) {
+  if (is.null(parallel)) {
+    # A caller who ran gdalcubes_options(parallel = 8) meant it. gdalcubes ships
+    # 1, so anything above that is a deliberate choice and outranks our cap —
+    # otherwise the auto default silently halves throughput they asked for.
+    if (is.numeric(session) && length(session) == 1L && !is.na(session) &&
+          session > 1) {
+      return(as.integer(session))
+    }
+    cores <- parallel::detectCores()
+    return(if (is.na(cores)) 1L else max(1L, min(4L, as.integer(cores) - 1L)))
+  }
+  # Shape and missingness first, so a bare NA — which is LOGICAL in R, and would
+  # otherwise be reported as a flag — is named for what it is. Length is tested
+  # before is.na() so a length-2 input cannot reach `||` with a length-2 test.
+  if (length(parallel) != 1L || is.na(parallel)) {
+    cli::cli_abort(c(
+      "{.arg parallel} must be a single whole number >= 1, or {.code NULL} to auto-detect.",
+      "x" = "Got {.obj_type_friendly {parallel}}."
+    ))
+  }
+  # Reject logical explicitly. gdalcubes' own idiom elsewhere is `parallel =
+  # TRUE` meaning "use all cores", and as.integer(TRUE) is 1 — so coercing it
+  # would hand a caller who asked for every core the single-threaded path, the
+  # exact opposite of the request, silently.
+  if (is.logical(parallel)) {
+    cli::cli_abort(c(
+      "{.arg parallel} must be a number of worker processes, not a flag.",
+      "x" = "Got {.obj_type_friendly {parallel}}.",
+      "i" = "Use {.code NULL} to auto-detect, or an integer such as {.val {4L}}."
+    ))
+  }
+  # `is.finite` and the integer ceiling BEFORE as.integer(): `trunc(Inf) == Inf`
+  # and `Inf < 1` is FALSE, so Inf and anything >= 2^31 would clear a
+  # whole-number test and then coerce to NA_integer_ — turning a validator into
+  # a source of NA. That NA reaches gdalcubes_options() and dies as
+  # "parallel >= 1 is not TRUE", naming neither this argument nor the caller.
+  if (!is.numeric(parallel) || !is.finite(parallel) ||
+        parallel < 1 || parallel > .Machine$integer.max ||
+        parallel != trunc(parallel)) {
+    cli::cli_abort(c(
+      "{.arg parallel} must be a single whole number >= 1, or {.code NULL} to auto-detect.",
+      "x" = "Got {.obj_type_friendly {parallel}}."
+    ))
+  }
+  n <- as.integer(parallel)
+  cores <- parallel::detectCores()
+  # oversubscribing is legitimate on a network-bound read, so warn rather than
+  # cap — but a typo'd 1e6 would fork the machine into the ground
+  if (!is.na(cores) && n > 4L * cores) {
+    cli::cli_warn(c(
+      "{.arg parallel} = {n} is more than 4x the {cores} detected core{?s}.",
+      "i" = "Each gdalcubes worker holds chunks in memory."
+    ))
+  }
+  n
+}
+
+
 #' Clip an index stack to the AOI polygon (client-side terra mask)
 #'
-#' Restores AOI-polygon-tight output without `gdalcubes::filter_geom()`, which
-#' segfaults / returns an all-NA cube on the pinned build (see
-#' `inst/notes/gdalcubes-pc-gotchas.md`, drift#32). Cells whose centre falls
-#' outside the polygon become `NA` on every layer, so [dft_rast_break()] /
-#' [dft_rast_trend()] skip them via their `rowSums(!is.na) >= min_obs` gate. A
-#' multi-feature `aoi` masks to the union. Mirrors the post-read mask in
+#' Restores AOI-polygon-tight output without `gdalcubes::filter_geom()` (see
+#' `inst/notes/gdalcubes-pc-gotchas.md`, drift#32 and drift#47).
+#'
+#' Every cell the polygon **touches** is kept: `terra::mask()` defaults to
+#' `touches = TRUE`, so the clip is inclusive at the boundary by up to one cell
+#' — deliberately, so a thin corridor is not eroded. Cells the polygon does not
+#' touch at all become `NA` on every layer, so [dft_rast_break()] /
+#' [dft_rast_trend()] skip them via their `rowSums(!is.na) >= min_obs` gate.
+#'
+#' This is a *different* rule from `gdalcubes::filter_geom()`, which rasterizes
+#' at cell centre and so returns a strictly smaller footprint — measured at
+#' **−15.5%** on the packaged AOI (drift#47). Anything reasoning about boundary
+#' hectares needs to know which rule produced the number.
+#'
+#' A multi-feature `aoi` masks to the union. Mirrors the post-read mask in
 #' [dft_stac_fetch()]; `aoi` is already in the stack's CRS.
 #' @noRd
 stac_cube_clip <- function(stk, aoi) {

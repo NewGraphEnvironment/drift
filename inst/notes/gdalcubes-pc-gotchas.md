@@ -1,13 +1,47 @@
 # gdalcubes + Planetary Computer Sentinel-2 gotchas
 
-Non-obvious gdalcubes 0.7.3 + Microsoft Planetary Computer Sentinel-2 gotchas hit
-building `dft_stac_cube()` / `dft_rast_break()` / `dft_rast_trend()` (#30). All
-verified by running code on gdalcubes 0.7.3 / rstac 1.0.1 / terra 1.9.11 /
-bfast 1.7.2.
+Non-obvious gdalcubes + Microsoft Planetary Computer Sentinel-2 gotchas hit
+building `dft_stac_cube()` / `dft_rast_break()` / `dft_rast_trend()`.
 
-- **`gdalcubes::filter_geom()` segfaults / returns an all-NA cube** on this build
-  (crashes `gc_exec_worker`, `address 0x120`). Do NOT clip to an AOI polygon
-  inside the cube pipeline. Use the AOI bbox in `cube_view(extent=)` and
+Provenance, because it is now mixed: the #30-era bullets were verified on
+**gdalcubes 0.7.3** / rstac 1.0.1 / terra 1.9.11 / bfast 1.7.2. The `filter_geom`,
+`parallel` and `tile_size` measurements (#47, 2026-09-01) were taken on
+**gdalcubes 0.7.4** — specifically `NewGraphEnvironment/gdalcubes@newgraph`
+(`8bad203`), which is 0.7.4 plus the `filter_geom` segfault fix — with terra
+1.9.34. Each bullet says which.
+
+- **`gdalcubes::filter_geom()` is not worth using — now for measured reasons, not
+  because it crashes (#47).** The original defect was a segfault in the compute
+  worker (`gc_exec_worker`, `address 0x120`) or, intermittently, a silent all-NA
+  cube; that is genuinely fixed in `NewGraphEnvironment/gdalcubes@newgraph`
+  (`8bad203`), which clears the upstream reproducer in `appelmar/gdalcubes#110`.
+  Do NOT reach for it anyway. Three findings, all measured on the
+  packaged AOI with `CPL_CURL_VERBOSE` request counts
+  (`data-raw/benchmark_filter_geom.R`, `data-raw/logs/benchmark_filter_geom/`):
+  - **It skips whole CHUNKS, not pixels**, and `gdalcubes:::.default_chunk_size()`
+    targets `2 * parallel` spatial chunks with the edge clamped to `[64, 1024]`
+    px. At `parallel = 1` that is a **2x2 grid** on a 3.3 km reach, which a
+    corridor intersects entirely — so at the default it skips **nothing**:
+    462 requests / 236.9 s against the bbox baseline's 462 / 236.8 s.
+  - **Forcing chunking finer costs more than it saves.** Sentinel-2 L2A COGs are
+    `Block=512x512`; a 64 px chunk sits inside one source block, so the same
+    bytes are refetched per chunk. 64 px and 128 px chunking both measured
+    **693 requests / ~345 s — 1.5x the requests and ~47% slower** — while
+    skipping 26.7% and 11.1% of the ground respectively (predicted by
+    `data-raw/benchmark_filter_geom_chunkskip.R`; the gap between that prediction
+    and the wire is the whole finding — more skipping, more cost). The AOI/bbox area ratio (0.102) is the wrong bound: the read
+    is chunk-granular and the cost is COG-block-granular.
+  - **It clips at CELL CENTRE where `terra::mask()` is `touches = TRUE`.**
+    Swapping them shrinks the analysed footprint by **15.5%** (49,244 -> 41,608
+    non-NA cells). Values agree exactly where both have data (correlation 1.000,
+    max abs diff 0) — it is the footprint that moves, silently. Any future
+    adoption must hand `filter_geom` a polygon buffered by `>= res*sqrt(2)/2`
+    and KEEP the `terra::mask()`, so the footprint does not move.
+  - Upstream `appelmar/gdalcubes#110` is open and the fix PR #111 unmerged, so
+    CRAN 0.7.4 still segfaults — and reports the **same version string** as the
+    fork, so no version check can tell them apart.
+
+  Use the AOI bbox in `cube_view(extent=)` and
   `terra::mask()` afterward, as `dft_stac_fetch()` does. **Resolved (#32):**
   `dft_stac_cube(clip = TRUE)` (the default) masks the assembled terra stack to
   the AOI polygon client-side (helper `stac_cube_clip()` = `terra::mask(stk,
@@ -78,6 +112,37 @@ bfast 1.7.2.
   speed/quality win is fetching fewer better months (growing-season `months`
   filter). A 100-ha reach, 4 yr monthly = ~25-30 min fetch (COG-stream bound);
   the bfast reduce is seconds.
+- **`gdalcubes_options(parallel =)` is the biggest single lever, and drift did
+  not set it at all before v0.9.0 (#47).** Every cube read therefore ran
+  single-threaded — not a considered choice, just the consequence of never
+  calling `gdalcubes_options()`. gdalcubes also *derives the chunk size from*
+  `parallel` (`gdalcubes:::.default_chunk_size()`), so raising it makes chunks
+  finer as a side effect — but that is **not** where the win comes from. Arms
+  isolating chunk size at `parallel = 1` measured finer chunks **45% slower and
+  50% more requests** (343.7 s / 693 requests at 128 px against 236.9 s / 462 at
+  the default), so the speedup below is concurrency alone. Measured on the
+  packaged AOI, 4-month monthly kNDVI cube:
+
+  | setting | wall clock | vs default | output |
+  |---|---|---|---|
+  | `parallel = 1` (the old behaviour) | 236.8 s | 1.00x | baseline |
+  | `parallel = 4` | 115.8 s | **0.49x** | byte-identical |
+  | `parallel = 8` | 96.0 s | **0.41x** | byte-identical |
+
+  Byte-identical means it: correlation 1.000, max absolute difference 0, same
+  grid, same 49,244 non-NA cells. So it is a pure cost knob and deliberately
+  does **not** enter the cache key. `dft_stac_cube(parallel =)` now defaults to
+  `min(4, cores - 1)` — capped rather than uncapped because each worker holds
+  chunks in memory and drift has hit OOM on large AOIs before (#27, #34).
+  Request *counts* go UP (462 -> 1134 at 4 workers, 1386 at 8) while wall clock
+  falls, so counting requests alone would score this exactly backwards — the
+  concurrency, not the byte volume, is the win.
+- **`tile_size` is the slowest option, not the fastest (#47).** Measured at 640 m
+  on the packaged AOI: **1263.6 s and 3213 requests** against an untiled
+  236.8 s / 462 — 5.3x slower — because every tile rebuilds the
+  `stac_image_collection` and reopens the COGs. It also lands sub-pixel-offset
+  (correlation 0.996, max abs diff 0.254, recall 95.8%). Reach for it only when
+  peak memory rather than wall clock is the binding constraint.
 
 See `planning/archive/2026-07-issue-30-index-trajectory/findings.md` and
 `planning/archive/2026-07-issue-30-vignette-qa-map/findings.md` for the full

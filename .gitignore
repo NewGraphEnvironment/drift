@@ -13,3 +13,9 @@ data-raw/.break_cache/
 
 # terra sidecars regenerated when tests/benchmarks read inst/extdata rasters
 inst/extdata/*.aux.xml
+
+# bulky benchmark artifacts (data-raw/benchmark_filter_geom.R); summary.csv is
+# committed as the evidence record, the raw curl logs and rasters are not
+data-raw/logs/**/*.log
+data-raw/logs/**/*.tif
+data-raw/logs/**/*.rds
