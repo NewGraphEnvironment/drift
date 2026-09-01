@@ -1549,12 +1549,65 @@ the premise fail.** A count threshold is the usual offender — 206 clears
   decide what to keep by looking at the first argument?* Same shape in any
   language where a variadic builder dispatches on an argument's type.
 
+### terra: `mask()` is `touches = TRUE`, so two "clip to the polygon" routines disagree by a cell ring
+
+Swapping one polygon clip for another looks like a refactor and is a **methodology
+change**. `terra::mask()` defaults to `touches = TRUE` — every cell the polygon
+touches is kept — while most other clips rasterize at **cell centre**:
+`terra::rasterize()` without `touches`, `gdalcubes::filter_geom()`, and
+`gdal_rasterize` without `-at`. Nothing errors, nothing warns, and the values
+agree exactly where both have data. Only the *footprint* moves.
+
+```r
+mask(r, v)                  # 150 cells   <- the default
+mask(r, v, touches = FALSE) # 122 cells
+# true polygon area: 123.4 cells
+```
+
+The magnitude is a perimeter-to-area ratio, so it is worst exactly where these
+clips get used — thin corridors, floodplains, riparian buffers. Measured
+2026-09-01 in drift#47 on a 3.3 km reach: **−15.5%** of the analysed footprint
+(49,244 → 41,608 cells) from a change whose entire stated purpose was to remove a
+redundant step. Against a parity tolerance of ±1 ha on 943 ha, that is 30–150×.
+
+- **Do not describe a clip without naming its rule.** drift's roxygen said "cells
+  whose centre falls outside become `NA`" for a `terra::mask()` call, and was
+  wrong for two releases. Anyone reasoning about boundary hectares from that doc
+  was off by a ring.
+- **An axis-aligned fixture cannot catch this.** A rectangle on a cell boundary
+  makes both rules agree, so the test passes for nothing. Use a polygon with
+  fractional coordinates and no edge parallel to the grid, and assert the premise
+  beside the property — `expect_gt(touch, centre)` — so a future terra default
+  change fails by naming the real cause.
+- **To swap in a cell-centre clip without moving the footprint**, buffer the
+  polygon by `>= res * sqrt(2)/2` first: if a polygon intersects a cell square,
+  that cell's centre is within a half-diagonal of it, so the buffered
+  cell-centre footprint is a guaranteed superset of `touches = TRUE`. Then keep
+  the `mask()` to trim back, and the output is byte-identical.
+
+Generalises past terra: whenever two libraries both offer "clip raster to
+polygon", assume they disagree at the boundary until measured. Count the cells.
+
 ### sf: `st_join(largest = TRUE)` ignores the join predicate
 - `sf::st_join(x, y, join = predicate, largest = TRUE)` does **not** use `predicate` to decide matches — with `largest = TRUE`, sf runs `st_intersection(x, y)` and keeps the feature of greatest overlap area, so matching is *always* intersection-based regardless of what `join =` is set to. A function that exposes a configurable predicate AND a largest-overlap mode therefore silently mis-attributes when both are combined: pass `st_within` expecting containment, get anything that merely *overlaps*. Verify against sf source, not the argument list — the `join` arg is accepted and ignored, not rejected. Fix: abort when a non-default predicate is combined with the largest-overlap mode, rather than honouring one and dropping the other. (drift#42)
 - Corollary: `largest = TRUE` also drops zero-area geometries from consideration — so a predicate join against **point** or **line** overlays cannot use largest mode at all (no area to compare). Point/line attribution must go through the plain (`largest = FALSE`) predicate path.
 
 ### sf: name validation must account for the geometry column
 - The active geometry column is a named entry in `names(x)`, but its name is **not fixed** — `"geometry"` from `sf::st_read()` of some sources, `"geom"` from a GeoPackage/PostGIS layer, `"geometry"` or `"_ogr_geometry_"` elsewhere. Code that validates user-supplied column names with `cols %in% names(x)` will happily accept the geometry column, then break downstream (`st_join` drops `y`'s geometry, so a requested "attribute" column silently never appears; a 0-row short-circuit path may instead attach a stray empty sfc). A same-name collision check across two sf objects also misses this when the two layers name their geometry differently. Guard explicitly with `attr(x, "sf_column")` — reject it from the caller-supplied column set. (drift#42)
+
+### sf: `st_intersection()` / `st_difference()` return a GEOMETRYCOLLECTION that QGIS will not draw
+- Intersecting or differencing two polygon layers yields a `GEOMETRYCOLLECTION` wherever the inputs *also* touch along a line or at a point. The polygonal part is real and `st_area()` reports it correctly, so every numeric check passes — but QGIS renders the feature as nothing, and it reads to the user as "one row with no geometry".
+- The failure is silent in exactly the wrong direction: written to a GeoPackage the layer reports its `geometry_type` as `Geometry Collection` and its area as correct. Nothing errors. It surfaces only when someone opens it.
+- Whether it fires depends on the geometry, not the code, so the same call can be clean on one input and a collection on the next. Do not conclude from one working case that a path is safe.
+- Fix: `sf::st_collection_extract(g, "POLYGON")` then cast to a single type before writing. Areas are unchanged — the discarded fragments have zero area.
+- **Assert it on anything you hand over**, not just the layer you expect to be interesting: no `GEOMETRYCOLLECTION` in `st_geometry_type()`, and `sum(st_is_empty())` is 0, across *every* layer in the file. Caught 2026-08-31 in floodplains only because the user opened the deliverable and asked why a layer looked empty.
+
+### A per-tenant key looks global whenever your test data has one tenant
+- `code-check-infra.md` records this for database joins (link's `id_segment`, unique per watershed group, cartesian against a multi-tenant table). The same mechanism appears well outside Postgres — in vector attribute tables, exported layers, and anything numbered per group during generation — and the reason it survives review is always the same: **the data that would expose it is the data nobody tested on.**
+- If N-1 of your areas have exactly one tenant, a per-tenant key is *observably* unique in all of them. Verifying uniqueness on one of those and generalising is not carelessness; it is a correct observation about an unrepresentative sample.
+- Caught 2026-08-31 in floodplains: `patch_id` is numbered within each sub-basin. Every whole-watershed-group area has one sub-basin, so `patch_id` was globally unique in all five that had been run. The only subset area (13 sub-basins) had 2032 rows and 1973 distinct ids. Grouping on it alone mis-apportioned by 6%.
+- **The tell is a contradictory pass.** That run reported "weights sum to 1 per patch" and "0 unbridged patches" *and* a 6% shortfall — three results that cannot all be true. A reconciliation check that disagrees with its own component checks is pointing at a key, not at arithmetic.
+- Before keying on an id you did not generate, ask what it is unique *within*, and prefer the composite (`(patch_id, name_basin)`) even where the current data makes the extra column redundant.
 
 ### sf: reproject the polygon to get a lat/lon bbox, never transform the projected bbox corners
 - To hand a geographic (EPSG:4326) bounding box to a bbox-filtered query (WFS/OGC features, `?bbox=`), reproject the whole AOI **geometry** then take its bbox: `sf::st_bbox(sf::st_transform(aoi, 4326))`. Do **not** compute the bbox in the projected CRS and transform its two corner points — a projected rectangle's edges bow under reprojection, so the corner-transformed box is skewed and generally too short on one axis. The pre-filter then silently under-covers the true extent: features inside the AOI but outside the shrunken box are never fetched, and a downstream clip can only *remove*, never recover them. Symptom: counts a few percent low near the north/south extremes of an area, with no error. A native-CRS bbox filter (e.g. ogr2ogr `-spat <bounds> -spat_srs EPSG:3005`) is unaffected — only the reproject-the-corners step is the bug. (rfp#12)
@@ -1581,6 +1634,44 @@ the premise fail.** A count threshold is the usual offender — 206 clears
 ### An offset regex must be anchored to a time, or a date looks like a zone
 - Refusing or stripping a trailing UTC offset with something like `[+-][0-9]{2}(:?[0-9]{2})?$` also matches the end of a plain ISO date: `"2026-08-15"` ends in `-15`, which reads as a −15 hour zone. Require the offset to follow `HH:MM[:SS[.fff]]`.
 - The mirror mistake is requiring four offset digits. `±hh` is valid ISO 8601 and is what Postgres emits for whole-hour zones; a two-digit-offset value then falls through the guard, gets stripped as trailing junk, and the instant moves by hours with nothing reported.
+
+### A reader that accepts a UTC offset may not be applying it
+
+- The rule above is about parsing an offset correctly. This is the case where the
+  parse never happens: the value is accepted, no error is raised, and the offset is
+  **silently discarded**. GDAL does this with a GeoPackage `DATETIME` — it returns
+  the wall-clock digits, which the caller then reads in the machine's zone.
+- So the same file yields a different instant on every machine. Measured 2026-09-01
+  on `trap`, writing one value and reading it back under three zones:
+
+  ```
+  stored                      TZ=America/Vancouver   TZ=UTC       TZ=Asia/Tokyo
+  2026-07-21T14:04:28Z        14:04:28Z              14:04:28Z    14:04:28Z
+  2026-07-21T14:04:28-07      21:04:28Z              14:04:28Z    05:04:28Z
+  2026-07-21T14:04:28+05:30   21:04:28Z              14:04:28Z    05:04:28Z
+  ```
+
+  **The tell is that the two offsets give identical answers.** Only the `Z` row is a
+  fact about the file; the other two are facts about the reader.
+- **The test that let it through asserted `-07` on a `-07` machine**, where a
+  wholly-ignored offset and a correctly-applied one produce the same number. The
+  coincidence was written into the fixture by choosing an offset equal to the local
+  one, so no amount of running it locally could have found it — CI on a UTC runner
+  did. Same family as "a fixture set that cannot reach the failure mode", with the
+  blind spot supplied by the machine rather than by the data.
+- Two things follow, and the second is the general one:
+  - **Refuse what you cannot read.** Where every real value carries `Z`, accepting an
+    offset buys nothing and costs a silent multi-hour error. Refusing it with its own
+    message — a missing zone and an untrusted zone are different failures — is
+    strictly better than honouring a parse you have not verified.
+  - **Test a timezone-sensitive property in more than one zone**, and make one of them
+    differ from the developer's. `withr::with_timezone()` costs nothing. The property
+    worth asserting is *the instant is the same in every zone*, which a single-zone
+    test structurally cannot check.
+- Generalises past GDAL to anything that returns a naive local timestamp from a
+  zone-bearing source: some JDBC drivers, `datetime.fromisoformat` before 3.11 on
+  certain shapes, spreadsheet readers. If a library hands back a value with no zone
+  attached, assume the zone was dropped rather than applied, and prove otherwise.
 
 ### `paste0()` treats a zero-length argument as `""`
 - `paste0(character(0), "x")` returns `"x"` — length **one**, not zero. So a composite key built from an empty data frame yields one phantom row rather than none:
@@ -2967,6 +3058,256 @@ Two checks worth making once you have one:
 - **No arm labelled FAIL may exit 0.** Sweep every single-fault state and check the
   label against the exit status; a reported-but-unenforced FAIL trains people to
   ignore the word. Where a condition is deliberately advisory, label it NOTE.
+
+### When a system both records and renders, the rendered copy drifts into fiction
+
+A pipeline that writes a durable record (a log table, a manifest) often also
+renders a human-readable summary beside its output — a `.stamp.md`, a README, a
+report header. Consumers reach for the **rendered** one, because it is a file
+sitting next to the artifact rather than a query against a database they may not
+have. So that is the copy that gets published, and the copy nobody checks.
+
+Measured 2026-09-01 across `link` and `floodplains`. Same runs, two artifacts:
+
+```
+fresh.log            UTRE 1.04 min   UTRE 1.67 min   FRAN 3.33 min   UFRA 4.12 min
+aquatic_network.stamp.md   "Started: 22:42:31  Ended: 22:42:31 (0.0s elapsed)"
+```
+
+The sidecar was constructed by calling the open and the close on **one line**, so
+the interval it reports is the cost of building the stamp object — not the work.
+A 0.0s network build for a 4,877-segment watershed group is not plausible, and
+the file states it as fact. It was a candidate field for publication into a STAC
+catalogue, where a consumer would have had no way to tell a wrong duration from a
+right one.
+
+Two rules, and the second is the one that saves the time:
+
+- **Prefer the record over the rendering** when both exist. The record is written
+  by the code doing the work, at the moment it does it; the rendering is assembled
+  afterwards by code that has to be *told* what happened. Only one of those can be
+  wrong about its own subject.
+- **A duration whose start and end are set in the same expression is not a
+  measurement.** Grep for it: `finish(start(...))`, `stamp <- close(open(x))`, any
+  construction where the two calls cannot have work between them. It reads as
+  bookkeeping and produces a number with a unit.
+
+The wider tell: **a rendered artifact that nothing consumes programmatically has
+nothing keeping it honest.** Tests assert on the record; the sidecar is prose.
+When a downstream repo then starts publishing the sidecar, it inherits every
+drift that accumulated while nobody was reading it — which is exactly when it
+becomes load-bearing.
+
+Same family as *"Measure the output, not the input you handed in"* above, one
+level out: there the probe reads back its own input, here the artifact reports a
+quantity it never observed.
+
+### A serializer's default for "no value" is rarely a null, and every wrong answer is silent
+
+Publishing an explicit null — "we looked and there was not one", as distinct from "not
+implemented" — depends on the serializer actually emitting one. Library defaults usually
+do not, and each wrong answer is a *valid* value that passes every downstream schema
+check.
+
+Three measured in one afternoon (stac_floodplains_bc#17), two of them live in the first
+draft:
+
+| producer | default behaviour | fix |
+|---|---|---|
+| `jsonlite::toJSON` / `write_json` | `NA_real_` serialises as the **string** `"NA"` | `na = "null"` |
+| `jsonlite::toJSON` / `write_json` | an R `NULL` serialises as `{}` | `null = "null"` |
+| GDAL metadata | no null exists; `str(None)` writes the literal `'None'` | see below |
+
+The `{}` one is the nastiest: it survives a JSON round trip, and on the Python side it
+passes `is not None`, so a consumer's own guard waves it through. `NA` (logical) and
+`NA_character_` happen to emit `null` under the defaults while `NA_real_` does not — so
+a probe that tests only one NA type reports the library as fine.
+
+Two habits:
+
+- **Set both arguments and say why at the call site.** They are independent: `na` governs
+  `NA`, `null` governs `NULL`, and the two failure modes are different. Check they are
+  byte-inert on the existing fields, which makes the change safe as well as necessary.
+- **Never build the record with `[[<-` or `modifyList`.** Both **drop** a `NULL` member,
+  turning an intended null into an absent key — the one outcome "publish the null"
+  exists to prevent. `list(...)` and `c()` keep it.
+
+For a string-only metadata store (GDAL tags, EXIF, HTTP headers) there is no null at all,
+so pick the encoding by measuring what the store does with each candidate rather than by
+choosing the one that reads best. Measured for GDAL: the **empty string** is treated as
+absence on write *and* deletes an existing key, which makes it both the encoding and the
+clearing mechanism — the latter mattering because `update_tags()` merges rather than
+replaces, so a stale tag otherwise survives a rewrite. `'None'`, `'NA'` and `'null'` all
+round-trip as ordinary strings a consumer cannot tell from a real value.
+
+**And check what the key namespace does to your names.** A colon in a GDAL tag key is a
+namespace separator: `update_tags(**{"NGE:LINK_RUN_UID": "abc"})` round-trips as key
+`NGE` with value `LINK_RUN_UID=abc`. Eleven prefixed fields collapse into one tag holding
+whichever was written last — uniform, silent, on every file.
+
+### A rename emits two signals, and reading only one cannot distinguish it from absence
+
+When code reads a document produced by something else — an upstream JSON contract, a
+config, an API response — a renamed or removed key produces **two** observable facts: an
+expected key is missing, and an unrecognised sibling is present. The first is ambiguous
+with a legitimate absence. The second never is.
+
+Guards are almost always written against the first, because that is the one the reading
+code naturally trips over. So an upstream rename degrades to whatever "absent" means —
+usually a published null or a default — and stays invisible for as long as nobody
+compares the output against the producer's own file.
+
+**The ambiguity is not uniform: it depends on whether the key has a parent whose presence
+is itself evidence.** At depth ≥ 2 a missing leaf inside a *present* section is already
+unambiguous, because the section being there proves the producer wrote this block. At the
+document root, and anywhere the key space is open, there is no such witness.
+
+That is what makes this recur rather than resolve. Fixing the leaf leaves the section;
+fixing the section leaves the root. Measured 2026-09-01 in stac_floodplains_bc#17 — three
+review rounds, the same defect at three depths, each found inside the previous round's
+fix:
+
+| depth | what was renamed | before | after |
+|---|---|---|---|
+| leaf | `link_log` key absent/renamed | 3 fields published null | stop |
+| section | `inputs` → `inputs_v2` | 4 fields published null | stop |
+| root | `floodplain` → `floodplain_v2` | 1 field published null | stop |
+
+Two closures, and they are not interchangeable:
+
+- **Where the key set is closed, reject unknown keys.** One `setdiff(names(got), known)`
+  at the document root closes that whole axis, and it is the only guard that reads the
+  second signal.
+- **Where the keys are DATA, pin their shape instead.** A map keyed by scenario id cannot
+  use unknown-key rejection — any string is a possible key — so assert the documented
+  form (`^[a-z]{2}_ff[0-9]{2}$`). Re-keying `ch_ff04` to `ff04` otherwise nulls every
+  field on every item at once, which is precisely the uniform loss a cross-item check
+  cannot see.
+
+**Version pins do not substitute.** A `schema_version` field fires only when the producer
+*bumps* it, and a rename shipped without a bump is the realistic case for anything still
+in flight.
+
+**One direction is worse than a null and belongs in the same sweep.** A scalar check
+written as `length(x) != 1` is a proxy that a single-key object satisfies: a leaf becoming
+`{"algorithm": "sha256"}` published `"sha256"` as the value. Every other failure here
+produces an absence a reader can see; this one produces something that looks like a real
+answer and is counted as present. Reject a list outright rather than testing its length.
+
+### Making an optional field mandatory breaks every producer that legitimately left it empty
+
+The rule above is about a *bypass* whose stated reason expires. This is the mirror,
+and it reaches further: tightening an assertion on a field — NULL becomes a failure,
+a warning becomes an error, a tolerance is removed — is a change to every path that
+**writes** that field, and those paths are usually not in the diff.
+
+The tell is a one-line change to a check accompanied by no change to a producer. Ask
+directly: *what are all the ways this field gets populated, and does each one still
+satisfy the new rule?* Enumerate them by grep, not by memory — the one that bites is
+always the path nobody thinks of as a producer, because it is an install script, a
+migration, a manual runbook step, or a fallback branch.
+
+Measured 2026-09-01 in link#264. A resolver was fixed so a package's commit SHA
+became recordable, and the verifier was tightened to require it on every host. Four
+producers existed. Three were fine. The fourth was `scripts/update_hosts.sh`, which
+installs with `R CMD INSTALL` of a source tarball — deliberately, to route around
+r-lib/pak#658 — and that writes **no `Remote*` fields at all**. So the repo's own
+maintenance script silently produced hosts that the new assertion would reject, and
+the rejection landed *after* cloud instances had been paid for, because the check ran
+post-provision. Found by review, not by any test: every test passed, because the
+tests exercised the resolver rather than the install paths feeding it.
+
+Three habits, and the second is the one that keeps being skipped:
+
+- **Grep for the producers before tightening the consumer.** Anything that writes the
+  field, sets the env var it reads, or installs the artifact it describes.
+- **Move the check as early as the fact is knowable.** A gate that fires after spend
+  is a report, not a gate. The same assertion five seconds in costs nothing and the
+  failure becomes free.
+- **Say what happens to existing records.** Historical rows written under the old rule
+  will now fail, and that is usually correct — but it has to be stated, or the first
+  person to run the check against last month's data reports it as a regression.
+
+Related and distinct: *"A fix to code that writes data is not done until the written
+data is reconciled"* covers the records already on disk. This one covers the *writers*
+still running.
+
+### Teaching a build or install step to record provenance is a change to a safety-critical path
+
+The remedy above — make the producer record what it produced — is correct and is
+where the next three defects come from. Provenance a build step writes is trusted
+absolutely by everything downstream, so a wrong value there is worse than the missing
+value it replaced: absence fails loudly, and a confident wrong SHA satisfies every
+guard built to catch exactly it.
+
+Three failures, all measured 2026-09-01 in the same ~40-line change, each individually
+invisible:
+
+- **The record outlived the thing recorded.** `R CMD INSTALL ... | tail -3` reports
+  *tail's* status, and `set -e` does not cross a pipeline, so a failed install exited
+  0 and the pin was written for a build that never happened. Quieter still when an
+  older version is present: the version probe succeeds and nothing looks wrong.
+  Gate the write on the build's own exit status — tempfile plus an explicit check —
+  so the record is unreachable unless the work returned 0.
+- **The pin was applied to something that had its own identity.** Writing an env
+  override for a package that is run from a checkout beat the checkout's git state,
+  which would have pinned a dirty-tree flag to a permanent `false`. A flag stuck
+  always-TRUE gets noticed and filed; **stuck always-FALSE is the direction nobody
+  can notice.** Pin only what has no other identity available.
+- **Nothing expires it.** An env pin written once wins forever, so a later install by
+  another route leaves the stale value winning — and the guard reading that variable
+  is now reading the thing it is meant to be checking. Cross-check the pin against an
+  independent source wherever one exists, and fail naming both values.
+
+Also: resolve the identifier **once** for the whole operation, not per target. Six API
+calls across a five-minute run put targets on different commits if someone pushes
+mid-run, which is precisely the disagreement the provenance was added to detect.
+
+The meta-lesson is worth more than any of the three. All of them arrived in the *fix*
+for a defect found in review, and the following round found all five of its findings
+inside that one fix. **Review the fixes at least as hard as the original**, and when a
+fix expands scope into a new file, treat that file as unreviewed code rather than as
+an extension of the change you already checked.
+
+### A claim flagged as under-evidenced gets repaired by widening, and widening is what breaks
+
+The two rules above are about a claim's scope when it is *written*. This is about what
+happens to that scope when it is **repaired**, and it is the more expensive failure
+because it recurs inside its own fix.
+
+Told that a claim is not supported, the natural repair is to widen the stated
+evidential base — "on every run", "from either layer", "across the figures here",
+"which run from X to Y" — rather than to narrow the claim. Widening requires a
+population. The population gets asserted, from recall of an adjacent document, and the
+next round finds it does not hold.
+
+**Tell: the fix adds a quantifier the previous version did not have.** For each one,
+name the population, and say whether it is enumerable from the artifact in front of you.
+If it is not, you have replaced an under-evidenced claim with an unfalsifiable one.
+
+Measured 2026-09-01 in flooded#52 — a four-paragraph prose diff to a shipped reference
+memo took **six review rounds, 36 findings, 14 of them bugs**. Every round's finding was
+about a *number*; every round's fix was correct about the number and introduced a new
+quantifier. Across rounds 4–6, **every widening broke or was under-justified; every
+narrowing held** — including one round-5 fix that correctly narrowed a licence and, in
+the same sentence, asserted a fresh absolute ("do not move with the fix at all") that
+measurement then falsified.
+
+Root cause is worth naming because it predicts where this happens: the artifact's
+figures sat on a ragged dataset × resolution × lineage × clipped/raw grid that no
+dataset filled, so "across the figures here" quantified over holes as much as cells. Any
+document whose values come from several partial runs has this shape.
+
+**Terminate it by enumeration, not by another round.** The candidate set is closed — it
+is every quantifier in the passage — so sweep them mechanically and work each one.
+What ended it here was reproducing the old behaviour exactly on current code (the defect
+was a constant factor on one term, so setting that term to `4 × 3.5926` returned the
+historical cell count to the digit) and measuring every row of the consumer's own table,
+which turned an asserted population into a finite measured one.
+
+Then state the residual precisely. "The channel-buffer half of this clause is vacuous,
+because the consumer publishes no channel-buffer-derived row" is definitional and ends
+the sweep. A residual you can only call unlikely means there is another instance.
 
 
 # NGE Feature Workflow
