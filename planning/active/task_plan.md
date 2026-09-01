@@ -29,84 +29,78 @@ The issue's central number is therefore not established, and this plan leads wit
 installable from CRAN); scope is **`dft_stac_cube()` only** — `dft_stac_fetch()` keeps `tile_size` and its
 post-read mask, with a follow-up issue carrying the measured numbers.
 
-## Phase 1: Measure before changing any API
+## Phase 1: Measure before changing any API — **COMPLETE, gate says stop**
 
-New `data-raw/benchmark_filter_geom.R` (matches the existing `data-raw/benchmark_transition_oom.R`
-family). No package API changes in this phase.
+`data-raw/benchmark_filter_geom.R` + `..._compare.R`. Evidence:
+`data-raw/logs/benchmark_filter_geom/summary.csv`.
 
-- [x] Reproduce `appelmar/gdalcubes#110`'s offline repro on the installed fork; confirm it succeeds **and**
-      that the broken mode is distinguishable by values (non-NA inside, NA outside)
-- [x] Establish the extent padding needed so `aoi_target` is strictly interior to drift's `bbox_ext`
-      (`R/dft_stac_cube.R:329-332`) — find the minimum that avoids the `within` throw, in pixels of `res`
-- [ ] Benchmark arms on the packaged Neexdzii AOI **and** one large real floodplain AOI (magnitude is
-      dataset-specific; the fixture is not the case anyone cares about):
-      **A** today's untiled bbox + `terra::mask` · **B** `filter_geom` at default chunking ·
-      **C** `filter_geom` at `chunking = c(1, 64, 64)` and `c(1, 128, 128)` · **D** existing `tile_size`
-      at comparable granularity (640 m, 1280 m)
-- [ ] Cost must be **observed, not inferred from chunk arithmetic**: count `/vsicurl` range requests via
-      `CPL_CURL_VERBOSE=YES` (stderr → a file, never merged into stdout), bytes fetched, and wall clock
-- [ ] Equivalence check: `filter_geom` output vs today's clipped output — same extent/`nlyr`, per-layer
-      means and correlation; characterise any edge-pixel disagreement (GDAL rasterize cell-centre vs
-      `terra::mask` cell-centre)
-- [ ] Record every arm, including the ones that disappoint, in `findings.md`
+- [x] Reproduce `appelmar/gdalcubes#110`'s offline repro on the installed fork — passes, so
+      adoption never depended on that PR merging
+- [x] Establish the extent padding — 0 px throws, 1 px suffices, 2 px used
+- [x] Benchmark arms on the packaged AOI with observed range-request counts
+- [x] Instrument positively controlled before any count was believed
+- [x] Record every arm, including the ones that disappoint
 
-**Decision gate.** If arm C beats neither A nor D by a margin worth two code paths, stop: close #47 with
-the measurement and file the chunking finding upstream. Only continue past this line if the numbers earn it.
+| arm | wall clock | requests | vs A | non-NA |
+|---|---|---|---|---|
+| A — today's bbox + `terra::mask` | 236.8 s | 462 | 1.00 | 49,244 |
+| B — `filter_geom`, default chunking | 236.9 s | 462 | 1.00 | 41,608 |
+| C — `filter_geom`, 64 px chunking | 348.2 s | 693 | 1.50 | 41,608 |
+| C — `filter_geom`, 128 px chunking | 343.7 s | 693 | 1.50 | 41,608 |
+| D — `tile_size = 640` (already shipped) | 1263.6 s | 3213 | 6.96 | 49,244 |
 
-## Phase 2: Capability probe
+- [ ] Rival hypothesis: `gdalcubes_options(parallel = 4/8)` on the baseline. drift never
+      calls `gdalcubes_options()` at all, so every fetch is single-threaded *and* coarse-chunked
 
-- [ ] Internal `filter_geom_ok()` in a new `R/dft_gdalcubes_capability.R`
-- [ ] Runs the offline reproducer in an **R subprocess** so a segfault kills the child, not the session:
-      write the probe to a tempfile and run `system2(file.path(R.home("bin"), "Rscript"), shQuote(path), ...)`
-      — never `Rscript -e` (quoting/backslash trap), stderr to its own file, and **read the exit status**,
-      not just the output
-- [ ] Assert all three, so neither failure mode passes: child exited 0 · ≥1 **non-NA** cell inside the
-      polygon (kills the all-NA mode) · ≥1 **NA** cell outside (kills a silent no-op)
-- [ ] Cache the verdict in the package env — at most one subprocess per session
-- [ ] Escape hatch `options(drift.filter_geom = TRUE/FALSE)` so a user or CI can pin either way without a probe
-- [ ] **Bound stated in the roxygen:** the probe establishes the installed *build* is patched (the segfault
-      is in `filter_geom`'s own chunk logic, not in the COG reader). It does not prove the network path.
+**GATE: FAILED for `filter_geom`.** Not a close call — no arm beats the baseline on either
+metric. At default chunking it is exactly neutral in cost while silently shrinking the
+footprint 15.5%; at the finest chunking gdalcubes permits it is 1.5× the requests and 47%
+slower. The predicted 26.7% chunk skip is real and is *more than cancelled* by losing
+alignment with the COGs' 512×512 blocks — the skip saves ground that was cheap, and the
+refetching costs more than the ground was worth. Structural arithmetic said 339 requests;
+the wire said 693.
 
-## Phase 3: Wire it into dft_stac_cube()
+## Phase 0: Defects that exist today, independent of #47
 
-- [ ] Take the `filter_geom` path when the probe passes, `tile_size` is `NULL`, and `clip = TRUE`
-- [ ] Pad `bbox_ext` (`:329-332`) by the Phase-1 margin so the polygon is strictly interior
-- [ ] `gdalcubes::filter_geom(cube, sf::st_union(sf::st_geometry(aoi_target)), srs = target_crs)` immediately
-      after `raster_cube()` (`:285-287`), with `chunking` set explicitly to the Phase-1 value
-- [ ] Skip `stac_cube_clip()` on this path (`filter_geom` already NAs the outside); keep the helper for the fallback
-- [ ] Name the two interactions rather than letting them fall out: **`clip = FALSE`** is incompatible
-      (`filter_geom` always clips) so it stays on the bbox path; **`tile_size`** and `filter_geom` are
-      mutually exclusive — document which wins
-- [ ] `stac_cube_cache_key()` (`:407`) gains the read mode, **appended only when the `filter_geom` path is
-      taken** — same shape as the `tile_size` append (`:424`), so the frozen legacy hash
-      (`638a2be11fdf`, `test-dft_stac_cube.R:57-63`) and every existing `cube_<key>.tif` stay valid
+Found while reviewing. These land regardless of how #47 is resolved.
 
-## Phase 4: Tests
+- [ ] `tests/testthat/test-dft_stac_cube.R:219-242` — the only end-to-end cube test **passes
+      on an all-NA cube**. `fully_na` is 1.0 for an empty cube and the assertion is
+      `expect_gt(fully_na, 0.5)`; `nlyr`, `time` and the cache-file checks pass too. Replace
+      with in-polygon non-NA, per-layer non-NA, and outside-NA. Confirm red against a stubbed
+      all-NA cube before believing the fix
+- [ ] `R/dft_stac_cube.R:364-366` — documents the clip as "cells whose centre falls outside",
+      but `terra::mask()` defaults to `touches = TRUE`. Correct the roxygen
+- [ ] Add the offline oracle that distinguishes the two rules — the existing clip test
+      (`:116-138`) uses an axis-aligned polygon on a cell boundary, where they agree, so it
+      cannot reach the difference. Assert the premise beside the property
+- [ ] Post-condition before `terra::writeRaster()` (`:355`): abort when no in-polygon cell is
+      non-NA, so the all-NA mode cannot reach a cache file
 
-- [ ] Offline: probe returns `TRUE` here; and a test that **forces the all-NA / no-op verdict and asserts
-      the probe returns `FALSE`** — the guard has to be seen firing, not assumed
-- [ ] Offline: legacy cache key byte-identical when the path is not taken; `filter_geom` keys apart
-- [ ] Offline: `clip = FALSE` and `tile_size` route away from `filter_geom`
-- [ ] Network smoke test (`DRIFT_TEST_NETWORK=true` + probe passes), asserting **non-NA coverage inside the
-      polygon** and NA outside — it must not be able to pass on the all-NA cube that #32 was protecting
-      against — plus agreement with the `terra::mask` arm
+## Phase 2: Close #47 with the measurement
 
-## Phase 5: Docs, dependency, release
+- [ ] Rewrite the issue body — its premise (~10× from the 0.102 area ratio) is refuted. The
+      area ratio is the wrong bound: the read is chunk-granular and cost is COG-block-granular
+- [ ] Record in `inst/notes/gdalcubes-pc-gotchas.md`: the fork fixes the segfault, but the
+      default chunking defeats the skip and fine chunking costs more than it saves. Keep the
+      "do not use `filter_geom`" guidance, replacing the *reason* — it is no longer "it
+      segfaults" but "it is measurably not worth it"
+- [ ] Report the `default_chunksize` × `filter_geom` interaction upstream on
+      `appelmar/gdalcubes` — at `parallel = 1` the default chunking makes `filter_geom` a
+      guaranteed no-op, which is a real observation independent of drift
+- [ ] Follow-up issue if the `parallel` arm wins: `gdalcubes_options(parallel =)` is a one-line
+      change with no fork, no probe and no cache question
 
-- [ ] Rewrite the first bullet of `inst/notes/gdalcubes-pc-gotchas.md` (`:8-20`) — it currently reads "Do NOT
-      clip inside the cube pipeline". Record the fork, the chunking finding, the within-cube constraint, and
-      the measured numbers
-- [ ] Replace the "never `filter_geom`" comment at `R/dft_stac_cube.R:276-280` and `:346-350`; update the
-      `tile_size` roxygen at `:75` ("the `filter_geom`-independent way to bound the read")
-- [ ] DESCRIPTION: add `NewGraphEnvironment/gdalcubes@newgraph` to `Remotes:` so fresh installs get the
-      working build; the probe covers anyone already holding CRAN gdalcubes
-- [ ] Follow-up issue for `dft_stac_fetch()`, carrying Phase-1's numbers and noting its cache is written
-      unmasked (`R/dft_stac_fetch.R:188`) so adopting this there changes cached content
-- [ ] `NEWS.md`; version bump as the **final** commit of the branch
+**Not doing:** the capability probe (Phase 2 as originally planned), the `filter_geom` code
+path, the `Remotes:` entry, and the cache-key change. All were downstream of a gate that
+failed. `Remotes:` was in any case a weaker guarantee than it reads as — it is ignored by
+`install.packages()` and satisfied by any already-installed `Suggests` copy.
 
 ## Validation
 
 - [ ] Tests pass (`devtools::test()`); `devtools::document()` output read for unexpected `.Rd` writes
+- [ ] The replaced smoke test is confirmed RED against a stubbed all-NA cube
 - [ ] `/code-check` clean on each commit
 - [ ] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion, with the Phase-1 numbers in the archive README's Measurement section
+- [ ] `/planning-archive` on completion, with the Phase-1 table in the archive README's
+      Measurement section
