@@ -4,7 +4,7 @@ pkgdown_sha: ~
 articles:
   land-cover-change: land-cover-change.html
   trajectory-break-detection: trajectory-break-detection.html
-last_built: 2026-09-01T19:35Z
+last_built: 2026-09-01T22:53Z
 urls:
   reference: https://newgraphenvironment.github.io/drift/reference
   article: https://newgraphenvironment.github.io/drift/articles

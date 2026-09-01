@@ -17,7 +17,7 @@ breakpoint detection."><meta property="og:image" content="https://newgraphenviro
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -73,6 +73,7 @@ breakpoint detection.</p>
 <span>  months <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  mask_values <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  tile_size <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  parallel <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  cache_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  force <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  sign_fn <span class="op">=</span> <span class="fu">rstac</span><span class="fu">::</span><span class="fu"><a href="https://brazil-data-cube.github.io/rstac/reference/items_sign_planetary_computer.html" class="external-link">sign_planetary_computer</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -128,8 +129,14 @@ must agree with.</p></dd>
 
 <dt id="arg-clip">clip<a class="anchor" aria-label="anchor" href="#arg-clip"></a></dt>
 <dd><p>Logical. When <code>TRUE</code> (default), clip the returned stack to the AOI
-polygon with <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> (cells outside → <code>NA</code> on every layer), so
-<code><a href="dft_rast_break.html">dft_rast_break()</a></code> / <code><a href="dft_rast_trend.html">dft_rast_trend()</a></code> reduce only in-polygon pixels. Set
+polygon with <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code>, so
+<code><a href="dft_rast_break.html">dft_rast_break()</a></code> / <code><a href="dft_rast_trend.html">dft_rast_trend()</a></code> reduce only in-polygon pixels. The
+clip keeps every cell the polygon <strong>touches</strong> — <code><a href="https://rspatial.github.io/terra/reference/mask.html" class="external-link">terra::mask()</a></code> defaults to
+<code>touches = TRUE</code> — so it is inclusive at the boundary by up to one cell,
+deliberately, so a thin corridor is not eroded. Cells the polygon does not
+touch become <code>NA</code> on every layer. That is a <em>different</em> rule from a
+cell-centre clip, and worth 15.5% of the analysed footprint on the packaged
+AOI (#47), so it matters to anything reporting boundary hectares. Set
 <code>FALSE</code> to keep the wider extent (e.g. for surrounding context, or to mask
 later with a different polygon). This clips the <em>output</em> — with the default
 <code>tile_size = NULL</code> the full bbox of COGs is still streamed either way, so
@@ -173,10 +180,36 @@ cost more per-tile round trips; there is no auto-tuning. The cube always caches
 a <code>.tif</code> either way; a tiled read keys distinctly (see the caching note above),
 so untiled caches are untouched and <code>tile_size = NULL</code> is byte-for-byte the
 previous behavior. This is the continuous-path twin of <code><a href="dft_stac_fetch.html">dft_stac_fetch()</a></code>'s
-<code>tile_size</code> — the <code>filter_geom</code>-independent way to bound the read. Because the
+<code>tile_size</code>. Benchmarked against the alternatives on the packaged AOI
+(drift#47) it is the <strong>slowest</strong> option — 1263.6 s and 3213 range requests
+against an untiled 236.8 s / 462, because every tile rebuilds the image
+collection and reopens the COGs — so prefer <code>parallel</code> for speed and reach
+for <code>tile_size</code> only when peak memory, not wall clock, is the constraint.
+Because the
 cube resamples with bilinear, a tiled cube faithfully reproduces the untiled
 cube (the per-pixel reducers are unaffected) but lands on a bbox-anchored grid
 that is sub-pixel-offset from — not pixel-identical to — the untiled cube.</p></dd>
+
+
+<dt id="arg-parallel">parallel<a class="anchor" aria-label="anchor" href="#arg-parallel"></a></dt>
+<dd><p>Integer, or <code>NULL</code> (default) to auto-detect as
+<code>min(4, cores - 1)</code>, flooring to 1 where the core count is undetectable.
+Number of gdalcubes worker processes used for the read. The COG stream is the
+dominant cost and it parallelizes well: measured on the packaged AOI, a
+4-month monthly kNDVI cube took 236.8 s at <code>parallel = 1</code>, 115.8 s at 4 and
+96.0 s at 8 — and the output is <strong>byte-identical</strong> at every setting
+(correlation 1.000, max absolute difference 0), so this is a pure cost knob
+and does not enter the cache key. Capped at 4 by default rather than the
+full core count because each worker holds chunks in memory; raise it on a
+machine with headroom, or set <code>1</code> for the previous single-threaded
+behaviour. Prior to v0.9.0 drift never called
+<code><a href="https://rdrr.io/pkg/gdalcubes/man/gdalcubes_options.html" class="external-link">gdalcubes::gdalcubes_options()</a></code> at all, so every fetch ran single-threaded
+(drift#47). gdalcubes also derives its default chunk size from this value,
+so raising it makes chunks finer as a side effect — measured in isolation on
+this AOI that is a <em>cost</em> (343.7 s / 693 requests at 128 px against 236.9 s
+/ 462 at the default), so the speedup is attributable to concurrency. When
+<code>NULL</code> and a session-level <code><a href="https://rdrr.io/pkg/gdalcubes/man/gdalcubes_options.html" class="external-link">gdalcubes::gdalcubes_options()</a></code> <code>parallel</code> above
+1 is already set, that value is honoured rather than overridden.</p></dd>
 
 
 <dt id="arg-cache-dir">cache_dir<a class="anchor" aria-label="anchor" href="#arg-cache-dir"></a></dt>
@@ -198,8 +231,9 @@ that is sub-pixel-offset from — not pixel-identical to — the untiled cube.</
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a> index stack — one layer per time step, with a
 time value per layer — cached as a GeoTIFF. By default (<code>clip = TRUE</code>) the
-stack is clipped to the AOI polygon (cloud-masked, cells outside the polygon
-<code>NA</code>), so the reduced raster from <code><a href="dft_rast_break.html">dft_rast_break()</a></code> is already polygon-tight;
+stack is clipped to the AOI polygon (cloud-masked; every cell the polygon
+touches is kept, cells it does not touch are <code>NA</code> — see <code>clip</code>), so the
+reduced raster from <code><a href="dft_rast_break.html">dft_rast_break()</a></code> is already polygon-tight;
 pass <code>clip = FALSE</code> for the full AOI <strong>bounding box</strong> (or, with <code>tile_size</code>
 set, the AOI-intersecting tile union). For sources with a
 reflectance-offset baseline boundary (Sentinel-2), items are split at the

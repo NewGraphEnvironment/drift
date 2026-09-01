@@ -29,6 +29,7 @@ dft_stac_cube(
   months = NULL,
   mask_values = NULL,
   tile_size = NULL,
+  parallel = NULL,
   cache_dir = NULL,
   force = FALSE,
   sign_fn = rstac::sign_planetary_computer()
@@ -89,14 +90,22 @@ dft_stac_cube(
 
   Logical. When `TRUE` (default), clip the returned stack to the AOI
   polygon with
-  [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html)
-  (cells outside → `NA` on every layer), so
+  [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html),
+  so
   [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
   /
   [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
-  reduce only in-polygon pixels. Set `FALSE` to keep the wider extent
-  (e.g. for surrounding context, or to mask later with a different
-  polygon). This clips the *output* — with the default
+  reduce only in-polygon pixels. The clip keeps every cell the polygon
+  **touches** —
+  [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html)
+  defaults to `touches = TRUE` — so it is inclusive at the boundary by
+  up to one cell, deliberately, so a thin corridor is not eroded. Cells
+  the polygon does not touch become `NA` on every layer. That is a
+  *different* rule from a cell-centre clip, and worth 15.5% of the
+  analysed footprint on the packaged AOI (#47), so it matters to
+  anything reporting boundary hectares. Set `FALSE` to keep the wider
+  extent (e.g. for surrounding context, or to mask later with a
+  different polygon). This clips the *output* — with the default
   `tile_size = NULL` the full bbox of COGs is still streamed either way,
   so `clip = FALSE` returns the full bounding box. When `tile_size` is
   set the read is tiled, so `clip = FALSE` returns the
@@ -144,11 +153,40 @@ dft_stac_cube(
   byte-for-byte the previous behavior. This is the continuous-path twin
   of
   [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)'s
-  `tile_size` — the `filter_geom`-independent way to bound the read.
-  Because the cube resamples with bilinear, a tiled cube faithfully
-  reproduces the untiled cube (the per-pixel reducers are unaffected)
-  but lands on a bbox-anchored grid that is sub-pixel-offset from — not
-  pixel-identical to — the untiled cube.
+  `tile_size`. Benchmarked against the alternatives on the packaged AOI
+  (drift#47) it is the **slowest** option — 1263.6 s and 3213 range
+  requests against an untiled 236.8 s / 462, because every tile rebuilds
+  the image collection and reopens the COGs — so prefer `parallel` for
+  speed and reach for `tile_size` only when peak memory, not wall clock,
+  is the constraint. Because the cube resamples with bilinear, a tiled
+  cube faithfully reproduces the untiled cube (the per-pixel reducers
+  are unaffected) but lands on a bbox-anchored grid that is
+  sub-pixel-offset from — not pixel-identical to — the untiled cube.
+
+- parallel:
+
+  Integer, or `NULL` (default) to auto-detect as `min(4, cores - 1)`,
+  flooring to 1 where the core count is undetectable. Number of
+  gdalcubes worker processes used for the read. The COG stream is the
+  dominant cost and it parallelizes well: measured on the packaged AOI,
+  a 4-month monthly kNDVI cube took 236.8 s at `parallel = 1`, 115.8 s
+  at 4 and 96.0 s at 8 — and the output is **byte-identical** at every
+  setting (correlation 1.000, max absolute difference 0), so this is a
+  pure cost knob and does not enter the cache key. Capped at 4 by
+  default rather than the full core count because each worker holds
+  chunks in memory; raise it on a machine with headroom, or set `1` for
+  the previous single-threaded behaviour. Prior to v0.9.0 drift never
+  called
+  [`gdalcubes::gdalcubes_options()`](https://rdrr.io/pkg/gdalcubes/man/gdalcubes_options.html)
+  at all, so every fetch ran single-threaded (drift#47). gdalcubes also
+  derives its default chunk size from this value, so raising it makes
+  chunks finer as a side effect — measured in isolation on this AOI that
+  is a *cost* (343.7 s / 693 requests at 128 px against 236.9 s / 462 at
+  the default), so the speedup is attributable to concurrency. When
+  `NULL` and a session-level
+  [`gdalcubes::gdalcubes_options()`](https://rdrr.io/pkg/gdalcubes/man/gdalcubes_options.html)
+  `parallel` above 1 is already set, that value is honoured rather than
+  overridden.
 
 - cache_dir:
 
@@ -171,8 +209,9 @@ A
 [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
 index stack — one layer per time step, with a time value per layer —
 cached as a GeoTIFF. By default (`clip = TRUE`) the stack is clipped to
-the AOI polygon (cloud-masked, cells outside the polygon `NA`), so the
-reduced raster from
+the AOI polygon (cloud-masked; every cell the polygon touches is kept,
+cells it does not touch are `NA` — see `clip`), so the reduced raster
+from
 [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
 is already polygon-tight; pass `clip = FALSE` for the full AOI
 **bounding box** (or, with `tile_size` set, the AOI-intersecting tile
