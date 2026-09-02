@@ -261,17 +261,44 @@ dft_stac_cube <- function(aoi,
     seq(as.Date(paste0(substr(dr[1], 1, 7), "-01")), by = "month", length.out = n)
   }
 
-  if (!force && file.exists(cache_file)) {
-    message("  cube: cached")
+  # Presence is not trust (#41). Validity is checked BEFORE cube_check_nonempty()
+  # so a truncated file that happens to read all-NA is reported as corrupt rather
+  # than as "your AOI does not overlap the collection" — the two have opposite
+  # remedies, which is also why they stay separate functions: an empty cube
+  # aborts (re-fetching will not fix a genuine AOI/datetime mismatch), a corrupt
+  # one re-fetches.
+  if (!force && file.exists(cache_file) && cache_hit_ok(cache_file, "cube")) {
     r <- terra::rast(cache_file)
     # Guard the READ path too, not only the write. A cube written by an earlier
     # version could be all-NA — drift's end-to-end test passed on exactly that
     # (#47) — and the cache key is unchanged, so upgrading does not invalidate
     # it. Without this the empty cube is served silently and, under
     # `force = FALSE`, permanently.
-    cube_check_nonempty(r, cfg$collection, datetime, cached = TRUE)
-    terra::time(r) <- month_times(terra::nlyr(r))
-    return(r)
+    #
+    # The warning handler makes this a WHOLE-FILE read probe at zero added cost:
+    # cube_check_nonempty() already scans every pixel via terra::global(), and a
+    # GDAL read failure surfaces as a warning while global() happily returns a
+    # number computed from whatever it got. That is strictly stronger than the
+    # last-row probe cache_hit_ok() just ran, and the cube is the path where it
+    # matters most — its cache is a multi-hour stream, not an annual raster.
+    read_dirty <- FALSE
+    withCallingHandlers(
+      cube_check_nonempty(r, cfg$collection, datetime, cached = TRUE),
+      warning = function(w) {
+        read_dirty <<- TRUE
+        invokeRestart("muffleWarning")
+      }
+    )
+    if (!read_dirty) {
+      message("  cube: cached")
+      terra::time(r) <- month_times(terra::nlyr(r))
+      return(r)
+    }
+    cli::cli_warn(c(
+      "The cached cube's pixel data could not be read cleanly; re-fetching.",
+      "i" = "{.file {cache_file}}"
+    ))
+    rm(r)
   }
 
   # STAC query: intersects (not bbox) + scene cloud pre-filter + pagination
@@ -426,7 +453,12 @@ dft_stac_cube <- function(aoi,
 
   terra::time(stk) <- month_times(terra::nlyr(stk))
   names(stk) <- rep(index, terra::nlyr(stk))
-  terra::writeRaster(stk, cache_file, overwrite = TRUE)
+  # Atomic publish (#41). Losing this cache to an interrupted write is far more
+  # expensive here than in dft_stac_fetch() — it is a multi-hour Sentinel-2
+  # stream rather than a small annual raster.
+  cache_write_atomic(cache_file, function(out) {
+    terra::writeRaster(stk, out, overwrite = TRUE)
+  })
   stk
 }
 

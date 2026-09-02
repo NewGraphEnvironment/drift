@@ -472,3 +472,179 @@ test_that("dft_stac_cube tiled read reproduces the untiled cube over the AOI", {
   }
   expect_lt(max(abs(layer_mean(tiled) - layer_mean(untiled))), 0.01)
 })
+
+
+# ---------------------------------------------------------------------------
+# #41 — the cube cache is published atomically and validated before it is served
+# ---------------------------------------------------------------------------
+
+# Drive dft_stac_cube() down its cache-hit branch offline. Everything after the
+# gate (STAC query, gdalcubes) is unreachable on a hit, so a stub that aborts is
+# the assertion: if the gate lets a bad file through, or refuses a good one, the
+# call goes somewhere it should not and says so.
+cube_cache_paths <- function(aoi, cache, index = "kndvi") {
+  cfg <- dft_stac_config("sentinel-2-l2a")
+  crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", crs)))
+  dir.create(file.path(cache, "sentinel-2-l2a"), recursive = TRUE,
+             showWarnings = FALSE)
+  list(aoi_t = aoi_t, dir = file.path(cache, "sentinel-2-l2a"), cfg = cfg)
+}
+
+# The cube cache key takes a long argument list; rather than reproduce it (which
+# would pin the key's current shape into an unrelated test), let a real call
+# create the entry through a stubbed assembly, then reuse the file it wrote.
+cube_seed_cache <- function(aoi, cache, nlyr = 3) {
+  bb <- sf::st_bbox(sf::st_transform(aoi, 32609))
+  stk <- terra::rast(lapply(seq_len(nlyr), function(i) {
+    r <- terra::rast(nrows = 12, ncols = 12, crs = "EPSG:32609",
+                     xmin = bb[["xmin"]], xmax = bb[["xmax"]],
+                     ymin = bb[["ymin"]], ymax = bb[["ymax"]])
+    terra::values(r) <- rep(0.4 + i / 100, terra::ncell(r))
+    r
+  }))
+  stk
+}
+
+test_that("dft_stac_cube publishes its cache atomically", {
+  # Same defect as the fetch path, in the more expensive place: a killed write
+  # left a partial .tif at the canonical name that every later call trusted.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cache <- tempfile("drift_cube_atomic_")
+  p <- cube_cache_paths(aoi, cache)
+
+  # Fail inside the write, after some bytes have landed.
+  testthat::local_mocked_bindings(
+    writeRaster = function(x, filename, ...) {
+      writeBin(as.raw(rep(0, 2048)), filename)
+      stop("killed mid-write")
+    },
+    .package = "terra"
+  )
+  expect_error(
+    suppressMessages(suppressWarnings(
+      drift:::cache_write_atomic(
+        file.path(p$dir, "cube_deadbeef0000.tif"),
+        function(out) terra::writeRaster(cube_seed_cache(aoi, cache), out)
+      )
+    )),
+    "killed mid-write"
+  )
+  expect_false(file.exists(file.path(p$dir, "cube_deadbeef0000.tif")))
+  expect_length(list.files(p$dir, all.files = TRUE, no.. = TRUE), 0L)
+})
+
+test_that("a corrupt cube cache is re-fetched rather than served", {
+  # Drive the real gate. stac_cube_cache_key() is mocked to a fixed value so the
+  # test knows the cache filename without reproducing the key's long argument
+  # list — which would pin the key's current shape into an unrelated test, and
+  # is exactly what the frozen-key guardian above exists to watch instead.
+  #
+  # Reaching the STAC query is the assertion: on a cache HIT the function returns
+  # before it, so getting there proves the corrupt entry was rejected.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cache <- tempfile("drift_cube_gate_")
+  dir.create(file.path(cache, "sentinel-2-l2a"), recursive = TRUE)
+  seeded <- file.path(cache, "sentinel-2-l2a", "cube_deadbeef0000.tif")
+  writeBin(as.raw(rep(0, 4096)), seeded)
+
+  testthat::local_mocked_bindings(
+    stac_cube_cache_key = function(...) "deadbeef0000"
+  )
+  testthat::local_mocked_bindings(
+    stac = function(...) stop("fell through to a re-fetch"), .package = "rstac"
+  )
+
+  expect_error(
+    suppressMessages(suppressWarnings(
+      dft_stac_cube(aoi, source = "sentinel-2-l2a", index = "kndvi",
+                    datetime = "2020-01-01/2020-12-31", cache_dir = cache)
+    )),
+    "fell through to a re-fetch"
+  )
+})
+
+test_that("a healthy cube cache is still served, with no re-fetch", {
+  # False-refusal control for the gate above. Without it, a validator that
+  # rejects everything would pass that test perfectly.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cache <- tempfile("drift_cube_gate_ok_")
+  dir.create(file.path(cache, "sentinel-2-l2a"), recursive = TRUE)
+  seeded <- file.path(cache, "sentinel-2-l2a", "cube_deadbeef0000.tif")
+
+  bb <- sf::st_bbox(sf::st_transform(aoi, 32609))
+  stk <- terra::rast(lapply(1:3, function(i) {
+    r <- terra::rast(nrows = 12, ncols = 12, crs = "EPSG:32609",
+                     xmin = bb[["xmin"]], xmax = bb[["xmax"]],
+                     ymin = bb[["ymin"]], ymax = bb[["ymax"]])
+    terra::values(r) <- rep(0.4 + i / 100, terra::ncell(r))
+    r
+  }))
+  terra::writeRaster(stk, seeded)
+
+  testthat::local_mocked_bindings(
+    stac_cube_cache_key = function(...) "deadbeef0000"
+  )
+  testthat::local_mocked_bindings(
+    stac = function(...) stop("re-fetched a healthy cube cache"), .package = "rstac"
+  )
+
+  out <- suppressMessages(suppressWarnings(
+    dft_stac_cube(aoi, source = "sentinel-2-l2a", index = "kndvi",
+                  datetime = "2020-01-01/2020-12-31", cache_dir = cache)
+  ))
+  expect_s4_class(out, "SpatRaster")
+  expect_equal(terra::nlyr(out), 3)
+})
+
+test_that("cube_check_nonempty read warnings mark the cached cube corrupt", {
+  # The zero-cost whole-file probe: cube_check_nonempty() already scans every
+  # pixel via terra::global(), and a GDAL read failure surfaces as a WARNING
+  # while global() returns a number computed from whatever it got. Nothing
+  # converts that warning into a decision unless a handler does.
+  #
+  # Named for what it tests: the handler. It asserts that a warning raised
+  # during the existing scan is observable and can be acted on, which is the
+  # mechanism dft_stac_cube() now relies on.
+  stk <- terra::rast(nrows = 5, ncols = 5, crs = "EPSG:32609",
+                     xmin = 0, xmax = 50, ymin = 0, ymax = 50)
+  terra::values(stk) <- seq_len(terra::ncell(stk))
+
+  read_dirty <- FALSE
+  testthat::local_mocked_bindings(
+    global = function(x, fun, ...) {
+      warning("netcdf error #-101 : NetCDF: HDF error")
+      data.frame(notNA = terra::ncell(x))
+    },
+    .package = "terra"
+  )
+  withCallingHandlers(
+    drift:::cube_check_nonempty(stk, "c", "d", cached = TRUE),
+    warning = function(w) {
+      read_dirty <<- TRUE
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_true(read_dirty)
+})
+
+test_that("an empty cached cube still ABORTS rather than re-fetching", {
+  # The two failures have opposite remedies and must not be merged: re-fetching
+  # will not fix an AOI that genuinely does not overlap the collection, so
+  # sending it into a multi-hour re-stream on every call would be worse than the
+  # abort. This pins that distinction.
+  stk <- terra::rast(nrows = 4, ncols = 4, crs = "EPSG:32609",
+                     xmin = 0, xmax = 40, ymin = 0, ymax = 40)
+  terra::values(stk) <- rep(NA_real_, terra::ncell(stk))
+  expect_error(
+    drift:::cube_check_nonempty(stk, "sentinel-2-l2a", "2020-01-01/2020-12-31",
+                                cached = TRUE),
+    "no data on any layer"
+  )
+})

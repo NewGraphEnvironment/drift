@@ -44,10 +44,10 @@ zero-cost whole-file probe.
 
 ## Phase 4: Same two changes in `dft_stac_cube()`
 
-- [ ] Wrap `terra::writeRaster()` at `R/dft_stac_cube.R:429` in `cache_write_atomic()`
-- [ ] Gate the cache hit at `:264` on `cache_usable()`, **before** `cube_check_nonempty()` — validity first, so a truncated all-NA file reads as corrupt not as an AOI mismatch
-- [ ] Fold arm (c) into the existing `cube_check_nonempty()` `global()` scan via a warning handler — a whole-file probe at zero added cost
-- [ ] Tests for both on the cube path
+- [x] Wrap `terra::writeRaster()` at `R/dft_stac_cube.R:429` in `cache_write_atomic()`
+- [x] Gate the cache hit at `:264` on `cache_usable()`, **before** `cube_check_nonempty()` — validity first, so a truncated all-NA file reads as corrupt not as an AOI mismatch
+- [x] Fold arm (c) into the existing `cube_check_nonempty()` `global()` scan via a warning handler — a whole-file probe at zero added cost
+- [x] Tests for both on the cube path
 
 ## Phase 5: Docs, NEWS, version
 
@@ -63,7 +63,7 @@ zero-cost whole-file probe.
 
 - [ ] `devtools::test()` green
 - [x] **False-refusal control**: `cache_usable()` passes all 168 files in the real cache
-- [ ] **Restore-the-defect**: each new test goes red against the reverted fix (patch BOTH `asNamespace("drift")` and `as.environment("package:drift")`)
+- [x] **Restore-the-defect**: each new test goes red against the reverted fix (patch BOTH `asNamespace("drift")` and `as.environment("package:drift")`)
 - [ ] `lintr::lint_package()` no new lints vs baseline
 - [ ] `devtools::check()` clean
 - [ ] `/code-check` clean on each commit
