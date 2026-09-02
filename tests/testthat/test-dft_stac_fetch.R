@@ -310,6 +310,26 @@ test_that("stac_items_paged strips the stale `next` link before returning", {
   expect_setequal(rels, c("self", "root"))         # nothing else was dropped
 })
 
+test_that("stac_items_paged strips `next` regardless of case, and keeps rel-less links", {
+  testthat::local_mocked_bindings(
+    get_request = function(q, ...) {
+      it <- fake_items("a", next_link = FALSE)
+      it$links <- list(list(rel = "self", href = "s"),
+                       list(href = "no-rel-at-all"),      # must survive
+                       list(rel = "NEXT", href = "p2"))   # must be dropped
+      it
+    },
+    items_fetch = function(items, ...) items,
+    items_sign = function(items, ...) items,
+    .package = "rstac"
+  )
+  out <- paged()
+  rels <- vapply(out$links,
+                 function(l) if (is.null(l$rel)) "" else l$rel, character(1))
+  expect_false(any(tolower(rels) == "next"))
+  expect_equal(length(out$links), 2L)      # self + the rel-less one
+})
+
 test_that("stac_items_paged aborts on duplicate item ids", {
   testthat::local_mocked_bindings(
     get_request = function(q, ...) fake_items("a"),

@@ -275,8 +275,15 @@ stac_items_paged <- function(stac_url, collection, bbox, datetime, sign_fn,
   }
 
   # Drop the stale `next` (see above) before it reaches callers via
-  # `attr(result, "stac_items")`.
-  items$links <- Filter(function(l) !identical(l$rel, "next"), items$links)
+  # `attr(result, "stac_items")`. Case-insensitive: STAC and rstac both emit
+  # lowercase `rel`, but matching only the exact string would silently leave a
+  # differently-cased link behind, which is the one outcome this must prevent.
+  # A link with no `rel` at all is kept — only `next` is being removed.
+  items$links <- Filter(
+    function(l) !(is.character(l$rel) && length(l$rel) == 1L &&
+                    tolower(l$rel) == "next"),
+    items$links
+  )
 
   rstac::items_sign(items, sign_fn = sign_fn)
 }
@@ -296,7 +303,7 @@ stac_items_paged <- function(stac_url, collection, bbox, datetime, sign_fn,
 #' keys distinctly. It must arrive already snapped by the caller.
 #' @noRd
 stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
-                           resampling, stac_url, collection, asset
+                           resampling, stac_url, collection, asset,
                            tile_size = NULL) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
   parts <- list(
@@ -309,6 +316,7 @@ stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
     # upgrade, silently and permanently under `force = FALSE`. Bumping the salt
     # costs a one-time re-fetch of small annual rasters. Do not remove it; to
     # invalidate again, change the string rather than adding another element.
+    "items-paged-v2"
   )
   # A tiled fetch caches a terra .tif mosaic; an untiled fetch caches a
   # gdalcubes .nc. Keying them apart stops one being served as the other.
