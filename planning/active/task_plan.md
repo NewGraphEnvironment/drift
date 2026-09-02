@@ -128,7 +128,24 @@ fixed on its read path (`R/dft_stac_cube.R:272`).
 
 ## Validation
 
-- [x] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass — 461 offline; 74/0 on this file with `DRIFT_TEST_NETWORK=true`.
+      One pre-existing unrelated failure remains (`test-dft_stac_cube.R:62`, red on
+      `main`, bisected to the commit that introduced it).
+- [ ] **`/code-check` subagent rounds did NOT deliver.** Three reviewers were spawned
+      (one broad, one correctness-under-adversarial-input, one test-validity); none wrote
+      its findings file within ~50 minutes. Recorded as incomplete rather than clean —
+      a lost review and an empty one are indistinguishable from this side, and reporting
+      the latter is how a guard stops being read. Re-run `/code-check` before merge.
+      Self-verification performed in its place:
+  - [x] Restore-the-bug over **9** defects; baseline FAIL=0, every defect red
+        (2, 1, 2, 1, 1, 9, 1, 1, 2). One test measured FAIL=0 and was rewritten.
+  - [x] Edge probes: `anyDuplicated` on empty / all-NA ids, `Filter` on NULL links,
+        links with no `rel`, `rel = "NEXT"` — the last found a real gap, now fixed
+        and pinned.
+  - [x] Interop against the real consumer: the links-rewritten `doc_items` is still
+        accepted by `rstac::items_length()` and builds a 4-image
+        `gdalcubes::stac_image_collection()`.
+  - [x] lintr: 1 lint against a 2-lint baseline; the remaining one is a confirmed
+        false positive (`dup` interpolates inside `cli_abort`, proved by running it).
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
