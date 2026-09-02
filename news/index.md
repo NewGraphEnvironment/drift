@@ -1,5 +1,103 @@
 # Changelog
 
+## drift 0.10.0
+
+- **Bug fix:
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  read only the first page of STAC items, so a wide AOI could silently
+  build a raster from a truncated item set
+  ([\#51](https://github.com/NewGraphEnvironment/drift/issues/51)).** It
+  called
+  [`rstac::get_request()`](https://brazil-data-cube.github.io/rstac/reference/request.html)
+  with no
+  [`rstac::items_fetch()`](https://brazil-data-cube.github.io/rstac/reference/items_functions.html),
+  and the partial item collection went straight to
+  [`gdalcubes::stac_image_collection()`](https://rdrr.io/pkg/gdalcubes/man/stac_image_collection.html)
+  — no error, no warning, a plausible-looking raster with missing tiles
+  over whatever the missing items covered. Because it depends on AOI
+  size it would have appeared first on the largest, most-published area
+  rather than in a test. The sibling
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  has always paged correctly;
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  was simply never brought across. Fetch now pages to exhaustion through
+  a new internal `stac_items_paged()`, signing **after** paging (signing
+  first leaves every item from page 2 onward unsigned).
+- **The obvious guard for this is wrong, and drift deliberately does not
+  implement it.** Erroring when a `rel="next"` link survives — what the
+  issue proposed — would abort every *correctly*-paged fetch:
+  `rstac:::items_fetch.doc_items` mutates only `items$features` and
+  never `items$links`, so a fully-paged collection still carries page
+  1’s [`next`](https://rdrr.io/r/base/Control.html). Measured on the
+  packaged AOI (`io-lulc-annual-v02`, 14 items ground truth): at
+  `limit=1` and `limit=3` the fetch returns the complete 14 items
+  **and** still reports a [`next`](https://rdrr.io/r/base/Control.html)
+  link, while at `limit=NULL` and `limit=500` it returns 14 with none.
+  The link is stale, so it is now stripped before
+  `attr(result, "stac_items")` reaches callers — otherwise anyone
+  re-running `items_fetch()` on that attribute re-fetches pages 2..N
+  into an already-complete feature list and silently duplicates them.
+  Recorded in `inst/notes/gdalcubes-pc-gotchas.md` so it is not
+  re-litigated.
+- The strip matches [`next`](https://rdrr.io/r/base/Control.html)
+  **exactly**, as `rstac` does, and a case-variant is deliberately
+  **kept** rather than removed. `rstac:::items_next.doc_items` selects
+  with `links(items, rel == "next")`, which is case-sensitive (measured:
+  [`next`](https://rdrr.io/r/base/Control.html) matches, `NEXT` and
+  `Next` do not). So a `NEXT` link is inert to `items_fetch()` and
+  cannot cause the duplicate it would otherwise be stripped to prevent —
+  what it means instead is that rstac *could not follow it and stopped
+  after page one*, which is the very truncation this release fixes. On
+  Planetary Computer nothing else can detect that (`items_matched()` is
+  NULL and duplicate ids cannot see a short read), so that link is the
+  last local evidence.
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  now warns and leaves it attached. An earlier draft of this fix
+  stripped it case-insensitively, which would have deleted the evidence.
+- An item with no usable `id` is now its own error rather than being
+  folded into the duplicate check, which used to report two id-less
+  items as `duplicate item id: NA — pages overlapped` — naming a cause
+  that had not occurred.
+- Two completeness checks with deliberately different reach: **duplicate
+  item ids** (never skipped, and the only signal available on Planetary
+  Computer —
+  [`gdalcubes::stac_image_collection()`](https://rdrr.io/pkg/gdalcubes/man/stac_image_collection.html)
+  drops duplicates behind a debug-only message, so nothing downstream
+  would ever report them), and **`items_matched()` against the item
+  count** (fires only where the API reports a total; PC sends no
+  `numberMatched`, so this never executes there and is fixtured in the
+  tests rather than left as dead code). `limit = 500` is a round-trip
+  reducer, not the fix — `items_fetch()` is.
+- **Cache-format break: existing
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  caches rebuild once.** The paging fix changes no cache-key parameter,
+  so without a deliberate break a raster written from a truncated item
+  set would keep being served by the
+  [`file.exists()`](https://rdrr.io/r/base/files.html) short-circuit —
+  and the wide-AOI users the bug hit hardest would get no fix at all on
+  upgrade, silently and permanently under `force = FALSE`.
+  `stac_cache_key()` therefore gains a constant salt and the frozen-hash
+  guardian moves from `79f67b7b9dae` to `2264b5dbef6e`. The cost is a
+  one-time re-fetch of small annual land-cover rasters, not the
+  multi-hour Sentinel-2 stream — which is why
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  chose a read-path check for its analogous problem and fetch can afford
+  a key break.
+  **[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  caches are unaffected**; `stac_cube_cache_key()` is a separate
+  function and is untouched.
+- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  now attaches `attr(, "cache_key")` alongside the existing
+  `attr(, "stac_items")`, so a caller can record which cache entry
+  served a fetch. It is **per call, not per year** — cached files are
+  named `<year>_<cache_key>`, so one key covers every year the call
+  returned.
+- Note for anyone reading warnings after upgrading:
+  [`gdalcubes::stac_image_collection()`](https://rdrr.io/pkg/gdalcubes/man/stac_image_collection.html)
+  skips an unreadable item with a warning, so a now-complete (larger)
+  item set can surface warnings that the truncated set never reached.
+  That is the paging working, not a regression introduced here.
+
 ## drift 0.9.0
 
 - [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)

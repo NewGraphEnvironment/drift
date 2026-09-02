@@ -118,7 +118,15 @@ A named list of
 [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
 objects, one per year. The STAC items are attached as
 `attr(, "stac_items")` for use with
-[`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md).
+[`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md)
+— paged to exhaustion, with the (stale)
+[`next`](https://rdrr.io/r/base/Control.html) link stripped so a caller
+re-running
+[`rstac::items_fetch()`](https://brazil-data-cube.github.io/rstac/reference/items_functions.html)
+on them cannot silently duplicate features. The cache key is attached as
+`attr(, "cache_key")` so a caller can record which cache entry served
+the fetch; it is **per call, not per year** — cached files are named
+`<year>_<cache_key>`, so one key covers every year the call returned.
 
 ## Details
 

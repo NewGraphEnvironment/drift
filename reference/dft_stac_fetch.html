@@ -13,7 +13,7 @@ custom COGs)."><meta property="og:image" content="https://newgraphenvironment.gi
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.9.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -159,7 +159,12 @@ contents.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A named list of <a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a> objects, one per year. The STAC
 items are attached as <code>attr(, "stac_items")</code> for use with
-<code><a href="dft_stac_classes.html">dft_stac_classes()</a></code>.</p>
+<code><a href="dft_stac_classes.html">dft_stac_classes()</a></code> — paged to exhaustion, with the (stale) <code><a href="https://rdrr.io/r/base/Control.html" class="external-link">next</a></code> link
+stripped so a caller re-running <code><a href="https://brazil-data-cube.github.io/rstac/reference/items_functions.html" class="external-link">rstac::items_fetch()</a></code> on them cannot
+silently duplicate features. The cache key is attached as
+<code>attr(, "cache_key")</code> so a caller can record which cache entry served the
+fetch; it is <strong>per call, not per year</strong> — cached files are named
+<code>&lt;year&gt;_&lt;cache_key&gt;</code>, so one key covers every year the call returned.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
