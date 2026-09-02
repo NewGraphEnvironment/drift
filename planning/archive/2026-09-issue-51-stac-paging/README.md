@@ -38,6 +38,28 @@ sign-before-page 1, next-link-kept 2, no duplicate check 1, no `items_matched` g
 cache salt removed 9, `is.null` instead of `length` guard 1, helper bypassed 1,
 exact-case strip 2.
 
+## Review found what self-verification did not
+
+Three reviewers ran (`review-round1/2/3.md`). They are the reason this is worth reading:
+between them they found **fourteen mutations that passed a suite I had already verified
+with a nine-defect restoration harness.** Two changed shipped behaviour:
+
+- **Round 2 reversed a change I had just made.** I had widened the `next`-link strip to
+  be case-insensitive, reasoning it was strictly safer. `rstac` matches `rel == "next"`
+  case-**sensitively** (measured: `next` 1, `NEXT` 0, `Next` 0), so a `NEXT` link is
+  inert to `items_fetch()` and cannot cause the duplicate I was guarding against. What it
+  actually means is that rstac *could not follow it and stopped after page one* — the
+  truncation this issue exists to fix — and on PC nothing else can detect that. My
+  "safer" strip was deleting the only evidence. Now it warns and keeps.
+- **Round 3 found that deleting `attr(, "cache_key")` left the suite green**, because its
+  only assertion sat behind the network skip. A documented v0.10.0 return element with no
+  CI coverage. Also that the wiring mock discarded its arguments, so `dft_stac_fetch()`
+  hardcoding `sign_fn` — making a documented argument a silent no-op — was invisible; and
+  that my own "pin the default `limit`" test pinned the *test helper's* default rather
+  than the function's.
+
+All fourteen are now caught, re-measured in a worktree.
+
 ## The wrong turns, kept
 
 - **The first probe measured the wrong collection.** `io-lulc-9-class` (6 items) rather
@@ -50,6 +72,15 @@ exact-case strip 2.
 - **A cube test failure was nearly attributed to this change.** `test-dft_stac_cube.R:62`
   went red and the instinct was that the new cache salt had leaked into
   `stac_cube_cache_key()`. Stashing the branch showed it red on `main` too.
+- **A commit captured a half-mutated source file.** A review agent ran its own
+  defect-restoration cycles in the *shared checkout* while the implementation session
+  committed, so `fc2e861` landed a `R/dft_stac_fetch.R` that does not parse and is
+  missing the cache salt — under a message claiming "458 pass". The next commit swept the
+  repair in silently, so nothing looked wrong. Two guards follow, and the repo convention
+  about one worktree per session already implied both: **a mutation harness runs in
+  `git worktree add --detach`, never the live checkout**, and **a commit on a branch where
+  one has run is verified by parsing the committed blob**, not by `git status` being
+  clean. Every commit on this branch was parse-checked afterwards.
 
 ## Evidence
 

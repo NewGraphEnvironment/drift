@@ -124,6 +124,17 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
   therefore **strips** the stale link rather than erroring on it (#51) — leaving it
   attached to `attr(result, "stac_items")` lets a caller re-run `items_fetch()` on
   an already-complete collection and silently duplicate pages 2..N.
+- **Strip `next` case-SENSITIVELY, and keep a case-variant.** `items_next.doc_items`
+  selects with `links(items, rel == "next")` — measured: `next` matches, `NEXT` and
+  `Next` do not. Two consequences, and the second is the one that matters. A `NEXT`
+  link is **inert** to `items_fetch()`, so it cannot cause the duplicate above and
+  does not need stripping. And its presence means rstac **could not follow it and
+  stopped after page one** — the truncation this whole entry is about — which on PC
+  nothing else can see, since `items_matched()` is NULL and a short read produces no
+  duplicate ids. So that link is the last local evidence of a truncated fetch, and a
+  "safer" case-insensitive strip *destroys* it. drift warns and keeps it. Widening a
+  matcher past what its consumer actually matches is the trap here: the guard stops
+  agreeing with the library whose behaviour it is compensating for.
 
   What completeness checks are actually available, and their reach:
   * **duplicate item ids** — never skipped, and the only one that works on PC.

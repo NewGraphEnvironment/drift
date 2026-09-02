@@ -272,6 +272,18 @@ paged <- function(sign_fn = function(items) items, limit = 500) {
   )
 }
 
+# Same call with `limit` OMITTED, so the PRODUCTION default is what reaches the
+# query. `paged()` carries its own default of 500 and would therefore pin the
+# test helper rather than the function — measured: changing the production
+# default to 1 left the suite green until this existed.
+paged_default_limit <- function() {
+  drift:::stac_items_paged(
+    stac_url = "https://example.com/stac", collection = "test-collection",
+    bbox = c(0, 0, 1, 1), datetime = "2020-01-01/2020-12-31",
+    sign_fn = function(items) items
+  )
+}
+
 test_that("stac_items_paged signs AFTER paging, so page-2 items are signed too", {
   testthat::local_mocked_bindings(
     get_request = function(q, ...) fake_items("a"),
@@ -310,24 +322,33 @@ test_that("stac_items_paged strips the stale `next` link before returning", {
   expect_setequal(rels, c("self", "root"))         # nothing else was dropped
 })
 
-test_that("stac_items_paged strips `next` regardless of case, and keeps rel-less links", {
+test_that("stac_items_paged KEEPS a case-variant `next` and warns, keeping rel-less links", {
+  # Deliberately NOT case-insensitive. rstac selects the next link with
+  # `links(items, rel == "next")`, which is case-sensitive — measured:
+  # next -> 1, NEXT -> 0, Next -> 0. So a `NEXT` link is inert to items_fetch()
+  # and cannot cause the re-paging duplicate the strip exists to prevent. What
+  # it DOES mean is that rstac could not follow it and stopped after page one —
+  # the #51 truncation — and on PC nothing else can detect that. Stripping it
+  # would delete the only local evidence, so it is kept and warned about.
   testthat::local_mocked_bindings(
     get_request = function(q, ...) {
       it <- fake_items("a", next_link = FALSE)
       it$links <- list(list(rel = "self", href = "s"),
                        list(href = "no-rel-at-all"),      # must survive
-                       list(rel = "NEXT", href = "p2"))   # must be dropped
+                       list(rel = "next", href = "p2"),   # followed -> stale, drop
+                       list(rel = "NEXT", href = "p3"))   # NOT followed -> keep
       it
     },
     items_fetch = function(items, ...) items,
     items_sign = function(items, ...) items,
     .package = "rstac"
   )
-  out <- paged()
+  expect_warning(out <- paged(), "case-sensitively")
   rels <- vapply(out$links,
                  function(l) if (is.null(l$rel)) "" else l$rel, character(1))
-  expect_false(any(tolower(rels) == "next"))
-  expect_equal(length(out$links), 2L)      # self + the rel-less one
+  expect_false("next" %in% rels)           # the one rstac followed is gone
+  expect_true("NEXT" %in% rels)            # the evidence is retained
+  expect_setequal(rels, c("self", "", "NEXT"))
 })
 
 test_that("stac_items_paged aborts on duplicate item ids", {
@@ -340,7 +361,8 @@ test_that("stac_items_paged aborts on duplicate item ids", {
     items_sign = function(items, ...) items,
     .package = "rstac"
   )
-  expect_error(paged(), "duplicate")
+  # names the offending id, so a message that reports the wrong one fails
+  expect_error(paged(), 'duplicate item id.*"a"')
 })
 
 test_that("stac_items_paged aborts when items_matched disagrees with the item count", {
@@ -353,7 +375,25 @@ test_that("stac_items_paged aborts when items_matched disagrees with the item co
     items_sign = function(items, ...) items,
     .package = "rstac"
   )
-  expect_error(paged(), "99")
+  # both numbers, in order: "returned 3 ... reports 99". Matching only "99"
+  # passes when n_items and matched are swapped, and those two numbers are
+  # exactly what a user acts on.
+  expect_error(paged(), "returned 3 items.*reports 99")
+})
+
+test_that("stac_items_paged warns, not aborts, when it has MORE items than reported", {
+  # Asymmetric by design: fewer than reported is truncation (abort); more is
+  # consistent with an ESTIMATED numberMatched, which pgstac/stac-fastapi can
+  # return above a row threshold. Aborting there would fail toward abort on a
+  # complete fetch — the mirror of the bug this whole change is about.
+  testthat::local_mocked_bindings(
+    get_request = function(q, ...) fake_items(c("a", "b", "c"), numberMatched = 2L),
+    items_fetch = function(items, ...) items,
+    items_sign = function(items, ...) items,
+    .package = "rstac"
+  )
+  expect_warning(out <- paged(), "returned 3 items, more than the 2")
+  expect_equal(length(out$features), 3L)      # and it still returns the items
 })
 
 test_that("stac_items_paged does not abort when items_matched is absent (the PC case)", {
@@ -380,6 +420,41 @@ test_that("stac_items_paged survives a zero-length items_matched", {
   expect_equal(length(paged()$features), 2L)
 })
 
+test_that("stac_items_paged hands sign_fn to items_sign", {
+  # Every other items_sign mock here is `function(items, ...)` and ignores
+  # sign_fn, so dropping `sign_fn = sign_fn` from the call measured FAIL=0.
+  # rstac::items_sign has no default for it, so the real failure is loud — but
+  # nothing offline saw it.
+  marker <- function(x) x
+  got <- NULL
+  testthat::local_mocked_bindings(
+    get_request = function(q, ...) fake_items("a", next_link = FALSE),
+    items_fetch = function(items, ...) items,
+    items_sign = function(items, sign_fn, ...) { got <<- sign_fn; items },
+    .package = "rstac"
+  )
+  paged(sign_fn = marker)
+  expect_identical(got, marker)
+})
+
+test_that("stac_items_paged aborts on an item with no id, naming that cause", {
+  # Not folded into the duplicate check: two id-less items would otherwise
+  # abort as "duplicate item id: NA / pages overlapped", which names the wrong
+  # cause. Measured FAIL=0 before this test existed.
+  testthat::local_mocked_bindings(
+    get_request = function(q, ...) {
+      it <- fake_items("a", next_link = FALSE)
+      it$features <- c(it$features, list(list(assets = list())))   # no id
+      it
+    },
+    items_fetch = function(items, ...) items,
+    items_sign = function(items, ...) items,
+    .package = "rstac"
+  )
+  expect_error(paged(), "no usable")
+  expect_error(paged(), "1 item")          # counts them
+})
+
 test_that("stac_items_paged passes limit through to the STAC query", {
   seen <- NULL
   testthat::local_mocked_bindings(
@@ -390,6 +465,11 @@ test_that("stac_items_paged passes limit through to the STAC query", {
   )
   paged(limit = 7)
   expect_equal(seen$params$limit, 7)
+  # and pin the DEFAULT, which is the only value production ever uses:
+  # dft_stac_fetch() never passes limit. Must go through the helper that OMITS
+  # limit, or this pins the test helper's default instead of the function's.
+  paged_default_limit()
+  expect_equal(seen$params$limit, 500)
 })
 
 test_that("dft_stac_fetch routes its STAC query through stac_items_paged", {
@@ -407,9 +487,16 @@ test_that("dft_stac_fetch routes its STAC query through stac_items_paged", {
     system.file("extdata", "example_aoi.gpkg", package = "drift"),
     quiet = TRUE
   )
+  # Capture the arguments, not just the fact of the call. A mock that discards
+  # `...` proves the helper was reached and NOTHING about what it was handed —
+  # measured: hardcoding sign_fn inside dft_stac_fetch(), or passing the wrong
+  # bbox/datetime/collection, all leave the suite green.
+  seen <- NULL
   testthat::local_mocked_bindings(
-    stac_items_paged = function(...) fake_items(c("sentinel-x", "sentinel-y"),
-                                                next_link = FALSE)
+    stac_items_paged = function(...) {
+      seen <<- list(...)
+      fake_items(c("sentinel-x", "sentinel-y"), next_link = FALSE)
+    }
   )
   testthat::local_mocked_bindings(
     # only reachable if dft_stac_fetch() queries STAC itself instead of via the helper
@@ -423,11 +510,71 @@ test_that("dft_stac_fetch routes its STAC query through stac_items_paged", {
     },
     .package = "gdalcubes"
   )
+  marker <- function(x) "SENTINEL-SIGN-FN"
   expect_error(
     suppressMessages(dft_stac_fetch(aoi, source = "io-lulc", years = 2020,
+                                    sign_fn = marker,
                                     cache_dir = tempfile("drift_wire_"))),
     "collection built from: sentinel-x,sentinel-y"
   )
+
+  # What it was handed. Without these, dft_stac_fetch() hardcoding its own
+  # sign_fn would make the documented argument a silent no-op that no test in
+  # this file catches — network test 1 uses the default and network test 2
+  # calls the helper directly.
+  cfg <- dft_stac_config("io-lulc")
+  expect_identical(seen$sign_fn, marker)
+  expect_identical(seen$collection, cfg$collection)
+  expect_identical(seen$stac_url, cfg$stac_url)
+  expect_identical(seen$datetime, "2020-01-01/2020-12-31")
+  expect_equal(seen$bbox, as.numeric(sf::st_bbox(sf::st_transform(aoi, 4326))))
+})
+
+test_that("dft_stac_fetch attaches cache_key, offline", {
+  # attr(, "cache_key") is a documented v0.10.0 return element whose only other
+  # assertion is behind the network skip, i.e. absent from CI. Deleting the
+  # assignment measured FAIL=0 without this. Pre-seed the cache so the
+  # file.exists() short-circuit fires and no network or gdalcubes read happens.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"),
+    quiet = TRUE
+  )
+  cfg <- dft_stac_config("io-lulc")
+  crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", crs)))
+  key <- drift:::stac_cache_key(aoi_t, 10, crs, "P1Y", "first", "near",
+                                cfg$stac_url, cfg$collection, cfg$asset,
+                                tile_size = NULL)
+  cache <- tempfile("drift_key_"); dir.create(file.path(cache, "io-lulc"), recursive = TRUE)
+  # any raster GDAL can open; the extension is not sniffed for content. Built
+  # over the AOI's own extent so the terra::mask() at the end of the cache-hit
+  # path has something to clip.
+  bb <- sf::st_bbox(aoi_t)
+  r <- terra::rast(nrows = 20, ncols = 20, crs = crs,
+                   xmin = bb[["xmin"]], xmax = bb[["xmax"]],
+                   ymin = bb[["ymin"]], ymax = bb[["ymax"]])
+  terra::values(r) <- seq_len(terra::ncell(r))
+  # .nc is the extension the untiled cache path expects; terra advises writeCDF
+  # for real NetCDF, but GDAL reads this back fine and the content is arbitrary
+  suppressWarnings(
+    terra::writeRaster(r, file.path(cache, "io-lulc", paste0("2020_", key, ".nc")))
+  )
+
+  testthat::local_mocked_bindings(
+    stac_items_paged = function(...) fake_items("a", next_link = FALSE)
+  )
+  # the image collection is built before the cache is consulted, and the fake
+  # items carry no assets; the cache-hit path never uses the result
+  testthat::local_mocked_bindings(
+    stac_image_collection = function(...) NULL,
+    .package = "gdalcubes"
+  )
+  out <- suppressMessages(
+    dft_stac_fetch(aoi, source = "io-lulc", years = 2020, cache_dir = cache)
+  )
+  expect_identical(attr(out, "cache_key"), key)
+  expect_s4_class(out[["2020"]], "SpatRaster")   # the cached file really was read
 })
 
 # Network end-to-end against the Planetary Computer. Opt-in only (env var), so
@@ -515,8 +662,11 @@ test_that("stac_items_paged pages to exhaustion at a tiny page size (network)", 
                        datetime = dt, limit = 1) |>
     rstac::get_request()
 
-  # the two answers must differ, or the test cannot fail
-  expect_lt(length(truncated$features), length(big$features))
+  # The discriminating comparison is truncated vs SMALL — both at limit = 1, so
+  # they differ only by whether paging happened. Comparing truncated against
+  # `big` cannot fail: limit = 500 returns all 14 in one page with or without
+  # items_fetch(), so 1 < 14 holds in both worlds.
+  expect_lt(length(truncated$features), length(small$features))
   # identical ORDERED ids, not merely equal counts: item order is output-visible
   # under aggregation = "first" where items share a datetime and overlap
   expect_identical(ids(small), ids(big))

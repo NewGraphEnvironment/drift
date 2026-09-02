@@ -251,21 +251,53 @@ stac_items_paged <- function(stac_url, collection, bbox, datetime, sign_fn,
   n_items <- length(items$features)
 
   matched <- rstac::items_matched(items)
-  # length(), not is.null(): items_matched() reads a caller-supplied field name
-  # and can yield numeric(0) as well as NULL, and `&&` on a zero-length value is
-  # an ERROR in R >= 4.2 — the guard would abort the fetch it exists to protect.
+  # length(), not is.null(). NULL is the reachable case here (PC sends no
+  # numberMatched); the length() form additionally covers a zero-length or
+  # multi-element value, because `&&` on a non-scalar is an ERROR in R >= 4.2 —
+  # the guard would abort the fetch it exists to protect. Being precise about
+  # reach: this call site passes no `matched_field`, so items_matched() only
+  # ever reads `search:metadata$matched`, `context$matched` or `numberMatched`
+  # off the document, and a server is free to put anything in those.
+  #
+  # ASYMMETRIC on purpose. Fewer items than reported is the truncation #51 is
+  # about, so it aborts. MORE is not: this function is documented as generic
+  # ("any STAC collection hosting single-band classified rasters"), and a
+  # pgstac/stac-fastapi catalogue can return an ESTIMATED `numberMatched` above
+  # a row threshold rather than an exact count — against which a complete fetch
+  # would abort. Warning there keeps a real signal without failing toward abort
+  # on a healthy result. (Not verified against a live pgstac instance; the
+  # asymmetry is chosen so it does not matter which way that lands.)
   if (length(matched) == 1L && !is.na(matched) && n_items != matched) {
-    cli::cli_abort(c(
-      "STAC paging returned {n_items} item{?s} but the API reports {matched}.",
-      "i" = "The item set is incomplete; the raster would be missing tiles."
+    if (n_items < matched) {
+      cli::cli_abort(c(
+        "STAC paging returned {n_items} item{?s} but the API reports {matched}.",
+        "i" = "The item set is incomplete; the raster would be missing tiles."
+      ))
+    }
+    cli::cli_warn(c(
+      "STAC paging returned {n_items} item{?s}, more than the {matched} the \\
+       API reports.",
+      "i" = "Treated as an estimated count, not truncation — the item set is \\
+             complete. Proceeding."
     ))
   }
 
   ids <- vapply(
     items$features,
-    function(f) if (is.null(f$id)) NA_character_ else as.character(f$id),
+    function(f) if (length(f$id) == 1L) as.character(f$id) else NA_character_,
     character(1)
   )
+  # Missing ids are their own diagnosis, checked FIRST. Folding them into the
+  # duplicate check reports two id-less items as "duplicate id: NA / pages
+  # overlapped", which names the wrong cause: the items are malformed and the
+  # pages did not overlap. STAC requires `id`, so this is a bad response.
+  if (anyNA(ids)) {
+    cli::cli_abort(c(
+      "STAC returned {sum(is.na(ids))} item{?s} with no usable {.field id}.",
+      "i" = "Every STAC item must carry a scalar {.field id}; this response \\
+             is malformed, and duplicate detection cannot run without one."
+    ))
+  }
   if (anyDuplicated(ids) > 0L) {
     dup <- unique(ids[duplicated(ids)])
     cli::cli_abort(c(
@@ -274,16 +306,34 @@ stac_items_paged <- function(stac_url, collection, bbox, datetime, sign_fn,
     ))
   }
 
+  # A case-VARIANT `next` is a different problem and must not be stripped.
+  # `rstac:::items_next.doc_items` selects with `links(items, rel == "next")`,
+  # which is case-sensitive (measured: next -> 1, NEXT -> 0, Next -> 0). So a
+  # `NEXT` link is inert to items_fetch() — it cannot cause the re-paging
+  # duplicate this strip exists to prevent. What it means instead is that rstac
+  # could not follow it and STOPPED AFTER PAGE ONE, i.e. exactly the #51
+  # truncation, with `items_matched()` NULL on PC and duplicate-ids unable to
+  # see it. That surviving link is then the last local trace, so deleting it
+  # would destroy the only evidence. Warn and keep.
+  is_odd_next <- function(l) {
+    is.character(l$rel) && length(l$rel) == 1L &&
+      tolower(l$rel) == "next" && !identical(l$rel, "next")
+  }
+  odd <- Filter(is_odd_next, items$links)
+  if (length(odd)) {
+    cli::cli_warn(c(
+      "STAC returned a {.val {odd[[1]]$rel}} link, which {.pkg rstac} matches \\
+       case-sensitively and therefore did not follow.",
+      "!" = "The item set may be truncated. The link is left attached to \\
+             {.code attr(, \"stac_items\")} as evidence."
+    ))
+  }
+
   # Drop the stale `next` (see above) before it reaches callers via
-  # `attr(result, "stac_items")`. Case-insensitive: STAC and rstac both emit
-  # lowercase `rel`, but matching only the exact string would silently leave a
-  # differently-cased link behind, which is the one outcome this must prevent.
-  # A link with no `rel` at all is kept — only `next` is being removed.
-  items$links <- Filter(
-    function(l) !(is.character(l$rel) && length(l$rel) == 1L &&
-                    tolower(l$rel) == "next"),
-    items$links
-  )
+  # `attr(result, "stac_items")`. Matched EXACTLY as rstac matches it, so this
+  # removes precisely the links that were followed and nothing else. A link
+  # with no `rel` is kept — only `next` is being removed.
+  items$links <- Filter(function(l) !identical(l$rel, "next"), items$links)
 
   rstac::items_sign(items, sign_fn = sign_fn)
 }
@@ -298,9 +348,22 @@ stac_items_paged <- function(stac_url, collection, bbox, datetime, sign_fn,
 #' as `target_crs`. `res` is coerced to double so `10L` and `10` key alike.
 #' Callers must pass post-resolution `stac_url`/`collection`/`asset`, never
 #' the raw possibly-NULL arguments. `tile_size` (the download-tiling grid, #36)
-#' is appended to the hash ONLY when non-NULL, so an untiled fetch keeps the
-#' exact legacy 9-element hash (existing caches stay valid) while a tiled fetch
-#' keys distinctly. It must arrive already snapped by the caller.
+#' is appended to the hash ONLY when non-NULL, so a tiled fetch keys distinctly
+#' from an untiled one. It must arrive already snapped by the caller.
+#'
+#' The parts list also carries a constant salt (#51) — see the comment in the
+#' body. **Untiled keys moved once, deliberately, at v0.10.0**, so the earlier
+#' claim that an untiled fetch keeps its legacy hash and that existing caches
+#' stay valid no longer holds: they rebuild once, on purpose, because the key
+#' is what stops a raster built from a truncated item set being served forever.
+#'
+#' `limit` (the STAC page size, `stac_items_paged()`) is deliberately NOT
+#' hashed. It changes only where page boundaries fall, not the item set: the
+#' network test asserts the *identical ordered* item ids at `limit = 1` and
+#' `limit = 500`, so on Planetary Computer the ordering is limit-independent
+#' and `limit` is not output-affecting. If `limit` is ever exposed as a
+#' user-facing argument, re-derive that before trusting it — two calls
+#' differing only in `limit` would otherwise key identically.
 #' @noRd
 stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
                            resampling, stac_url, collection, asset,
