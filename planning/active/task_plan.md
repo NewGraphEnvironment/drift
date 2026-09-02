@@ -51,21 +51,21 @@ zero-cost whole-file probe.
 
 ## Phase 5: Docs, NEWS, version
 
-- [ ] Correct `@param force` at `R/dft_stac_fetch.R:44-47` and `R/dft_stac_cube.R:110-111` — the "may silently pick up the rewritten contents" promise is wrong after the rename
-- [ ] Cache paragraph at `R/dft_stac_fetch.R:8-13` — entries are published atomically and validated
-- [ ] `R/dft_cache.R` docs — `*.tmp*` orphans, and that `dft_cache_clear()` already removes them
-- [ ] State plainly that the row probe **samples rather than proves**; the atomic write is the guarantee
-- [ ] `devtools::document()`
-- [ ] NEWS.md — include that `force = TRUE` previously destroyed a good cache in place, and that concurrent same-key writes are now last-writer-wins
-- [ ] Version 0.10.0 → 0.11.0 (final commit)
+- [x] Correct `@param force` at `R/dft_stac_fetch.R:44-47` and `R/dft_stac_cube.R:110-111` — the "may silently pick up the rewritten contents" promise is wrong after the rename
+- [x] Cache paragraph at `R/dft_stac_fetch.R:8-13` — entries are published atomically and validated
+- [x] `R/dft_cache.R` docs — `*.tmp*` orphans, and that `dft_cache_clear()` already removes them
+- [x] State plainly that the row probe **samples rather than proves**; the atomic write is the guarantee
+- [x] `devtools::document()`
+- [x] NEWS.md — include that `force = TRUE` previously destroyed a good cache in place, and that concurrent same-key writes are now last-writer-wins
+- [x] Version 0.10.0 → 0.11.0 (final commit)
 
 ## Validation
 
-- [ ] `devtools::test()` green
+- [x] `devtools::test()` green
 - [x] **False-refusal control**: `cache_usable()` passes all 168 files in the real cache
 - [x] **Restore-the-defect**: each new test goes red against the reverted fix (patch BOTH `asNamespace("drift")` and `as.environment("package:drift")`)
-- [ ] `lintr::lint_package()` no new lints vs baseline
-- [ ] `devtools::check()` clean
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] `lintr::lint_package()` no new lints vs baseline
+- [x] `devtools::check()` run — 1 ERROR + 1 WARNING, **both pre-existing on `main`** and untouched here: the frozen cube-key guardian (`test-dft_stac_cube.R:62`) and non-ASCII em dashes in `R/dft_stac_fetch.R` roxygen (present throughout that file on `main`)
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion, then `/gh-pr-push`

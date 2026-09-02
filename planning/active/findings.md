@@ -85,12 +85,22 @@ completely, and the premise for switching probes does not hold.
 The last row is still what gets probed — same cost, and for any partially-written file the tail is
 the least likely part to be complete — but on that reasoning, not the refuted one.
 
-### Refuted: PAM sidecar hazard on the cube write
+### Half-refuted, and my refutation was over-scoped: the PAM sidecar
 
-The review flagged that `terra::writeRaster()` might emit a `<file>.tif.aux.xml` sidecar which a
-single rename would strand. Measured on the exact cube write shape (12-layer stack with
-`terra::time()` and `names()` set immediately before writing): **one file, no sidecar**. No
-dual-rename needed.
+The review flagged that `terra::writeRaster()` might emit a `<file>.aux.xml` sidecar which a
+single rename would strand. I measured the exact **cube** write shape (12-layer stack with
+`terra::time()` and `names()` set immediately before writing) — **one file, no sidecar** — and
+recorded the hazard as refuted.
+
+That was wrong as a general claim, and my own test caught it an hour later: writing `.nc` through
+terra **does** emit `<file>.nc.aux.xml`, which the rename stranded under the dead temp name. I had
+tested one of the two extensions and generalised from it — the same over-scoping the review itself
+had committed in the other direction.
+
+Production reaches the sidecar case rarely (the untiled path writes via `gdalcubes::write_ncdf`,
+which emits none, and the real cache contains no `.aux.xml` at all), but `cache_write_atomic()` now
+carries a sidecar across the rename when one exists — sidecar first, raster second, so the
+canonical name never exists without it.
 
 ### Confirmed in substance, wrong mechanism: arm (c)'s fixture
 

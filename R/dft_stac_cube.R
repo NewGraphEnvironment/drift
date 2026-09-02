@@ -107,8 +107,10 @@
 #'   1 is already set, that value is honoured rather than overridden.
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
 #'   [dft_cache_path()].
-#' @param force Logical. Re-fetch even if cached, overwriting the cached raster
-#'   (default `FALSE`).
+#' @param force Logical. Re-fetch even if cached, replacing the cached raster
+#'   (default `FALSE`). The replacement is atomic, so an interrupted forced
+#'   re-fetch leaves the previous entry intact rather than destroying it — which
+#'   matters here, where rebuilding is a multi-hour stream.
 #' @param sign_fn A signing function for STAC assets. Default is
 #'   [rstac::sign_planetary_computer()].
 #'

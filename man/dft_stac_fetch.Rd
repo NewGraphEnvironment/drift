@@ -65,10 +65,11 @@ GeoTIFF (\code{.tif}) rather than a gdalcubes NetCDF (\code{.nc}).}
 \item{cache_dir}{Character. Cache directory path. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
 
-\item{force}{Logical. Re-fetch even if cached, overwriting the cached file
-(default \code{FALSE}). A raster returned by an earlier call with the same
-parameters is backed by that file and may silently pick up the rewritten
-contents.}
+\item{force}{Logical. Re-fetch even if cached, replacing the cached file
+(default \code{FALSE}). The replacement is atomic, so a raster returned by an
+earlier call keeps reading the entry it was opened against rather than
+picking up half-rewritten contents, and an interrupted forced re-fetch
+leaves the previous entry intact.}
 
 \item{sign_fn}{A signing function for STAC assets. Default is
 \code{\link[rstac:items_sign_planetary_computer]{rstac::sign_planetary_computer()}}.}
@@ -96,4 +97,16 @@ where \code{key} is a hash of the AOI geometry and every fetch parameter that
 affects the output (\code{res}, \code{crs}, \code{dt}, \code{aggregation}, \code{resampling},
 \code{stac_url}, \code{collection}, \code{asset}, and \code{tile_size}). Repeat calls with the
 same AOI and parameters reuse the cache; changing any of them re-fetches.
+
+Entries are \strong{published atomically} — written to a temp file in the same
+directory and renamed into place only after a complete, validated write — so
+an interrupted fetch cannot leave a partial file under the canonical name for
+a later run to trust. A cached entry is also \strong{validated before it is
+served}: it must open as a raster, be sanely georeferenced, and return its
+pixels without a read error. An entry that fails is re-fetched with a warning
+rather than served or left for the user to delete by hand.
+
+The read check samples rather than proves — it reads one row, so interior
+damage that leaves the file structurally walkable can pass it. The guarantee
+against partial entries is the atomic write, not the check.
 }
