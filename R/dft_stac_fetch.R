@@ -50,7 +50,12 @@
 #'
 #' @return A named list of [terra::SpatRaster] objects, one per year. The STAC
 #'   items are attached as `attr(, "stac_items")` for use with
-#'   [dft_stac_classes()].
+#'   [dft_stac_classes()] — paged to exhaustion, with the (stale) `next` link
+#'   stripped so a caller re-running [rstac::items_fetch()] on them cannot
+#'   silently duplicate features. The cache key is attached as
+#'   `attr(, "cache_key")` so a caller can record which cache entry served the
+#'   fetch; it is **per call, not per year** — cached files are named
+#'   `<year>_<cache_key>`, so one key covers every year the call returned.
 #' @export
 dft_stac_fetch <- function(aoi,
                            source = "io-lulc",
@@ -123,16 +128,15 @@ dft_stac_fetch <- function(aoi,
   aoi_target <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", target_crs)))
   bbox_target <- sf::st_bbox(aoi_target)
 
-  # STAC query
+  # STAC query, paged to exhaustion (#51)
   message("Querying STAC: ", collection, " (", min(years), "-", max(years), ")...")
-  items <- rstac::stac(stac_url) |>
-    rstac::stac_search(
-      collections = collection,
-      bbox = bbox_query,
-      datetime = paste0(min(years), "-01-01/", max(years), "-12-31")
-    ) |>
-    rstac::get_request() |>
-    rstac::items_sign(sign_fn = sign_fn)
+  items <- stac_items_paged(
+    stac_url = stac_url,
+    collection = collection,
+    bbox = bbox_query,
+    datetime = paste0(min(years), "-01-01/", max(years), "-12-31"),
+    sign_fn = sign_fn
+  )
 
   n_items <- length(items$features)
   message("  ", n_items, " items returned")
@@ -190,7 +194,91 @@ dft_stac_fetch <- function(aoi,
 
   names(result) <- as.character(years)
   attr(result, "stac_items") <- items
+  attr(result, "cache_key") <- cache_key
   result
+}
+
+
+#' Query STAC and page to exhaustion, then sign
+#'
+#' `rstac::get_request()` returns ONE page. Handing that to
+#' [gdalcubes::stac_image_collection()] builds the cube from a partial item set,
+#' so a wide AOI silently yields a raster with missing tiles (#51). This pages
+#' with [rstac::items_fetch()] before signing.
+#'
+#' **Order matters.** Signing must come after paging: [rstac::items_sign()]
+#' rewrites asset hrefs, so signing first leaves every item from page 2 onward
+#' unsigned.
+#'
+#' **GET, not POST.** [dft_stac_cube()] posts because `ext_filter()` (CQL2)
+#' requires it and because its `intersects` carries a whole polygon; neither
+#' applies here, where the query is a bbox with no filter. Revisit if this
+#' function ever gains `intersects` or a property filter.
+#'
+#' **No guard on a surviving `next` link**, which is what the obvious
+#' implementation would do. `rstac:::items_fetch.doc_items` mutates only
+#' `items$features` and never `items$links`, so a fully-paged collection still
+#' carries page 1's `next`. Erroring on it would abort every correctly-paged
+#' fetch. The link is stale rather than meaningful, so it is stripped before
+#' returning — otherwise a caller who runs `items_fetch()` on
+#' `attr(, "stac_items")` re-fetches pages 2..N into an already-complete feature
+#' list and silently duplicates them.
+#'
+#' Two completeness checks, deliberately of different reach:
+#' * `items_matched()` vs the item count — fires only where the API reports a
+#'   total. Planetary Computer reports none, so **this never executes against
+#'   PC**; it is fixtured in the tests rather than left as dead code.
+#' * duplicate item ids — never skipped, and the only completeness signal
+#'   available on PC. [gdalcubes::stac_image_collection()] drops duplicates
+#'   behind a debug-only message, so nothing downstream would ever report them.
+#'
+#' `limit` is a round-trip reducer, not the fix: it sets the page size, and PC
+#' clamps it to its own cap regardless. `items_fetch()` is what makes the result
+#' complete.
+#' @noRd
+stac_items_paged <- function(stac_url, collection, bbox, datetime, sign_fn,
+                             limit = 500) {
+  items <- rstac::stac(stac_url) |>
+    rstac::stac_search(
+      collections = collection,
+      bbox = bbox,
+      datetime = datetime,
+      limit = limit
+    ) |>
+    rstac::get_request() |>
+    rstac::items_fetch()
+
+  n_items <- length(items$features)
+
+  matched <- rstac::items_matched(items)
+  # length(), not is.null(): items_matched() reads a caller-supplied field name
+  # and can yield numeric(0) as well as NULL, and `&&` on a zero-length value is
+  # an ERROR in R >= 4.2 — the guard would abort the fetch it exists to protect.
+  if (length(matched) == 1L && !is.na(matched) && n_items != matched) {
+    cli::cli_abort(c(
+      "STAC paging returned {n_items} item{?s} but the API reports {matched}.",
+      "i" = "The item set is incomplete; the raster would be missing tiles."
+    ))
+  }
+
+  ids <- vapply(
+    items$features,
+    function(f) if (is.null(f$id)) NA_character_ else as.character(f$id),
+    character(1)
+  )
+  if (anyDuplicated(ids) > 0L) {
+    dup <- unique(ids[duplicated(ids)])
+    cli::cli_abort(c(
+      "STAC paging returned duplicate item id{?s}: {.val {dup}}.",
+      "i" = "Pages overlapped — the item set cannot be trusted."
+    ))
+  }
+
+  # Drop the stale `next` (see above) before it reaches callers via
+  # `attr(result, "stac_items")`.
+  items$links <- Filter(function(l) !identical(l$rel, "next"), items$links)
+
+  rstac::items_sign(items, sign_fn = sign_fn)
 }
 
 
@@ -208,12 +296,19 @@ dft_stac_fetch <- function(aoi,
 #' keys distinctly. It must arrive already snapped by the caller.
 #' @noRd
 stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
-                           resampling, stac_url, collection, asset,
+                           resampling, stac_url, collection, asset
                            tile_size = NULL) {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
   parts <- list(
     geom_wkb, as.numeric(res), target_crs, dt, aggregation,
-    resampling, stac_url, collection, asset
+    resampling, stac_url, collection, asset,
+    # Deliberate cache-format break (#51). Every key parameter above is
+    # unchanged by the paging fix, so without this salt a raster written from a
+    # TRUNCATED item set keeps being served by the file.exists() short-circuit —
+    # and the users the bug hit hardest (wide AOIs) get no fix at all on
+    # upgrade, silently and permanently under `force = FALSE`. Bumping the salt
+    # costs a one-time re-fetch of small annual rasters. Do not remove it; to
+    # invalidate again, change the string rather than adding another element.
   )
   # A tiled fetch caches a terra .tif mosaic; an untiled fetch caches a
   # gdalcubes .nc. Keying them apart stops one being served as the other.

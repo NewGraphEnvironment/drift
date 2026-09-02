@@ -107,6 +107,36 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
   `items_matched()` is NULL, so you can't detect truncation —
   `post_request() |> items_fetch()` is mandatory for multi-year monthly queries.
   `ext_filter(`eo:cloud_cover` <= {{var}})` needs `{{ }}` for a runtime variable.
+- **The `next` link SURVIVES a successful `items_fetch()`, so "error if a `next`
+  link remains" is a guard that aborts every correctly-paged fetch.** This is the
+  obvious implementation and it is wrong. `rstac:::items_fetch.doc_items` mutates
+  only `items$features` and never `items$links`, so what you get back is page 1's
+  document with a concatenated feature list — carrying page 1's `next` verbatim.
+  Measured 2026-09-01 on `io-lulc-annual-v02` over the packaged AOI (14 items):
+
+  ```
+  limit=NULL raw_n=14 raw_next=FALSE | fetched_n=14 fetched_next=FALSE | matched=NULL
+  limit=1    raw_n=1  raw_next=TRUE  | fetched_n=14 fetched_next=TRUE  | matched=NULL
+  limit=3    raw_n=3  raw_next=TRUE  | fetched_n=14 fetched_next=TRUE  | matched=NULL
+  ```
+
+  A surviving `next` means *paging happened*, not *paging is incomplete*. drift
+  therefore **strips** the stale link rather than erroring on it (#51) — leaving it
+  attached to `attr(result, "stac_items")` lets a caller re-run `items_fetch()` on
+  an already-complete collection and silently duplicate pages 2..N.
+
+  What completeness checks are actually available, and their reach:
+  * **duplicate item ids** — never skipped, and the only one that works on PC.
+    `gdalcubes::stac_image_collection()` drops duplicates behind a
+    `.pkgenv$debug`-gated message, so nothing downstream would ever report them.
+  * **`items_matched()` vs the item count** — works on STAC APIs that return
+    `numberMatched`; **never executes against PC**, so it must be fixtured in tests
+    or it is dead code.
+  * Every non-`next_error` failure inside `items_fetch()`'s loop (transport, non-200,
+    non-JSON) propagates rather than being swallowed, so after a successful
+    `items_fetch()` the only remaining silent-truncation mode is a server omitting
+    `next` while more data exists. That — not "the check skips on PC" — is why not
+    asserting completeness there is honest.
 - **GDAL /vsicurl tuning** (`GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR`,
   `VSI_CACHE=TRUE`, HTTP multiplex) helps modestly (~38→28 s/month); the real
   speed/quality win is fetching fewer better months (growing-season `months`
