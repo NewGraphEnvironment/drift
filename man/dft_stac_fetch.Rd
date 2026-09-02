@@ -76,7 +76,12 @@ contents.}
 \value{
 A named list of \link[terra:SpatRaster-class]{terra::SpatRaster} objects, one per year. The STAC
 items are attached as \code{attr(, "stac_items")} for use with
-\code{\link[=dft_stac_classes]{dft_stac_classes()}}.
+\code{\link[=dft_stac_classes]{dft_stac_classes()}} — paged to exhaustion, with the (stale) \code{next} link
+stripped so a caller re-running \code{\link[rstac:items_functions]{rstac::items_fetch()}} on them cannot
+silently duplicate features. The cache key is attached as
+\code{attr(, "cache_key")} so a caller can record which cache entry served the
+fetch; it is \strong{per call, not per year} — cached files are named
+\verb{<year>_<cache_key>}, so one key covers every year the call returned.
 }
 \description{
 Query a STAC catalog, build a gdalcubes image collection, and extract
