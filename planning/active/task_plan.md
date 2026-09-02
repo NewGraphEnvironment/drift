@@ -18,29 +18,29 @@ zero-cost whole-file probe.
 
 ## Phase 1: Failing tests for atomic write (fetch)
 
-- [ ] Test: a writer that throws partway leaves **nothing** at the canonical cache path
-- [ ] Test: a writer that throws partway does **not destroy an existing good cache** under `force = TRUE`
-- [ ] Test: `file.rename()` returning `FALSE` aborts rather than silently leaving no cache
-- [ ] Test: no `*.tmp*` temp file survives a successful write
-- [ ] Confirm all fail against current `main`
+- [x] Test: a writer that throws partway leaves **nothing** at the canonical cache path
+- [x] Test: a writer that throws partway does **not destroy an existing good cache** under `force = TRUE`
+- [x] Test: `file.rename()` returning `FALSE` aborts rather than silently leaving no cache
+- [x] Test: no `*.tmp*` temp file survives a successful write
+- [x] Confirm all fail against current `main`
 
 ## Phase 2: `cache_write_atomic()` and wire into fetch
 
-- [ ] Add `cache_write_atomic()` to `R/dft_stac_fetch.R` — temp in same dir, **real extension preserved** (terra picks its driver from it), PID + counter in the name, no leading dot, checked `file.rename()`, `on.exit()` cleanup
-- [ ] Wrap the two call sites that name `cache_file` (untiled `fetch_extent_to()`, and `mosaic_tiles()`) — **not** inside `fetch_extent_to()`, which is also called per-tile with a `tempfile()` already and would then rename across filesystems
-- [ ] Fix the tile leak: `on.exit(unlink(tile_files), add = TRUE)` so a `mosaic_tiles()` error does not strand every tile
-- [ ] Phase 1 tests go green
+- [x] Add `cache_write_atomic()` to `R/dft_stac_fetch.R` — temp in same dir, **real extension preserved** (terra picks its driver from it), PID + counter in the name, no leading dot, checked `file.rename()`, `on.exit()` cleanup
+- [x] Wrap the two call sites that name `cache_file` (untiled `fetch_extent_to()`, and `mosaic_tiles()`) — **not** inside `fetch_extent_to()`, which is also called per-tile with a `tempfile()` already and would then rename across filesystems
+- [x] Fix the tile leak: `on.exit(unlink(tile_files), add = TRUE)` so a `mosaic_tiles()` error does not strand every tile
+- [x] Phase 1 tests go green
 
 ## Phase 3: `cache_usable()` + validation on both write and read
 
-- [ ] `cache_geom_ok()` — predicate over plain numerics, so every branch is unit-testable (terra refuses to construct degenerate rasters)
-- [ ] `cache_usable()` — arm (a) open **errors only** (never the multidim capability warning), arm (b) geometry incl. empty-CRS **conjoined** with the identity geotransform, arm (c) last-row read raises a warning
-- [ ] **Validate the temp before renaming** — covers `force = TRUE` and the miss branch, which currently flows unvalidated into `terra::mask()` at `R/dft_stac_fetch.R:192`
-- [ ] Gate the fetch cache hit on `cache_usable()`; warn naming the failing arm, then re-fetch
-- [ ] Test arm (a) — zero-byte and truncated fixtures; assert `rast()` really errors (premise)
-- [ ] Test arm (b) — `cache_geom_ok()` directly on all branches, plus one file-level identity-geotransform fixture for the wiring
-- [ ] Test arm (c) — CI test injects a warning-raising probe and is **named for that**; fixture-based version is env-guarded and skips (never passes) if the damage fails to warn
-- [ ] Confirm `force = TRUE` skips read-side validation
+- [x] `cache_geom_ok()` — predicate over plain numerics, so every branch is unit-testable (terra refuses to construct degenerate rasters)
+- [x] `cache_usable()` — arm (a) open **errors only** (never the multidim capability warning), arm (b) geometry incl. empty-CRS **conjoined** with the identity geotransform, arm (c) last-row read raises a warning
+- [x] **Validate the temp before renaming** — covers `force = TRUE` and the miss branch, which currently flows unvalidated into `terra::mask()` at `R/dft_stac_fetch.R:192`
+- [x] Gate the fetch cache hit on `cache_usable()`; warn naming the failing arm, then re-fetch
+- [x] Test arm (a) — zero-byte and truncated fixtures; assert `rast()` really errors (premise)
+- [x] Test arm (b) — `cache_geom_ok()` directly on all branches, plus one file-level identity-geotransform fixture for the wiring
+- [x] Test arm (c) — CI test injects a warning-raising probe and is **named for that**; fixture-based version is env-guarded and skips (never passes) if the damage fails to warn
+- [x] Confirm `force = TRUE` skips read-side validation
 
 ## Phase 4: Same two changes in `dft_stac_cube()`
 
@@ -62,7 +62,7 @@ zero-cost whole-file probe.
 ## Validation
 
 - [ ] `devtools::test()` green
-- [ ] **False-refusal control**: `cache_usable()` passes all 168 files in the real cache
+- [x] **False-refusal control**: `cache_usable()` passes all 168 files in the real cache
 - [ ] **Restore-the-defect**: each new test goes red against the reverted fix (patch BOTH `asNamespace("drift")` and `as.environment("package:drift")`)
 - [ ] `lintr::lint_package()` no new lints vs baseline
 - [ ] `devtools::check()` clean

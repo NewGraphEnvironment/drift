@@ -172,12 +172,19 @@ dft_stac_fetch <- function(aoi,
     t0 <- paste0(yr, "-01-01")
     t1 <- paste0(yr, "-12-31")
 
-    if (!force && file.exists(cache_file)) {
+    # Presence is no longer trust (#41): a cached file must also be readable,
+    # sanely georeferenced, and able to return its pixels. `force` short-circuits
+    # first — the file is about to be replaced, so validating it is pure cost,
+    # and a validation abort would break `force = TRUE` exactly when the cache is
+    # broken, which is the documented recovery lever.
+    if (!force && file.exists(cache_file) && cache_hit_ok(cache_file, yr)) {
       message("  ", yr, ": cached")
     } else if (is.null(tile_size)) {
       message("  ", yr, ": fetching...")
-      fetch_extent_to(col, bbox_ext, t0, t1, target_crs, res, dt,
-                      aggregation, resampling, cache_file)
+      cache_write_atomic(cache_file, function(out) {
+        fetch_extent_to(col, bbox_ext, t0, t1, target_crs, res, dt,
+                        aggregation, resampling, out)
+      })
     } else {
       message("  ", yr, ": fetching ", length(tiles), " tile(s)...")
       tile_files <- vapply(seq_along(tiles), function(i) {
@@ -185,8 +192,10 @@ dft_stac_fetch <- function(aoi,
                         aggregation, resampling,
                         tempfile(sprintf("drift_tile%d_", i), fileext = ".nc"))
       }, character(1))
-      mosaic_tiles(tile_files, cache_file)
-      unlink(tile_files)
+      # on.exit, not a trailing unlink(): a mosaic_tiles() error would otherwise
+      # strand every tile file for the life of the session.
+      on.exit(unlink(tile_files), add = TRUE)
+      cache_write_atomic(cache_file, function(out) mosaic_tiles(tile_files, out))
     }
 
     terra::mask(terra::rast(cache_file), terra::vect(aoi_target))
@@ -496,6 +505,232 @@ mosaic_tiles <- function(tile_files, out_file) {
   merged <- terra::merge(terra::sprc(rasters))
   terra::writeRaster(merged, out_file, overwrite = TRUE)
   out_file
+}
+
+
+#' Publish a cache entry atomically
+#'
+#' Writes via a unique temp file **in the same directory** and moves it onto the
+#' canonical name only after `write_fn` has returned and the result has been
+#' validated. Same directory means same filesystem, so the move is a POSIX
+#' `rename(2)` — atomic, and it replaces the destination in one step.
+#'
+#' This is what #41 was missing. Writing straight to `<year>_<key>.nc` meant a
+#' process killed mid-write left a partial file at the *canonical* name, which
+#' the presence-only cache gate then reported as `cached` forever.
+#'
+#' Three details that are easy to get wrong:
+#' * **The temp keeps the real extension.** [terra::writeRaster()] picks its
+#'   driver from the extension, so a `.tmp` suffix would select the wrong driver
+#'   or fail outright.
+#' * **[file.rename()] signals failure by returning `FALSE`**, not by erroring.
+#'   An unchecked move is how a missing cache reaches a consumer silently.
+#' * **The temp is not hidden.** `dft_cache_info()` and `dft_cache_clear()` call
+#'   [list.files()] with the default `all.files = FALSE`, so a dot-prefixed temp
+#'   would be invisible to the size report and would under-report the count
+#'   removed.
+#'
+#' The temp name carries the PID and a per-call token, so two sessions fetching
+#' the same key no longer interleave writes onto one path — that becomes clean
+#' last-writer-wins.
+#'
+#' `on.exit()` removes the temp on error and on R-level interrupt. It does not
+#' run on `SIGKILL`, OOM-kill or power loss, so a hard kill can still strand a
+#' `*.tmp*` file. That is disk garbage and never a correctness problem: the read
+#' gate matches only the canonical name, so a temp can never be served — which
+#' is precisely the property #41 lacked. `dft_cache_clear()` removes them.
+#' @noRd
+cache_write_atomic <- function(path, write_fn) {
+  tmp <- file.path(
+    dirname(path),
+    sprintf("%s.tmp%d-%s.%s",
+            tools::file_path_sans_ext(basename(path)),
+            Sys.getpid(),
+            basename(tempfile("")),
+            tools::file_ext(path))
+  )
+  # GDAL's PAM sidecar rides along with whatever the writer produced. Measured:
+  # terra::writeRaster() to `.nc` emits one, to `.tif` does not. Renaming only
+  # the raster would strand it under the dead temp name, leaving cache litter
+  # that dft_cache_info() then counts.
+  tmp_pam <- paste0(tmp, ".aux.xml")
+  on.exit(unlink(c(tmp, tmp_pam)), add = TRUE)
+
+  write_fn(tmp)
+
+  if (!file.exists(tmp)) {
+    cli::cli_abort(c(
+      "Writing the cache entry for {.file {basename(path)}} produced no file.",
+      "i" = "Nothing was written to {.file {tmp}}."
+    ))
+  }
+  # Validate BEFORE publishing, not only at the read gate. This is what covers
+  # the miss branch — a freshly written file otherwise flows straight into
+  # terra::mask(terra::rast(cache_file)), which is exactly where the #41
+  # traceback dies — and it is the only validation `force = TRUE` ever reaches.
+  why <- cache_invalid_reason(tmp)
+  if (!is.na(why)) {
+    cli::cli_abort(c(
+      "The cache entry just written for {.file {basename(path)}} {why}.",
+      "i" = "It was discarded rather than published; the previous entry, if \\
+             any, is untouched."
+    ))
+  }
+
+  # Sidecar first, raster second, so the canonical name never exists without it.
+  if (file.exists(tmp_pam) &&
+        !isTRUE(file.rename(tmp_pam, paste0(path, ".aux.xml")))) {
+    cli::cli_abort(
+      "The sidecar for {.file {basename(path)}} could not be moved into place."
+    )
+  }
+  if (!isTRUE(file.rename(tmp, path))) {
+    cli::cli_abort(c(
+      "The cache entry for {.file {basename(path)}} could not be moved into \\
+       place.",
+      "i" = "Failed to rename {.file {tmp}} onto {.file {path}}.",
+      "i" = "Check permissions on the cache directory and that it is not \\
+             read-only."
+    ))
+  }
+  path
+}
+
+
+#' Why a cache file cannot be trusted, or `NA` if it can
+#'
+#' Three arms, each covering a damage shape the others structurally cannot see.
+#' Measured 2026-09-02 (terra 1.9.34, GDAL 3.8.5, gdalcubes 0.7.4):
+#'
+#' | shape | `terra::rast()` | geometry | pixel read |
+#' | --- | --- | --- | --- |
+#' | tail-truncated (and zero-byte) | errors | -- | -- |
+#' | broken geotransform | succeeds + warns | degenerate | `mask()` fails |
+#' | content-damaged, size preserved | succeeds silently | valid | warns |
+#'
+#' So none of the cheaper single checks is sufficient: `tryCatch(rast())` alone
+#' passes the second and third shapes, and a geometry check alone passes the
+#' third — that file opens clean, has correct dim/res/CRS, and even masks fine.
+#' Content damage is detectable *only* via the warning raised during the read;
+#' the values come back looking plausible (`nNA = 0`), so nothing is inferable
+#' by inspecting them.
+#'
+#' **Arm (a) catches errors only, never a warning on open.** The multidim-API
+#' warning is a capability message rather than a damage signal — drift's own
+#' tests must `suppressWarnings()` around writing a `.nc` through terra — so
+#' failing on it would refuse healthy `.nc` entries across the whole cache.
+#'
+#' `probe` is injectable so the warning-handling branch is testable without
+#' depending on a damage fixture whose reachability is format-dependent.
+#' @noRd
+cache_invalid_reason <- function(path, probe = cache_probe_last_row) {
+  # suppressWarnings on the OPEN only. Warnings here are capability messages,
+  # not damage signals (see above), and this function is routinely pointed at a
+  # file that may be broken — letting GDAL's "not recognized as a supported file
+  # format" escape would make every successful detection also spray a second,
+  # lower-level warning at the user. The READ warnings below are deliberately
+  # NOT suppressed: there, the condition is the entire signal.
+  r <- suppressWarnings(tryCatch(terra::rast(path), error = function(e) NULL))
+  if (is.null(r)) return("could not be opened as a raster")
+
+  why <- cache_geom_ok(dim(r), terra::res(r), as.vector(terra::ext(r)),
+                       terra::crs(r))
+  if (!is.na(why)) return(why)
+
+  # The caller judges, the probe just reads. A GDAL read failure surfaces as a
+  # WARNING with the values still returned (measured: `netcdf error #-101`), so
+  # the warning is the only signal — and catching it here rather than inside the
+  # probe means an injected probe cannot accidentally swallow its own evidence.
+  ok <- TRUE
+  withCallingHandlers(
+    tryCatch(probe(r), error = function(e) {
+      ok <<- FALSE
+      NULL
+    }),
+    warning = function(w) {
+      ok <<- FALSE
+      invokeRestart("muffleWarning")
+    }
+  )
+  if (!ok) return("its pixel data could not be read cleanly")
+  NA_character_
+}
+
+
+#' Is a raster's georeferencing self-consistent?
+#'
+#' Kept separate from the [terra::SpatRaster] it describes, over plain numerics,
+#' because terra refuses to *construct* a zero-dimension, non-finite-resolution
+#' or collapsed-extent raster — so driving these checks through a file would
+#' leave three of the four shipping with no test able to reach them.
+#'
+#' The empty-CRS check is a **conjunction** with the identity geotransform
+#' (`res == 1`, extent `0..ncol` by `0..nrow`) rather than a test on the CRS
+#' alone. An absent CRS is not by itself proof of damage, and refusing on it
+#' alone risks discarding healthy entries — the cost of a false refusal here is
+#' a silent, permanent re-download. Together the two are the shape the #41
+#' report describes, where GDAL fell back to an identity geotransform and terra
+#' reported `Cannot invert geotransform`.
+#'
+#' @return `NA_character_` when the geometry is sound, otherwise a reason.
+#' @noRd
+cache_geom_ok <- function(dims, res, ext, crs) {
+  if (any(dims[1:2] <= 0)) return("has zero rows or columns")
+  if (any(!is.finite(res)) || any(res <= 0)) {
+    return("has a non-finite or non-positive resolution")
+  }
+  if (any(!is.finite(ext))) return("has a non-finite extent")
+  if (ext[1] >= ext[2] || ext[3] >= ext[4]) return("has a collapsed extent")
+  if (!nzchar(crs) &&
+        isTRUE(all.equal(as.numeric(res), c(1, 1))) &&
+        isTRUE(all.equal(as.numeric(ext),
+                         c(0, dims[2], 0, dims[1]), check.names = FALSE))) {
+    return("has no CRS and an identity geotransform, the fallback GDAL uses \\
+            when it cannot read the georeferencing")
+  }
+  NA_character_
+}
+
+
+#' Read the last row of a raster, reporting whether it came back clean
+#'
+#' The **last** row rather than the first: an interrupted write truncates at the
+#' end, so the tail is the part least likely to be complete. Cost is the same
+#' either way — one block-row across every layer, 0.08 s on a 13 MB cache entry
+#' against 2.4 s for a `minmax(compute = TRUE)` scan.
+#'
+#' This **samples, it does not prove**. It is a smoke test for truncation and
+#' structural damage; interior content damage that leaves the container walkable
+#' can pass it. The guarantee against partial cache entries is the atomic write
+#' in `cache_write_atomic()`, not this probe.
+#'
+#' It only reads. Whether the read counts as clean is decided by
+#' `cache_invalid_reason()`, which watches for a warning or error around this
+#' call — a GDAL read failure surfaces as a *warning* with the values still
+#' returned, so the returned data cannot be distinguished from healthy data by
+#' inspection and the condition is the whole signal.
+#' @noRd
+cache_probe_last_row <- function(r) {
+  terra::values(r, row = terra::nrow(r), nrows = 1)
+}
+
+
+#' Decide whether a cached file may be served, warning if it may not
+#'
+#' Shared by [dft_stac_fetch()] and [dft_stac_cube()]. A rejected entry is
+#' treated as a **miss and re-fetched** — never an abort telling the user to
+#' delete a file by hand, since manual deletion is the recovery #41 exists to
+#' remove. The warning names the failing arm so a false refusal is reportable
+#' rather than showing up as "drift mysteriously got slow".
+#' @noRd
+cache_hit_ok <- function(cache_file, label) {
+  why <- cache_invalid_reason(cache_file)
+  if (is.na(why)) return(TRUE)
+  cli::cli_warn(c(
+    "The cached file for {label} {why}; re-fetching.",
+    "i" = "{.file {cache_file}}"
+  ))
+  FALSE
 }
 
 

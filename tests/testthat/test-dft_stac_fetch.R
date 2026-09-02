@@ -681,3 +681,398 @@ test_that("stac_items_paged pages to exhaustion at a tiny page size (network)", 
   last_href <- small$features[[length(small$features)]]$assets[[cfg$asset]]$href
   expect_match(last_href, "\\?")
 })
+
+
+# ---------------------------------------------------------------------------
+# #41 — atomic cache write, and validation of a cache entry before it is trusted
+# ---------------------------------------------------------------------------
+
+# Shared scaffolding: put a fetch on the MISS branch offline, with a writer we
+# control. `stac_items_paged` and `stac_image_collection` are stubbed exactly as
+# the cache_key test above does; `fetch_extent_to` is the drift internal that
+# actually writes the untiled cache entry.
+local_fetch_harness <- function(env = parent.frame()) {
+  testthat::local_mocked_bindings(
+    stac_items_paged = function(...) fake_items("a", next_link = FALSE),
+    .env = env
+  )
+  testthat::local_mocked_bindings(
+    stac_image_collection = function(...) NULL,
+    .package = "gdalcubes", .env = env
+  )
+}
+
+# A small valid raster over the AOI, so a "successful" fetch produces something
+# the trailing terra::mask() can actually clip.
+aoi_raster <- function(aoi_target, nrows = 20, ncols = 20) {
+  bb <- sf::st_bbox(aoi_target)
+  r <- terra::rast(nrows = nrows, ncols = ncols,
+                   crs = sf::st_crs(aoi_target)$wkt,
+                   xmin = bb[["xmin"]], xmax = bb[["xmax"]],
+                   ymin = bb[["ymin"]], ymax = bb[["ymax"]])
+  terra::values(r) <- seq_len(terra::ncell(r))
+  r
+}
+
+fetch_paths <- function(aoi, cache) {
+  cfg <- dft_stac_config("io-lulc")
+  crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", crs)))
+  key <- drift:::stac_cache_key(aoi_t, 10, crs, "P1Y", "first", "near",
+                                cfg$stac_url, cfg$collection, cfg$asset,
+                                tile_size = NULL)
+  dir.create(file.path(cache, "io-lulc"), recursive = TRUE, showWarnings = FALSE)
+  list(aoi_t = aoi_t, key = key,
+       dir = file.path(cache, "io-lulc"),
+       file = file.path(cache, "io-lulc", paste0("2020_", key, ".nc")))
+}
+
+read_aoi <- function() {
+  sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+              quiet = TRUE)
+}
+
+test_that("a fetch that dies mid-write leaves NOTHING at the canonical cache path", {
+  # The #41 defect itself. Against the pre-fix code the half-written bytes land
+  # on `cache_file`, and the NEXT run reports them as `cached`.
+  skip_if_not_installed("gdalcubes")
+  aoi <- read_aoi()
+  cache <- tempfile("drift_atomic_")
+  p <- fetch_paths(aoi, cache)
+  local_fetch_harness()
+
+  testthat::local_mocked_bindings(
+    fetch_extent_to = function(col, ext, t0, t1, target_crs, res, dt,
+                               aggregation, resampling, out_nc) {
+      writeBin(as.raw(rep(0, 2048)), out_nc)   # a partial, unreadable file
+      stop("killed mid-write")
+    }
+  )
+
+  expect_error(
+    suppressMessages(suppressWarnings(
+      dft_stac_fetch(aoi, source = "io-lulc", years = 2020, cache_dir = cache)
+    )),
+    "killed mid-write"
+  )
+  expect_false(file.exists(p$file))
+  # and no temp survives either
+  expect_length(list.files(p$dir, all.files = TRUE, no.. = TRUE), 0L)
+})
+
+test_that("a fetch that dies mid-write does not destroy an existing good cache under force", {
+  # Pre-fix, force = TRUE truncates the canonical file BEFORE writing, so an
+  # interrupted forced re-fetch loses a cache that was perfectly good.
+  skip_if_not_installed("gdalcubes")
+  aoi <- read_aoi()
+  cache <- tempfile("drift_atomic_force_")
+  p <- fetch_paths(aoi, cache)
+  suppressWarnings(terra::writeRaster(aoi_raster(p$aoi_t), p$file))
+  before_size <- file.size(p$file)
+  before_vals <- terra::values(terra::rast(p$file))
+  local_fetch_harness()
+
+  testthat::local_mocked_bindings(
+    fetch_extent_to = function(col, ext, t0, t1, target_crs, res, dt,
+                               aggregation, resampling, out_nc) {
+      writeBin(as.raw(rep(0, 2048)), out_nc)
+      stop("killed mid-write")
+    }
+  )
+
+  expect_error(
+    suppressMessages(suppressWarnings(
+      dft_stac_fetch(aoi, source = "io-lulc", years = 2020,
+                     cache_dir = cache, force = TRUE)
+    )),
+    "killed mid-write"
+  )
+  expect_true(file.exists(p$file))
+  expect_identical(file.size(p$file), before_size)
+  expect_equal(terra::values(terra::rast(p$file)), before_vals)
+})
+
+test_that("a successful fetch leaves the canonical file and no temp behind", {
+  # Positive control for the two tests above: they would both also pass if the
+  # fetch simply never wrote anything.
+  skip_if_not_installed("gdalcubes")
+  aoi <- read_aoi()
+  cache <- tempfile("drift_atomic_ok_")
+  p <- fetch_paths(aoi, cache)
+  local_fetch_harness()
+
+  seen_path <- NULL
+  testthat::local_mocked_bindings(
+    fetch_extent_to = function(col, ext, t0, t1, target_crs, res, dt,
+                               aggregation, resampling, out_nc) {
+      seen_path <<- out_nc
+      suppressWarnings(terra::writeRaster(aoi_raster(p$aoi_t), out_nc,
+                                          overwrite = TRUE))
+      out_nc
+    }
+  )
+
+  out <- suppressMessages(suppressWarnings(
+    dft_stac_fetch(aoi, source = "io-lulc", years = 2020, cache_dir = cache)
+  ))
+  expect_s4_class(out[["2020"]], "SpatRaster")
+  expect_true(file.exists(p$file))
+  # No temp litter. A GDAL PAM sidecar may legitimately sit beside the entry
+  # (terra emits one writing .nc, not .tif) — it must carry the CANONICAL stem,
+  # never the dead temp name.
+  left <- list.files(p$dir, all.files = TRUE, no.. = TRUE)
+  expect_length(grep("\\.tmp[0-9]", left, value = TRUE), 0L)
+  expect_true(all(startsWith(left, tools::file_path_sans_ext(basename(p$file)))))
+  # The writer is handed the TEMP, not the canonical name — asserting equality
+  # with p$file here would pin the very defect this fixes.
+  expect_false(identical(seen_path, p$file))
+  expect_identical(dirname(seen_path), p$dir)
+})
+
+test_that("a failed file.rename aborts rather than silently leaving no cache", {
+  # file.rename() signals failure by RETURNING FALSE, not by erroring, so an
+  # unchecked move is how a missing cache reaches a consumer with no complaint.
+  skip_if_not_installed("gdalcubes")
+  aoi <- read_aoi()
+  cache <- tempfile("drift_atomic_rename_")
+  p <- fetch_paths(aoi, cache)
+  local_fetch_harness()
+
+  testthat::local_mocked_bindings(
+    fetch_extent_to = function(col, ext, t0, t1, target_crs, res, dt,
+                               aggregation, resampling, out_nc) {
+      suppressWarnings(terra::writeRaster(aoi_raster(p$aoi_t), out_nc,
+                                          overwrite = TRUE))
+      out_nc
+    }
+  )
+  testthat::local_mocked_bindings(
+    file.rename = function(from, to) FALSE, .package = "base"
+  )
+
+  expect_error(
+    suppressMessages(suppressWarnings(
+      dft_stac_fetch(aoi, source = "io-lulc", years = 2020, cache_dir = cache)
+    )),
+    "could not be moved into place"
+  )
+})
+
+# --- cache_geom_ok(): the predicate, exercised on every branch ---------------
+#
+# Split out from the SpatRaster so all four sub-checks are reachable. terra
+# refuses to CONSTRUCT a zero-dim, non-finite-res or collapsed-extent raster, so
+# driving these through a file would leave three of the four shipping untested.
+
+test_that("cache_geom_ok accepts a healthy geometry", {
+  expect_true(is.na(drift:::cache_geom_ok(
+    dims = c(100, 200, 1), res = c(10, 10),
+    ext = c(5e5, 5.02e5, 6e6, 6.001e6), crs = "EPSG:32609"
+  )))
+})
+
+test_that("cache_geom_ok rejects each degenerate geometry", {
+  base_ok <- list(dims = c(100, 200, 1), res = c(10, 10),
+                  ext = c(5e5, 5.02e5, 6e6, 6.001e6), crs = "EPSG:32609")
+  bad <- function(...) {
+    a <- utils::modifyList(base_ok, list(...))
+    drift:::cache_geom_ok(a$dims, a$res, a$ext, a$crs)
+  }
+  expect_match(bad(dims = c(0, 200, 1)), "zero rows or columns")
+  expect_match(bad(res = c(0, 10)), "non-finite or non-positive resolution")
+  expect_match(bad(res = c(NaN, 10)), "non-finite or non-positive resolution")
+  expect_match(bad(ext = c(5e5, Inf, 6e6, 6.001e6)), "non-finite extent")
+  expect_match(bad(ext = c(5e5, 5e5, 6e6, 6.001e6)), "collapsed extent")
+})
+
+test_that("cache_geom_ok flags an empty CRS only WITH the identity geotransform", {
+  # The conjunction is the point. An empty CRS alone is not proof of damage, and
+  # refusing on it alone risks throwing away healthy cache entries; the identity
+  # geotransform (res 1, extent 0..ncol / 0..nrow) is the second, independent
+  # signal, and together they are the shape the #41 traceback describes
+  # ("Cannot invert geotransform").
+  identity_hit <- drift:::cache_geom_ok(
+    dims = c(100, 200, 1), res = c(1, 1), ext = c(0, 200, 0, 100), crs = ""
+  )
+  expect_match(identity_hit, "identity geotransform")
+
+  # empty CRS but real georeferencing -> accepted
+  expect_true(is.na(drift:::cache_geom_ok(
+    dims = c(100, 200, 1), res = c(10, 10),
+    ext = c(5e5, 5.02e5, 6e6, 6.001e6), crs = ""
+  )))
+  # identity geotransform but a real CRS -> accepted
+  expect_true(is.na(drift:::cache_geom_ok(
+    dims = c(100, 200, 1), res = c(1, 1), ext = c(0, 200, 0, 100),
+    crs = "EPSG:32609"
+  )))
+})
+
+# --- cache_invalid_reason(): the three arms ---------------------------------
+
+test_that("arm (a): an unopenable cache file is rejected", {
+  d <- tempfile("drift_arm_a_"); dir.create(d)
+  zero <- file.path(d, "zero.nc"); file.create(zero)
+
+  r <- terra::rast(nrows = 60, ncols = 60, crs = "EPSG:32609",
+                   xmin = 5e5, xmax = 5.006e5, ymin = 6e6, ymax = 6.0006e6)
+  terra::values(r) <- seq_len(terra::ncell(r))
+  full <- file.path(d, "full.tif"); terra::writeRaster(r, full)
+  raw_all <- readBin(full, "raw", file.size(full))
+  trunc <- file.path(d, "trunc.tif")
+  writeBin(raw_all[seq_len(floor(length(raw_all) * 0.4))], trunc)
+
+  # Premise: these fixtures really do fail to OPEN, so this test is exercising
+  # arm (a) and not being carried by a later arm.
+  expect_error(suppressWarnings(terra::rast(zero)))
+  expect_error(suppressWarnings(terra::rast(trunc)))
+
+  expect_match(suppressWarnings(drift:::cache_invalid_reason(zero)),
+               "could not be opened")
+  expect_match(suppressWarnings(drift:::cache_invalid_reason(trunc)),
+               "could not be opened")
+})
+
+test_that("arm (a) does not reject a healthy raster, and tolerates open warnings", {
+  # terra emits a capability warning when writing .nc; the multidim-API warning
+  # on open is likewise a capability message, NOT a damage signal. Arm (a)
+  # catches ERRORS only — failing on an open warning would refuse healthy .nc
+  # files across the whole cache.
+  d <- tempfile("drift_arm_a_ok_"); dir.create(d)
+  r <- terra::rast(nrows = 40, ncols = 40, crs = "EPSG:32609",
+                   xmin = 5e5, xmax = 5.004e5, ymin = 6e6, ymax = 6.0004e6)
+  terra::values(r) <- seq_len(terra::ncell(r))
+  for (f in c("ok.tif", "ok.nc")) {
+    p <- file.path(d, f)
+    suppressWarnings(terra::writeRaster(r, p))
+    expect_true(is.na(suppressWarnings(drift:::cache_invalid_reason(p))),
+                info = f)
+  }
+})
+
+test_that("arm (c): a read probe that warns is treated as a corrupt entry", {
+  # NAMED FOR WHAT IT TESTS: the handler, not the damage. The probe is injected
+  # so this runs everywhere and deterministically.
+  #
+  # This does NOT prove drift detects real content damage — see the env-guarded
+  # test below for that. Against a restored defect it fails only if the warning
+  # handling is deleted, which is exactly the scope claimed here.
+  d <- tempfile("drift_arm_c_"); dir.create(d)
+  r <- terra::rast(nrows = 20, ncols = 20, crs = "EPSG:32609",
+                   xmin = 5e5, xmax = 5.002e5, ymin = 6e6, ymax = 6.0002e6)
+  terra::values(r) <- seq_len(terra::ncell(r))
+  p <- file.path(d, "ok.tif"); terra::writeRaster(r, p)
+
+  # Premise: with the real probe this file is CLEAN, so any rejection below is
+  # attributable to the injected probe and not to the fixture.
+  expect_true(is.na(drift:::cache_invalid_reason(p)))
+
+  warned <- drift:::cache_invalid_reason(
+    p, probe = function(x) { warning("netcdf error #-101 : NetCDF: HDF error"); TRUE }
+  )
+  expect_match(warned, "pixel data could not be read")
+
+  errored <- drift:::cache_invalid_reason(p, probe = function(x) stop("read blew up"))
+  expect_match(errored, "pixel data could not be read")
+})
+
+test_that("arm (c): real content damage is detected (fixture must prove itself)", {
+  # The honest version. Content damage that leaves the container walkable is
+  # NOT reproducible from a terra-written file: measured 2026-09-02, zeroing the
+  # tail of a terra-written .nc (which is NC4/HDF5) produces no warning at all,
+  # while the same damage to a gdalcubes-written .nc does. Whether the arm fires
+  # depends on whether the zeroed bytes carried structure or bulk data.
+  #
+  # So this test builds the damage and then ASSERTS ITS OWN PREMISE: if the
+  # damaged file does not actually warn on read, it SKIPS rather than passing.
+  # A silent pass here would be a test that proves nothing.
+  skip_if(Sys.getenv("DRIFT_TEST_CACHE_DAMAGE") != "true",
+          "damage fixture is format-dependent — set DRIFT_TEST_CACHE_DAMAGE=true")
+  src <- Sys.getenv("DRIFT_TEST_CACHE_DAMAGE_FILE")
+  skip_if(!nzchar(src) || !file.exists(src),
+          "set DRIFT_TEST_CACHE_DAMAGE_FILE to a gdalcubes-written .nc")
+
+  d <- tempfile("drift_arm_c_real_"); dir.create(d)
+  raw_all <- readBin(src, "raw", file.size(src))
+  n <- length(raw_all)
+  raw_all[(floor(n * 0.5) + 1):n] <- as.raw(0)
+  dmg <- file.path(d, paste0("damaged.", tools::file_ext(src)))
+  writeBin(raw_all, dmg)
+
+  # Premise 1: it still OPENS with valid geometry, so arms (a) and (b) are
+  # proven not to be what fires below.
+  opened <- tryCatch(terra::rast(dmg), error = function(e) NULL)
+  skip_if(is.null(opened), "damage broke the open — reaches arm (a), not arm (c)")
+  skip_if(!is.na(drift:::cache_geom_ok(dim(opened), terra::res(opened),
+                                       as.vector(terra::ext(opened)),
+                                       terra::crs(opened))),
+          "damage broke the geometry — reaches arm (b), not arm (c)")
+  # Premise 2: the damage really does surface on read (as a warning or error).
+  read_dirty <- FALSE
+  withCallingHandlers(
+    tryCatch(drift:::cache_probe_last_row(terra::rast(dmg)),
+             error = function(e) read_dirty <<- TRUE),
+    warning = function(w) {
+      read_dirty <<- TRUE
+      invokeRestart("muffleWarning")
+    }
+  )
+  skip_if(!read_dirty,
+          "damage did not surface on read — fixture cannot reach arm (c)")
+
+  expect_match(drift:::cache_invalid_reason(dmg), "pixel data could not be read")
+})
+
+# --- the read gate ----------------------------------------------------------
+
+test_that("a corrupt cache entry is re-fetched instead of served as a hit", {
+  # The end-to-end #41 behaviour: presence is no longer trust.
+  skip_if_not_installed("gdalcubes")
+  aoi <- read_aoi()
+  cache <- tempfile("drift_gate_")
+  p <- fetch_paths(aoi, cache)
+  writeBin(as.raw(rep(0, 4096)), p$file)   # a corrupt entry at the canonical name
+  local_fetch_harness()
+
+  refetched <- FALSE
+  testthat::local_mocked_bindings(
+    fetch_extent_to = function(col, ext, t0, t1, target_crs, res, dt,
+                               aggregation, resampling, out_nc) {
+      refetched <<- TRUE
+      suppressWarnings(terra::writeRaster(aoi_raster(p$aoi_t), out_nc,
+                                          overwrite = TRUE))
+      out_nc
+    }
+  )
+
+  expect_warning(
+    out <- suppressMessages(
+      dft_stac_fetch(aoi, source = "io-lulc", years = 2020, cache_dir = cache)
+    ),
+    "re-fetching"
+  )
+  expect_true(refetched)
+  expect_s4_class(out[["2020"]], "SpatRaster")
+  expect_true(is.na(suppressWarnings(drift:::cache_invalid_reason(p$file))))
+})
+
+test_that("a healthy cache entry is still served as a hit, with no re-fetch", {
+  # False-refusal control. A validator that rejects healthy input is worse than
+  # the bug it guards, because the cost is a silent permanent re-download.
+  skip_if_not_installed("gdalcubes")
+  aoi <- read_aoi()
+  cache <- tempfile("drift_gate_ok_")
+  p <- fetch_paths(aoi, cache)
+  suppressWarnings(terra::writeRaster(aoi_raster(p$aoi_t), p$file))
+  local_fetch_harness()
+
+  testthat::local_mocked_bindings(
+    fetch_extent_to = function(...) stop("re-fetched a healthy cache entry")
+  )
+  expect_no_error(
+    out <- suppressMessages(suppressWarnings(
+      dft_stac_fetch(aoi, source = "io-lulc", years = 2020, cache_dir = cache)
+    ))
+  )
+  expect_s4_class(out[["2020"]], "SpatRaster")
+})
