@@ -127,8 +127,10 @@ this AOI that is a \emph{cost} (343.7 s / 693 requests at 128 px against 236.9 s
 \item{cache_dir}{Character. Cache directory. When \code{NULL}, uses
 \code{\link[=dft_cache_path]{dft_cache_path()}}.}
 
-\item{force}{Logical. Re-fetch even if cached, overwriting the cached raster
-(default \code{FALSE}).}
+\item{force}{Logical. Re-fetch even if cached, replacing the cached raster
+(default \code{FALSE}). The replacement is atomic, so an interrupted forced
+re-fetch leaves the previous entry intact rather than destroying it — which
+matters here, where rebuilding is a multi-hour stream.}
 
 \item{sign_fn}{A signing function for STAC assets. Default is
 \code{\link[rstac:items_sign_planetary_computer]{rstac::sign_planetary_computer()}}.}
