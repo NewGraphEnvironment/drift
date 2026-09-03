@@ -4,13 +4,23 @@
 \alias{dft_cache_clear}
 \title{Clear the drift tile cache}
 \usage{
-dft_cache_clear(cache_dir = NULL, source = NULL)
+dft_cache_clear(
+  cache_dir = NULL,
+  source = NULL,
+  scheme = c("all", "current", "superseded")
+)
 }
 \arguments{
 \item{cache_dir}{Character. Override the default cache location.}
 
 \item{source}{Character. If provided, only clear files for this source.
 Otherwise clears everything.}
+
+\item{scheme}{Character. Which cache-scheme generations to clear (#48).
+\code{"all"} (default) clears everything, matching the behaviour before schemes
+existed. \code{"current"} clears only entries the running version can actually
+use. \code{"superseded"} clears only entries left behind by an older scheme —
+the reclaim path for caches orphaned by a key change.}
 }
 \value{
 Invisibly returns the number of files removed.
@@ -32,6 +42,7 @@ cube write is precisely the in-flight temp such a sweep would delete.
 \examples{
 \dontrun{
 dft_cache_clear()
+dft_cache_clear(scheme = "superseded") # reclaim orphaned generations only
 }
 
 }
