@@ -5,7 +5,11 @@ Removes all cached files from the drift cache directory.
 ## Usage
 
 ``` r
-dft_cache_clear(cache_dir = NULL, source = NULL)
+dft_cache_clear(
+  cache_dir = NULL,
+  source = NULL,
+  scheme = c("all", "current", "superseded")
+)
 ```
 
 ## Arguments
@@ -18,6 +22,14 @@ dft_cache_clear(cache_dir = NULL, source = NULL)
 
   Character. If provided, only clear files for this source. Otherwise
   clears everything.
+
+- scheme:
+
+  Character. Which cache-scheme generations to clear (#48). `"all"`
+  (default) clears everything, matching the behaviour before schemes
+  existed. `"current"` clears only entries the running version can
+  actually use. `"superseded"` clears only entries left behind by an
+  older scheme — the reclaim path for caches orphaned by a key change.
 
 ## Value
 
@@ -42,5 +54,6 @@ delete.
 ``` r
 if (FALSE) { # \dontrun{
 dft_cache_clear()
+dft_cache_clear(scheme = "superseded") # reclaim orphaned generations only
 } # }
 ```

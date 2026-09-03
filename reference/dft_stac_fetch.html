@@ -13,7 +13,7 @@ custom COGs)."><meta property="og:image" content="https://newgraphenvironment.gi
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -165,12 +165,15 @@ stripped so a caller re-running <code><a href="https://brazil-data-cube.github.i
 silently duplicate features. The cache key is attached as
 <code>attr(, "cache_key")</code> so a caller can record which cache entry served the
 fetch; it is <strong>per call, not per year</strong> — cached files are named
-<code>&lt;year&gt;_&lt;cache_key&gt;</code>, so one key covers every year the call returned.</p>
+<code>&lt;year&gt;_&lt;cache_key&gt;</code>, so one key covers every year the call returned. Its
+format changed in 0.12.0 (#48): 16 lowercase hex characters, from
+<code>digest::digest(algo = "xxhash64")</code> over a canonical string, where it was
+previously 12 from <code><a href="https://rlang.r-lib.org/reference/hash.html" class="external-link">rlang::hash()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Fetched rasters are cached under <code><a href="dft_cache_path.html">dft_cache_path()</a></code> as
-<code>&lt;source&gt;/&lt;year&gt;_&lt;key&gt;.nc</code> (or <code>.tif</code> when <code>tile_size</code> is set — see below),
+<code>v2/&lt;source&gt;/&lt;year&gt;_&lt;key&gt;.nc</code> (or <code>.tif</code> when <code>tile_size</code> is set — see below),
 where <code>key</code> is a hash of the AOI geometry and every fetch parameter that
 affects the output (<code>res</code>, <code>crs</code>, <code>dt</code>, <code>aggregation</code>, <code>resampling</code>,
 <code>stac_url</code>, <code>collection</code>, <code>asset</code>, and <code>tile_size</code>). Repeat calls with the
@@ -185,6 +188,14 @@ rather than served or left for the user to delete by hand.</p>
 <p>The read check samples rather than proves — it reads one row, so interior
 damage that leaves the file structurally walkable can pass it. The guarantee
 against partial entries is the atomic write, not the check.</p>
+<p>The key is a function of <strong>content alone</strong> (#48), so the same AOI and
+parameters produce the same filename on any machine, R version, rlang version
+and architecture — a cache can be copied between machines and stay valid. The
+leading <code>v2</code> is the cache-scheme generation: a deliberate key change moves it,
+leaving older entries findable rather than silently orphaned. See
+<code><a href="dft_cache_info.html">dft_cache_info()</a></code> and <code><a href="dft_cache_clear.html">dft_cache_clear()</a></code> for reporting and reclaiming them.</p>
+<p>Note <code><a href="https://r-spatial.github.io/sf/reference/st_as_binary.html" class="external-link">sf::st_as_binary()</a></code> honours <code><a href="https://r-spatial.github.io/sf/reference/st_precision.html" class="external-link">sf::st_precision()</a></code>, so setting a precision
+on the AOI changes its WKB and therefore the key. That has always been true.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

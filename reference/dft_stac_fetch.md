@@ -128,13 +128,17 @@ on them cannot silently duplicate features. The cache key is attached as
 `attr(, "cache_key")` so a caller can record which cache entry served
 the fetch; it is **per call, not per year** — cached files are named
 `<year>_<cache_key>`, so one key covers every year the call returned.
+Its format changed in 0.12.0 (#48): 16 lowercase hex characters, from
+`digest::digest(algo = "xxhash64")` over a canonical string, where it
+was previously 12 from
+[`rlang::hash()`](https://rlang.r-lib.org/reference/hash.html).
 
 ## Details
 
 Fetched rasters are cached under
 [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
-as `<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set — see
-below), where `key` is a hash of the AOI geometry and every fetch
+as `v2/<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set —
+see below), where `key` is a hash of the AOI geometry and every fetch
 parameter that affects the output (`res`, `crs`, `dt`, `aggregation`,
 `resampling`, `stac_url`, `collection`, `asset`, and `tile_size`).
 Repeat calls with the same AOI and parameters reuse the cache; changing
@@ -153,3 +157,21 @@ The read check samples rather than proves — it reads one row, so
 interior damage that leaves the file structurally walkable can pass it.
 The guarantee against partial entries is the atomic write, not the
 check.
+
+The key is a function of **content alone** (#48), so the same AOI and
+parameters produce the same filename on any machine, R version, rlang
+version and architecture — a cache can be copied between machines and
+stay valid. The leading `v2` is the cache-scheme generation: a
+deliberate key change moves it, leaving older entries findable rather
+than silently orphaned. See
+[`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
+and
+[`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
+for reporting and reclaiming them.
+
+Note
+[`sf::st_as_binary()`](https://r-spatial.github.io/sf/reference/st_as_binary.html)
+honours
+[`sf::st_precision()`](https://r-spatial.github.io/sf/reference/st_precision.html),
+so setting a precision on the AOI changes its WKB and therefore the key.
+That has always been true.

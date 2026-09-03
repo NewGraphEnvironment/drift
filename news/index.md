@@ -1,5 +1,87 @@
 # Changelog
 
+## drift 0.12.0
+
+- **Bug fix: the cache key moved on an rlang upgrade, silently orphaning
+  every cached cube and fetch
+  ([\#48](https://github.com/NewGraphEnvironment/drift/issues/48)).**
+  The key **is** the cache filename (`<year>_<key>.nc`,
+  `cube_<key>.tif`), and
+  [`rlang::hash()`](https://rlang.r-lib.org/reference/hash.html) was
+  rewritten in rlang 1.3.0. Its own NEWS says so: *“with this version
+  all hash values will now be different… you should assume it’s always
+  possible for a new version to invalidate existing hashes.”* So every
+  cache entry became unreachable — no error, no warning, no log line;
+  the only symptom was “the pipeline got slower”, which is exactly the
+  kind of thing nobody files. The frozen goldens were the only reason it
+  was known.
+- **The reported diagnosis was wrong, and the correction changed the
+  fix.** The issue suspected sf/PROJ drift under
+  [`sf::st_as_binary()`](https://r-spatial.github.io/sf/reference/st_as_binary.html).
+  Measured: the key function extracted from its own pinning commit
+  reproduces today’s value exactly, so nothing in drift moved. Both
+  pre-rlang-1.3.0 goldens fail to reproduce and the one re-pinned
+  *after* the upgrade holds — and rlang 1.3.0 was installed between
+  them. A fix aimed at the geometry member would have left the real
+  cause untouched.
+- **Keys are now a function of content alone.** Each member is rendered
+  to a canonical string (geometry WKB as hex, numerics as IEEE-754
+  bytes, characters through
+  [`enc2utf8()`](https://rdrr.io/r/base/Encoding.html), a one-character
+  type tag per member) and that string is hashed **by its bytes** with
+  `digest::digest(algo = "xxhash64", serialize = FALSE)` — no R
+  serializer, no library traversal of an R object. `digest` joins
+  Imports. It is a categorically different bet from rlang: it implements
+  a **published** algorithm and pins this exact call shape to the
+  upstream XXH64 reference vector in its own test suite, where rlang
+  explicitly reserves the right to change. drift pins that same vector
+  as a control test, so a future failure distinguishes “the hashing
+  layer moved” from “our inputs changed” — a distinction the goldens
+  alone could not make.
+- **No rlang pin is needed**: rlang is no longer in the key path at all.
+- **The key is now 16 characters, not 12**, which changes the documented
+  `attr(, "cache_key")` return value. A key collision does not crash —
+  it silently serves the **wrong raster**, and nothing downstream can
+  detect it. 48 bits to 64 costs four characters of filename and buys a
+  65,536x margin, and re-keying was already being paid for, so this was
+  the only moment it was free.
+- **Cache entries move under a scheme directory,
+  `<cache>/v2/<source>/`.** A deliberate key change is now a *migration*
+  rather than a silent orphaning: superseded generations stay findable,
+  [`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
+  reports them (`n_files_superseded`, `size_mb_superseded`), and
+  `dft_cache_clear(scheme = "superseded")` reclaims that space. Nothing
+  is deleted automatically.
+- **What this costs you once:** every existing entry is superseded —
+  measured on one real cache, 204 files / 1.09 GB. Re-fetch is **~10 s
+  per entry** and **flat in entry size** (0.05 / 0.12 / 0.36 MB all took
+  ~10 s; the cost is STAC query, signing and COG opens, not bytes), and
+  it happens on demand rather than all at once. The issue’s “10–30 min
+  per cube” is real for Sentinel-2 cubes but was not a cost anyone was
+  paying — that cache held no cube entries at all. It is the
+  forward-looking reason this matters: the next rlang bump would have
+  destroyed those silently.
+- **Cross-machine:** the key is now identical on any machine, R version,
+  rlang version and architecture, so a cache can be shared or copied
+  between machines and stay valid. It does **not** avoid a first-run
+  rebuild on a new machine — the cache is machine-local — and the
+  goldens double as the check, since they are now portable facts rather
+  than facts about one environment.
+- Three canonicalization hazards are guarded because they were measured,
+  not assumed: `digest(serialize = FALSE)` silently hashes **only the
+  first element** of a character vector (a length \> 1 would collapse
+  every key to one value),
+  [`sf::st_as_binary()`](https://r-spatial.github.io/sf/reference/st_as_binary.html)
+  returns a **list** so [`is.raw()`](https://rdrr.io/r/base/raw.html) is
+  `FALSE` on it, and
+  [`is.logical()`](https://rdrr.io/r/base/logical.html) must be branched
+  before [`is.numeric()`](https://rdrr.io/r/base/numeric.html) or `TRUE`
+  renders as `1`. Numerics use IEEE-754 bytes rather than
+  `sprintf("%.17g")`, which keeps `NaN` and `NA_real_` apart
+  (`is.na(NaN)` is `TRUE`) and avoids a libc call whose formatting is a
+  platform variable — this package has no cross-platform CI, so these
+  goldens are verified on one machine.
+
 ## drift 0.11.0
 
 - **Bug fix: an interrupted fetch left a corrupt cache entry that every
@@ -156,8 +238,13 @@
   chose a read-path check for its analogous problem and fetch can afford
   a key break.
   **[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
-  caches are unaffected**; `stac_cube_cache_key()` is a separate
-  function and is untouched.
+  caches were unaffected *by
+  [\#51](https://github.com/NewGraphEnvironment/drift/issues/51)*** —
+  `stac_cube_cache_key()` is a separate function and was untouched
+  there. **Superseded by
+  [\#48](https://github.com/NewGraphEnvironment/drift/issues/48) in
+  0.12.0**, which re-keys both functions and moves every entry under a
+  `v2/` scheme directory; cube caches are invalidated too.
 - [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
   now attaches `attr(, "cache_key")` alongside the existing
   `attr(, "stac_items")`, so a caller can record which cache entry
