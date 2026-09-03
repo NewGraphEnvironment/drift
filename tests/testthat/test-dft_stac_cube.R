@@ -51,7 +51,7 @@ cube_key <- function(aoi = square_aoi(), res = 10, target_crs = "EPSG:32609",
 
 test_that("stac_cube_cache_key is deterministic and 12-char hex", {
   expect_equal(cube_key(), cube_key())
-  expect_match(cube_key(), "^[0-9a-f]{12}$")
+  expect_match(cube_key(), "^[0-9a-f]{16}$")
 })
 
 test_that("stac_cube_cache_key untiled key is frozen (legacy-cache guardian)", {
@@ -59,7 +59,7 @@ test_that("stac_cube_cache_key untiled key is frozen (legacy-cache guardian)", {
   # tile_size append can't silently perturb the untiled key and orphan every
   # existing cube_<key>.tif (10-30 min to re-stream). Mirrors the fetch golden
   # 79f67b7b9dae (#36). If this ever changes, existing cube caches are invalid.
-  expect_equal(cube_key(), "638a2be11fdf")
+  expect_equal(cube_key(), "3e704313eb1f1c00")
 })
 
 test_that("stac_cube_cache_key keys tile_size distinctly and after snapping", {
@@ -486,9 +486,10 @@ cube_cache_paths <- function(aoi, cache, index = "kndvi") {
   cfg <- dft_stac_config("sentinel-2-l2a")
   crs <- drift:::auto_utm_epsg(aoi)
   aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", crs)))
-  dir.create(file.path(cache, "sentinel-2-l2a"), recursive = TRUE,
+  dir.create(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"), recursive = TRUE,
              showWarnings = FALSE)
-  list(aoi_t = aoi_t, dir = file.path(cache, "sentinel-2-l2a"), cfg = cfg)
+  list(aoi_t = aoi_t, dir = drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
+       cfg = cfg)
 }
 
 # The cube cache key takes a long argument list; rather than reproduce it (which
@@ -548,8 +549,9 @@ test_that("a corrupt cube cache is re-fetched rather than served", {
   aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
                      quiet = TRUE)
   cache <- tempfile("drift_cube_gate_")
-  dir.create(file.path(cache, "sentinel-2-l2a"), recursive = TRUE)
-  seeded <- file.path(cache, "sentinel-2-l2a", "cube_deadbeef0000.tif")
+  dir.create(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"), recursive = TRUE)
+  seeded <- file.path(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
+                      "cube_deadbeef0000.tif")
   writeBin(as.raw(rep(0, 4096)), seeded)
 
   testthat::local_mocked_bindings(
@@ -558,6 +560,15 @@ test_that("a corrupt cube cache is re-fetched rather than served", {
   testthat::local_mocked_bindings(
     stac = function(...) stop("fell through to a re-fetch"), .package = "rstac"
   )
+
+  # PREMISE: the seed must sit at the path production actually consults. When
+  # the cache gained its scheme segment (#48) this test kept passing while the
+  # seed sat at the pre-scheme path — a plain cache MISS reaches the same
+  # re-fetch stub, so the corrupt-rejection gate was never exercised and the
+  # assertion below was green for the wrong reason. Its companion test ("a
+  # healthy cube cache is still served") is what rules that out: a healthy file
+  # at this same path must NOT reach the stub.
+  expect_true(file.exists(seeded))
 
   expect_error(
     suppressMessages(suppressWarnings(
@@ -575,8 +586,9 @@ test_that("a healthy cube cache is still served, with no re-fetch", {
   aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
                      quiet = TRUE)
   cache <- tempfile("drift_cube_gate_ok_")
-  dir.create(file.path(cache, "sentinel-2-l2a"), recursive = TRUE)
-  seeded <- file.path(cache, "sentinel-2-l2a", "cube_deadbeef0000.tif")
+  dir.create(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"), recursive = TRUE)
+  seeded <- file.path(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
+                      "cube_deadbeef0000.tif")
 
   bb <- sf::st_bbox(sf::st_transform(aoi, 32609))
   stk <- terra::rast(lapply(1:3, function(i) {

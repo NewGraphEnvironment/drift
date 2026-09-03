@@ -6,7 +6,7 @@
 #' custom COGs).
 #'
 #' Fetched rasters are cached under [dft_cache_path()] as
-#' `<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set — see below),
+#' `v2/<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set — see below),
 #' where `key` is a hash of the AOI geometry and every fetch parameter that
 #' affects the output (`res`, `crs`, `dt`, `aggregation`, `resampling`,
 #' `stac_url`, `collection`, `asset`, and `tile_size`). Repeat calls with the
@@ -23,6 +23,16 @@
 #' The read check samples rather than proves — it reads one row, so interior
 #' damage that leaves the file structurally walkable can pass it. The guarantee
 #' against partial entries is the atomic write, not the check.
+#'
+#' The key is a function of **content alone** (#48), so the same AOI and
+#' parameters produce the same filename on any machine, R version, rlang version
+#' and architecture — a cache can be copied between machines and stay valid. The
+#' leading `v2` is the cache-scheme generation: a deliberate key change moves it,
+#' leaving older entries findable rather than silently orphaned. See
+#' [dft_cache_info()] and [dft_cache_clear()] for reporting and reclaiming them.
+#'
+#' Note `sf::st_as_binary()` honours `sf::st_precision()`, so setting a precision
+#' on the AOI changes its WKB and therefore the key. That has always been true.
 #'
 #' @param aoi An `sf` polygon defining the area of interest.
 #' @param source Character. A known source name passed to [dft_stac_config()].
@@ -68,7 +78,10 @@
 #'   silently duplicate features. The cache key is attached as
 #'   `attr(, "cache_key")` so a caller can record which cache entry served the
 #'   fetch; it is **per call, not per year** — cached files are named
-#'   `<year>_<cache_key>`, so one key covers every year the call returned.
+#'   `<year>_<cache_key>`, so one key covers every year the call returned. Its
+#'   format changed in 0.12.0 (#48): 16 lowercase hex characters, from
+#'   `digest::digest(algo = "xxhash64")` over a canonical string, where it was
+#'   previously 12 from `rlang::hash()`.
 #' @export
 dft_stac_fetch <- function(aoi,
                            source = "io-lulc",
@@ -159,9 +172,12 @@ dft_stac_fetch <- function(aoi,
   col <- gdalcubes::stac_image_collection(items$features, asset_names = asset)
 
   # Cache setup
-  cache_base <- dft_cache_path(cache_dir)
   source_label <- if (!is.null(source)) source else "custom"
-  cache_source_dir <- file.path(cache_base, source_label)
+  # <base>/<scheme>/<source> (#48). recursive = TRUE is required, not tidiness:
+  # the scheme segment adds a level, and cache_write_atomic() renames its temp
+  # (and any GDAL sidecar) within this directory, so a missing parent aborts the
+  # very first fetch.
+  cache_source_dir <- cache_scheme_dir(cache_dir, source_label)
   dir.create(cache_source_dir, recursive = TRUE, showWarnings = FALSE)
   cache_key <- stac_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
@@ -406,7 +422,107 @@ stac_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
   # A tiled fetch caches a terra .tif mosaic; an untiled fetch caches a
   # gdalcubes .nc. Keying them apart stops one being served as the other.
   if (!is.null(tile_size)) parts <- c(parts, list(as.numeric(tile_size)))
-  substr(rlang::hash(parts), 1, 12)
+  cache_key_hash(parts)
+}
+
+
+#' Hash a key parts list to a stable cache key
+#'
+#' The one place a cache key is produced. Canonicalizes to a single string, then
+#' hashes **that string's bytes** — so the key is a function of content alone,
+#' not of any library's traversal of an R object.
+#'
+#' **This replaced `rlang::hash()` for a measured reason (#48).** rlang 1.3.0
+#' rewrote `hash()` and says so in its own NEWS: *"with this version all hash
+#' values will now be different… you should assume it's always possible for a
+#' new version to invalidate existing hashes."* Because the key **is** the cache
+#' filename, that made every rlang upgrade a silent, cache-wide re-download with
+#' no error and no log line. `digest` is a categorically different bet: it
+#' implements **published** algorithms and pins this exact call shape to the
+#' upstream XXH64 reference vector in its own test suite
+#' (`digest("abc", algo = "xxhash64", serialize = FALSE)` is `44bc2cf5ad770999`,
+#' asserted in `inst/tinytest/test_digest.R`), so a change in its output would be
+#' a bug rather than a design decision. drift pins that same vector as a control.
+#'
+#' `serialize = FALSE` is load-bearing: it hashes the string directly, keeping
+#' R's serializer out of the path entirely. Never set it to `TRUE`.
+#'
+#' The full 16 characters are kept rather than the legacy 12 (#48). A key
+#' collision does not crash — it silently serves the **wrong raster**, and
+#' nothing downstream can detect that. 12 hex chars is 48 bits; keeping all 64
+#' costs four characters of filename and buys a 65,536x margin.
+#' @noRd
+cache_key_hash <- function(parts) {
+  s <- cache_key_string(parts)
+  # digest(serialize = FALSE) takes only the FIRST element of a character
+  # vector, silently and with no warning: digest(c("a","b")) == digest("a").
+  # A length > 1 here would collapse every key to the hash of its first member —
+  # a total collision, not a probabilistic one. Cheapest possible guard.
+  stopifnot(is.character(s), length(s) == 1L, !is.na(s))
+  digest::digest(s, algo = "xxhash64", serialize = FALSE)
+}
+
+
+#' Render a key parts list to one canonical string
+#'
+#' Every member becomes `<type-tag>:<value>`, members joined on `\x1f` and vector
+#' elements on `\x1e`. Control characters cannot occur in the real values (hex,
+#' numbers, URLs, enum strings), which is what keeps the separators unambiguous.
+#'
+#' **Type tags are not decoration.** Without them a plain string scheme collides
+#' `NULL` with the literal `"<none>"`, `NA` with `"<NA>"`, numeric `10` with
+#' character `"10"`, and `TRUE` with `"TRUE"`. None of those bite today, because
+#' every member position happens to be type-fixed by coercion at the call sites —
+#' but that is an invariant held by convention, written down nowhere, and the
+#' cube key does not coerce most of its character members. One byte per member
+#' removes the whole class by construction.
+#'
+#' Branch order matters in two places, both measured:
+#' * **`is.list()` first.** `sf::st_as_binary()` returns a **list** of raw
+#'   vectors classed `"WKB"` — `is.raw()` on it is `FALSE`. A raw-only branch
+#'   would never match it.
+#' * **`is.logical()` before `is.numeric()`**, or `TRUE` renders as `1` and
+#'   collides with the number.
+#'
+#' Numerics are hashed as their **IEEE-754 bytes**, not via `sprintf("%.17g")`.
+#' `%.17g` is injective and would work, but it routes through libc — so its
+#' exponent formatting is a platform variable, and drift has no cross-platform
+#' CI to catch that. It also collapses `NaN` into `NA_real_` under any `is.na()`
+#' sentinel (`is.na(NaN)` is `TRUE`), a distinction the old key made. The byte
+#' form has neither problem and reuses the hex path the WKB member already needs.
+#'
+#' Character members go through `enc2utf8()`: the same text in UTF-8 and latin1
+#' hashes differently otherwise, which is a spurious distinction rather than a
+#' real one.
+#' @noRd
+cache_key_string <- function(parts) {
+  paste(vapply(parts, cache_key_member, character(1)), collapse = "\x1f")
+}
+
+#' @noRd
+cache_key_member <- function(x) {
+  # zero-length and NULL are one case, tagged so they cannot collide with any
+  # literal a caller might pass
+  if (is.null(x) || length(x) == 0L) return("0:")
+  # BEFORE the vector branches: a WKB is a list, and is.raw() is FALSE on it
+  if (is.list(x)) {
+    return(paste0("l:", paste(vapply(x, cache_key_member, character(1)),
+                              collapse = "\x1e")))
+  }
+  if (is.raw(x)) return(paste0("x:", paste(as.character(x), collapse = "")))
+  # before is.numeric(): sprintf/as.double would render TRUE as 1
+  if (is.logical(x)) {
+    return(paste0("b:", paste(ifelse(is.na(x), "NA", ifelse(x, "T", "F")),
+                              collapse = "\x1e")))
+  }
+  if (is.numeric(x)) {
+    return(paste0("n:", paste(vapply(x, function(v) {
+      paste(as.character(writeBin(as.double(v), raw(), endian = "little")),
+            collapse = "")
+    }, character(1)), collapse = "\x1e")))
+  }
+  paste0("s:", paste(ifelse(is.na(x), "\x01NA", enc2utf8(as.character(x))),
+                     collapse = "\x1e"))
 }
 
 

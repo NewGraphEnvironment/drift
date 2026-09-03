@@ -247,8 +247,8 @@ dft_stac_cube <- function(aoi,
   t1 <- dr[2]
 
   # Cache
-  cache_base <- dft_cache_path(cache_dir)
-  cache_source_dir <- file.path(cache_base, source)
+  # <base>/<scheme>/<source> (#48); recursive = TRUE required for the extra level
+  cache_source_dir <- cache_scheme_dir(cache_dir, source)
   dir.create(cache_source_dir, recursive = TRUE, showWarnings = FALSE)
   cache_key <- stac_cube_cache_key(
     aoi_target, res, target_crs, dt, aggregation, resampling,
@@ -642,5 +642,7 @@ stac_cube_cache_key <- function(aoi_target, res, target_crs, dt, aggregation,
   # union; keying it apart stops a tiled cube being served for an untiled request
   # (or vice versa). Appending only when non-NULL preserves the legacy key.
   if (!is.null(tile_size)) parts <- c(parts, list(as.numeric(tile_size)))
-  substr(rlang::hash(parts), 1, 12)
+  # Shared with stac_cache_key(); see cache_key_hash() for why this is no longer
+  # rlang::hash() (#48) and why the key is now 16 characters.
+  cache_key_hash(parts)
 }

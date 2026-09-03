@@ -82,7 +82,10 @@ stripped so a caller re-running \code{\link[rstac:items_functions]{rstac::items_
 silently duplicate features. The cache key is attached as
 \code{attr(, "cache_key")} so a caller can record which cache entry served the
 fetch; it is \strong{per call, not per year} — cached files are named
-\verb{<year>_<cache_key>}, so one key covers every year the call returned.
+\verb{<year>_<cache_key>}, so one key covers every year the call returned. Its
+format changed in 0.12.0 (#48): 16 lowercase hex characters, from
+\code{digest::digest(algo = "xxhash64")} over a canonical string, where it was
+previously 12 from \code{rlang::hash()}.
 }
 \description{
 Query a STAC catalog, build a gdalcubes image collection, and extract
@@ -92,7 +95,7 @@ custom COGs).
 }
 \details{
 Fetched rasters are cached under \code{\link[=dft_cache_path]{dft_cache_path()}} as
-\verb{<source>/<year>_<key>.nc} (or \code{.tif} when \code{tile_size} is set — see below),
+\verb{v2/<source>/<year>_<key>.nc} (or \code{.tif} when \code{tile_size} is set — see below),
 where \code{key} is a hash of the AOI geometry and every fetch parameter that
 affects the output (\code{res}, \code{crs}, \code{dt}, \code{aggregation}, \code{resampling},
 \code{stac_url}, \code{collection}, \code{asset}, and \code{tile_size}). Repeat calls with the
@@ -109,4 +112,14 @@ rather than served or left for the user to delete by hand.
 The read check samples rather than proves — it reads one row, so interior
 damage that leaves the file structurally walkable can pass it. The guarantee
 against partial entries is the atomic write, not the check.
+
+The key is a function of \strong{content alone} (#48), so the same AOI and
+parameters produce the same filename on any machine, R version, rlang version
+and architecture — a cache can be copied between machines and stay valid. The
+leading \code{v2} is the cache-scheme generation: a deliberate key change moves it,
+leaving older entries findable rather than silently orphaned. See
+\code{\link[=dft_cache_info]{dft_cache_info()}} and \code{\link[=dft_cache_clear]{dft_cache_clear()}} for reporting and reclaiming them.
+
+Note \code{sf::st_as_binary()} honours \code{sf::st_precision()}, so setting a precision
+on the AOI changes its WKB and therefore the key. That has always been true.
 }

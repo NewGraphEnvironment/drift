@@ -10,10 +10,19 @@ dft_cache_info(cache_dir = NULL)
 \item{cache_dir}{Character. Override the default cache location.}
 }
 \value{
-A list with \code{path}, \code{n_files}, and \code{size_mb}.
+A list with \code{path} (the base), \code{n_files} and \code{size_mb} (everything
+under it), and \code{n_files_superseded} / \code{size_mb_superseded} (the subset
+belonging to superseded schemes, which can never be served).
 }
 \description{
 Reports the cache location and size.
+}
+\details{
+Entries left behind by an older cache scheme are reported separately (#48).
+A key change orphans them — they can never be served again — but nothing
+deletes them automatically, so without a count they are simply invisible disk
+use that no one can attribute. Reclaim with
+\code{dft_cache_clear(scheme = "superseded")}.
 }
 \examples{
 dft_cache_info()
