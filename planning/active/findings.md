@@ -41,10 +41,11 @@ contemporaneous #36-era value fails too.
 
 | quantity | measured |
 |---|---|
-| orphaned entries | 129 of 183 (450.9 MB of 1.1 GB), mean 3.50 MB |
+| orphaned by the rlang bump | 129 of 183 (450.9 MB), mean 3.50 MB |
+| superseded once this fix lands | **all 204 (1085.5 MB)** — the key changes regardless, so the 54 post-upgrade entries go too; the scheme dir only makes that visible |
 | re-fetch, cold | 0.05 MB → 10.1 s; 0.12 MB → 9.2 s; 0.36 MB → 9.7 s |
 | ⇒ per-entry cost | **~10 s, flat** — all fixed overhead (STAC query, signing, COG opens), not bytes |
-| whole orphaned set | **≈20 min**, serial, one machine |
+| whole set, if every entry is re-fetched | **≈34 min**, serial, one machine (204 x ~10 s) — and only on demand, entry by entry |
 | warm cache hit | 1.39 s (includes the #41 validation probe) |
 
 **There are zero cube entries cached.** The entire 1.1 GB is `io-lulc` *fetch* entries. The issue's

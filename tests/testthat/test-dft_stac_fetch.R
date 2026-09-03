@@ -57,7 +57,7 @@ test_that("stac_cache_key is deterministic and 12-char hex", {
   k1 <- cache_key(square_aoi())
   k2 <- cache_key(square_aoi())
   expect_equal(k1, k2)
-  expect_match(k1, "^[0-9a-f]{12}$")
+  expect_match(k1, "^[0-9a-f]{16}$")
 })
 
 test_that("stac_cache_key changes when the AOI geometry changes", {
@@ -85,13 +85,21 @@ test_that("stac_cache_key(tile_size = NULL) is frozen against accidental drift",
   # every cached io-lulc fetch on upgrade. If this literal must change, that is
   # a deliberate cache-format break — flag it, don't just re-freeze.
   #
-  # MOVED ONCE, DELIBERATELY, in #51: was "79f67b7b9dae" up to v0.9.0. The
-  # paging fix changes no key parameter, so without a break a raster built from
-  # a TRUNCATED item set would keep being served from cache forever under
-  # `force = FALSE` — the wide-AOI users the bug hit hardest would get no fix.
-  # The salt in stac_cache_key() is what moved it. Cost is a one-time re-fetch
-  # of small annual rasters.
-  expect_equal(cache_key(), "2264b5dbef6e")
+  # MOVED TWICE, both times deliberately:
+  #   #51  "79f67b7b9dae" -> "2264b5dbef6e"  (the salt; a truncated item set
+  #        would otherwise have been served from cache forever)
+  #   #48  "2264b5dbef6e" -> "8b02f87e393e7f9a"  (this one)
+  #
+  # #48 is NOT a drift change: rlang 1.3.0 rewrote hash() and its own NEWS says
+  # "with this version all hash values will now be different". Since the key IS
+  # the cache filename, that silently orphaned every cached entry. The fix moves
+  # off rlang::hash() onto a canonical string hashed by digest, so the key is a
+  # function of content alone. It is now also 16 chars rather than 12.
+  #
+  # This value is a PORTABLE FACT: identical on any machine, R version, rlang
+  # version and architecture. If it differs on another machine, that is a real
+  # failure of the property #48 exists to create -- not a golden to re-pin.
+  expect_equal(cache_key(), "8b02f87e393e7f9a")
 })
 
 test_that("the #51 cache-format break actually changed the key", {
@@ -546,7 +554,8 @@ test_that("dft_stac_fetch attaches cache_key, offline", {
   key <- drift:::stac_cache_key(aoi_t, 10, crs, "P1Y", "first", "near",
                                 cfg$stac_url, cfg$collection, cfg$asset,
                                 tile_size = NULL)
-  cache <- tempfile("drift_key_"); dir.create(file.path(cache, "io-lulc"), recursive = TRUE)
+  cache <- tempfile("drift_key_")
+  dir.create(drift:::cache_scheme_dir(cache, "io-lulc"), recursive = TRUE)
   # any raster GDAL can open; the extension is not sniffed for content. Built
   # over the AOI's own extent so the terra::mask() at the end of the cache-hit
   # path has something to clip.
@@ -558,7 +567,8 @@ test_that("dft_stac_fetch attaches cache_key, offline", {
   # .nc is the extension the untiled cache path expects; terra advises writeCDF
   # for real NetCDF, but GDAL reads this back fine and the content is arbitrary
   suppressWarnings(
-    terra::writeRaster(r, file.path(cache, "io-lulc", paste0("2020_", key, ".nc")))
+    terra::writeRaster(r, file.path(drift:::cache_scheme_dir(cache, "io-lulc"),
+                                    paste0("2020_", key, ".nc")))
   )
 
   testthat::local_mocked_bindings(
@@ -721,10 +731,12 @@ fetch_paths <- function(aoi, cache) {
   key <- drift:::stac_cache_key(aoi_t, 10, crs, "P1Y", "first", "near",
                                 cfg$stac_url, cfg$collection, cfg$asset,
                                 tile_size = NULL)
-  dir.create(file.path(cache, "io-lulc"), recursive = TRUE, showWarnings = FALSE)
+  dir.create(drift:::cache_scheme_dir(cache, "io-lulc"), recursive = TRUE,
+             showWarnings = FALSE)
   list(aoi_t = aoi_t, key = key,
-       dir = file.path(cache, "io-lulc"),
-       file = file.path(cache, "io-lulc", paste0("2020_", key, ".nc")))
+       dir = drift:::cache_scheme_dir(cache, "io-lulc"),
+       file = file.path(drift:::cache_scheme_dir(cache, "io-lulc"),
+                        paste0("2020_", key, ".nc")))
 }
 
 read_aoi <- function() {
@@ -1075,4 +1087,143 @@ test_that("a healthy cache entry is still served as a hit, with no re-fetch", {
     ))
   )
   expect_s4_class(out[["2020"]], "SpatRaster")
+})
+
+
+# ---------------------------------------------------------------------------
+# #48 — the cache key must be a function of CONTENT, not of a library's
+# traversal of an R object. rlang 1.3.0 rewrote hash() and moved every key,
+# silently orphaning every cached entry, because the key IS the filename.
+# ---------------------------------------------------------------------------
+
+test_that("cache_key_string returns exactly one non-NA string", {
+  # THE load-bearing guard. digest(serialize = FALSE) takes only the FIRST
+  # element of a character vector, silently:
+  #   digest(c("a","b"), "xxhash64", serialize = FALSE) ==
+  #   digest("a",        "xxhash64", serialize = FALSE)
+  # so a length > 1 here collapses EVERY key to the hash of its first member —
+  # a total collision, not a probabilistic one, with no warning anywhere.
+  s <- drift:::cache_key_string(list(sf::st_as_binary(sf::st_geometry(square_aoi())),
+                                     10, "a", TRUE, NULL, c("x", "y")))
+  expect_type(s, "character")
+  expect_length(s, 1L)
+  expect_false(is.na(s))
+
+  # and the premise: digest really does behave that way, so this test is
+  # guarding a live hazard rather than a hypothetical one
+  expect_identical(
+    digest::digest(c("a", "b"), algo = "xxhash64", serialize = FALSE),
+    digest::digest("a", algo = "xxhash64", serialize = FALSE)
+  )
+})
+
+test_that("cache_key_hash refuses a multi-element string", {
+  local_mocked_bindings(cache_key_string = function(...) c("a", "b"))
+  expect_error(drift:::cache_key_hash(list(1)), "length")
+})
+
+test_that("cache_key_string distinguishes every type-collision pair", {
+  # Without a per-member type tag a plain string scheme collides all of these.
+  # None bites today only because each member position happens to be type-fixed
+  # by coercion at the call sites — an invariant held by convention and written
+  # down nowhere, which the cube key does not even follow for its character
+  # members. The tags make it structural.
+  ks <- function(x) drift:::cache_key_string(list(x))
+  expect_false(ks(NULL)            == ks("<none>"))
+  expect_false(ks(NA_character_)   == ks("<NA>"))
+  expect_false(ks(10)              == ks("10"))
+  expect_false(ks(TRUE)            == ks("TRUE"))
+  expect_false(ks(as.raw(0xab))    == ks("ab"))
+  expect_false(ks(c("B08", "B04")) == ks("B08,B04"))
+  expect_false(ks(character(0))    == ks(""))
+})
+
+test_that("cache_key_string keeps NaN and NA_real_ apart", {
+  # sprintf("%.17g", ...) plus an is.na() sentinel would collapse these, because
+  # is.na(NaN) is TRUE. The IEEE-754 byte encoding does not.
+  expect_true(is.na(NaN))                                   # the premise
+  expect_false(drift:::cache_key_string(list(NaN)) ==
+                 drift:::cache_key_string(list(NA_real_)))
+})
+
+test_that("cache_key_string treats integer and double alike, and TRUE is not 1", {
+  expect_identical(drift:::cache_key_string(list(10L)),
+                   drift:::cache_key_string(list(10)))
+  # branch order: sprintf/as.double render TRUE as 1, so is.logical() must be
+  # tested before is.numeric()
+  expect_false(drift:::cache_key_string(list(TRUE)) ==
+                 drift:::cache_key_string(list(1)))
+})
+
+test_that("cache_key_string handles the WKB member, which is a LIST not a raw", {
+  # sf::st_as_binary() returns a list of raw vectors classed "WKB"; is.raw() on
+  # it is FALSE. A raw-only branch would never match it, so this pins the
+  # is.list() branch and its ordering.
+  w <- sf::st_as_binary(sf::st_geometry(square_aoi()), endian = "little")
+  expect_false(is.raw(w))                                   # the premise
+  expect_true(is.list(w))
+  s <- drift:::cache_key_string(list(w))
+  expect_length(s, 1L)
+  expect_match(s, "^l:x:[0-9a-f]+$")
+})
+
+test_that("a multi-feature AOI keys differently under a different feature order", {
+  p1 <- sf::st_polygon(list(rbind(c(0, 0), c(1, 0), c(1, 1), c(0, 1), c(0, 0))))
+  p2 <- sf::st_polygon(list(rbind(c(5, 5), c(6, 5), c(6, 6), c(5, 6), c(5, 5))))
+  a <- sf::st_sfc(p1, p2, crs = 32609)
+  b <- sf::st_sfc(p2, p1, crs = 32609)
+  expect_false(
+    drift:::stac_cache_key(a, 10, "EPSG:32609", "P1Y", "first", "near",
+                           "u", "c", "d", tile_size = NULL) ==
+    drift:::stac_cache_key(b, 10, "EPSG:32609", "P1Y", "first", "near",
+                           "u", "c", "d", tile_size = NULL)
+  )
+})
+
+test_that("the canonical STRING is pinned, not only the hash", {
+  # The honest form of the stability goal, and the one that makes a future
+  # failure diagnosable:
+  #   this passes + the key golden fails -> the HASHING layer moved
+  #   this fails                         -> OUR INPUTS moved, and the diff
+  #                                          names the member that did
+  expect_identical(
+    drift:::cache_key_string(list(as.raw(c(0x01, 0xff)), 10, "abc", TRUE, NULL)),
+    "x:01ff\x1fn:0000000000002440\x1fs:abc\x1fb:T\x1f0:"
+  )
+})
+
+test_that("digest still reproduces its own published XXH64 vector", {
+  # The control that separates "the hashing layer moved" from "we changed the
+  # inputs". Uses digest's OWN pinned upstream vector (inst/tinytest/
+  # test_digest.R) rather than an arbitrary string, so a failure here is
+  # directly attributable upstream instead of being drift's problem to guess at.
+  expect_identical(
+    digest::digest("abc", algo = "xxhash64", serialize = FALSE),
+    "44bc2cf5ad770999"
+  )
+})
+
+test_that("neither key function reaches R serialization or rlang::hash", {
+  # Structural, not behavioural: catches a reintroduction by ANY route,
+  # including an accidental `serialize = TRUE` on the digest call — which is the
+  # specific regression that would silently re-couple the key to R's
+  # serialization version without changing any visible behaviour today.
+  for (f in list(drift:::stac_cache_key, drift:::stac_cube_cache_key,
+                 drift:::cache_key_hash, drift:::cache_key_string,
+                 drift:::cache_key_member)) {
+    src <- paste(deparse(body(f)), collapse = " ")
+    expect_false(grepl("rlang::hash|\\bhash\\(", src))
+    expect_false(grepl("serialize\\s*=\\s*TRUE|\\bserialize\\(", src))
+  }
+})
+
+test_that("the key does not move when rlang's hash does", {
+  # A REINTRODUCTION guard, not a proof of independence — the key now depends on
+  # digest instead, and the source assertion above is what proves rlang is gone.
+  # This fails loudly if someone routes the key back through rlang::hash().
+  before <- cache_key()
+  local_mocked_bindings(hash = function(...) "TOTALLY-DIFFERENT-VALUE",
+                        .package = "rlang")
+  expect_identical(cache_key(), before)
+  expect_identical(cache_key(), "8b02f87e393e7f9a")
 })
