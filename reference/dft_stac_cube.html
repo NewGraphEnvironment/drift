@@ -17,7 +17,7 @@ breakpoint detection."><meta property="og:image" content="https://newgraphenviro
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -218,8 +218,10 @@ this AOI that is a <em>cost</em> (343.7 s / 693 requests at 128 px against 236.9
 
 
 <dt id="arg-force">force<a class="anchor" aria-label="anchor" href="#arg-force"></a></dt>
-<dd><p>Logical. Re-fetch even if cached, overwriting the cached raster
-(default <code>FALSE</code>).</p></dd>
+<dd><p>Logical. Re-fetch even if cached, replacing the cached raster
+(default <code>FALSE</code>). The replacement is atomic, so an interrupted forced
+re-fetch leaves the previous entry intact rather than destroying it — which
+matters here, where rebuilding is a multi-hour stream.</p></dd>
 
 
 <dt id="arg-sign-fn">sign_fn<a class="anchor" aria-label="anchor" href="#arg-sign-fn"></a></dt>

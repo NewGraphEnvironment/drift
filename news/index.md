@@ -1,5 +1,77 @@
 # Changelog
 
+## drift 0.11.0
+
+- **Bug fix: an interrupted fetch left a corrupt cache entry that every
+  later run trusted as a hit
+  ([\#41](https://github.com/NewGraphEnvironment/drift/issues/41)).**
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  wrote each year’s raster straight to its canonical cache path, and the
+  cache gate was presence-only — so a process killed mid-download left a
+  partial file under the name a later run reports as `cached`, returns,
+  and then breaks on (`[mask] rasterization failed`). Recovery was
+  manual deletion of the specific `<year>_<hash>.nc`. Cache entries are
+  now written to a unique temp file in the same directory and renamed
+  into place only after a complete, validated write, so a killed fetch
+  leaves at most a `*.tmp*` orphan that the gate can never serve. Latent
+  on small AOIs, which is why it surfaced on long large-floodplain runs.
+- **The same fix lands on
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)**,
+  which had the identical defect and was not named in the issue. It is
+  the more expensive path to lose — a cube entry is a multi-hour
+  Sentinel-2 stream rather than a small annual raster.
+- **A second instance of the same bug, which the issue did not name:
+  `force = TRUE` destroyed a good cache.** It truncated the canonical
+  file *before* writing, so an interrupted forced re-fetch lost an entry
+  that had been perfectly valid — the exact situation in which someone
+  reaches for `force`. There is a regression test.
+- **Concurrent fetches of the same key no longer interleave.** Two
+  sessions writing one canonical path previously produced a mixed file;
+  a unique temp per writer makes it clean last-writer-wins.
+- **Cached entries are validated before they are served.** Three damage
+  shapes were measured rather than assumed, and no single cheaper check
+  sees all of them: a tail-truncated or zero-byte file makes
+  [`terra::rast()`](https://rspatial.github.io/terra/reference/rast.html)
+  **error**; the shape in the issue’s own traceback **opens with a
+  warning** and a degenerate geotransform; and a content-damaged file
+  whose size is preserved **opens silently**, with correct dim/res/CRS,
+  masks fine, and returns plausible-looking values (`nNA = 0`) — its
+  damage is visible *only* in the warning raised during the pixel read.
+  So `tryCatch(terra::rast())` alone passes the second and third, and a
+  geometry check alone passes the third. A failing entry is re-fetched
+  with a warning naming the reason, never an abort telling the user to
+  delete a file by hand.
+- Two limits of that check are deliberate and documented at the call
+  sites, so they are not later “tightened” by someone reading them as
+  oversights. The open check catches **errors only**, never the
+  multidim-API warning — that is a capability message, and failing on it
+  would refuse healthy `.nc` entries across the whole cache. The
+  empty-CRS check fires only **in conjunction with** an identity
+  geotransform, since an absent CRS alone is not proof of damage and the
+  cost of a false refusal is a silent, permanent re-download.
+- **The read probe samples rather than proves, and says so.** It reads
+  one row, so interior damage that leaves the container walkable can
+  pass it; the guarantee against partial entries is the atomic write. On
+  the cube path the probe is free and strictly stronger:
+  `cube_check_nonempty()` already scans every pixel via
+  [`terra::global()`](https://rspatial.github.io/terra/reference/global.html),
+  so wrapping that existing call in a warning handler gives a whole-file
+  check at no added cost. Validity is checked *before* it, so a
+  truncated file that happens to read all-`NA` is reported as corrupt
+  rather than as “your AOI does not overlap the collection”.
+- **No cache-format break.** Unlike
+  [\#51](https://github.com/NewGraphEnvironment/drift/issues/51),
+  nothing needs invalidating: all 168 entries in a real cache were
+  checked and none is corrupt. The same 168 (123 `.nc`, 45 `.tif`) are
+  the false-refusal control for the new validator — it rejects none of
+  them, at 41 ms each.
+- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  no longer strands per-tile files when `mosaic_tiles()` errors, and the
+  GDAL PAM sidecar is carried across the rename
+  ([`terra::writeRaster()`](https://rspatial.github.io/terra/reference/writeRaster.html)
+  emits one writing `.nc`, though not `.tif`), so it cannot be left
+  behind under a dead temp name.
+
 ## drift 0.10.0
 
 - **Bug fix:

@@ -13,7 +13,7 @@ custom COGs)."><meta property="og:image" content="https://newgraphenvironment.gi
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -144,10 +144,11 @@ GeoTIFF (<code>.tif</code>) rather than a gdalcubes NetCDF (<code>.nc</code>).</
 
 
 <dt id="arg-force">force<a class="anchor" aria-label="anchor" href="#arg-force"></a></dt>
-<dd><p>Logical. Re-fetch even if cached, overwriting the cached file
-(default <code>FALSE</code>). A raster returned by an earlier call with the same
-parameters is backed by that file and may silently pick up the rewritten
-contents.</p></dd>
+<dd><p>Logical. Re-fetch even if cached, replacing the cached file
+(default <code>FALSE</code>). The replacement is atomic, so a raster returned by an
+earlier call keeps reading the entry it was opened against rather than
+picking up half-rewritten contents, and an interrupted forced re-fetch
+leaves the previous entry intact.</p></dd>
 
 
 <dt id="arg-sign-fn">sign_fn<a class="anchor" aria-label="anchor" href="#arg-sign-fn"></a></dt>
@@ -174,6 +175,16 @@ where <code>key</code> is a hash of the AOI geometry and every fetch parameter t
 affects the output (<code>res</code>, <code>crs</code>, <code>dt</code>, <code>aggregation</code>, <code>resampling</code>,
 <code>stac_url</code>, <code>collection</code>, <code>asset</code>, and <code>tile_size</code>). Repeat calls with the
 same AOI and parameters reuse the cache; changing any of them re-fetches.</p>
+<p>Entries are <strong>published atomically</strong> — written to a temp file in the same
+directory and renamed into place only after a complete, validated write — so
+an interrupted fetch cannot leave a partial file under the canonical name for
+a later run to trust. A cached entry is also <strong>validated before it is
+served</strong>: it must open as a raster, be sanely georeferenced, and return its
+pixels without a read error. An entry that fails is re-fetched with a warning
+rather than served or left for the user to delete by hand.</p>
+<p>The read check samples rather than proves — it reads one row, so interior
+damage that leaves the file structurally walkable can pass it. The guarantee
+against partial entries is the atomic write, not the check.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

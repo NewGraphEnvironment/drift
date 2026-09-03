@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.10.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,26 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.11.0" id="drift-0110">drift 0.11.0<a class="anchor" aria-label="anchor" href="#drift-0110"></a></h2>
+<ul><li>
+<strong>Bug fix: an interrupted fetch left a corrupt cache entry that every later run trusted as a hit (<a href="https://github.com/NewGraphEnvironment/drift/issues/41" class="external-link">#41</a>).</strong> <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> wrote each year’s raster straight to its canonical cache path, and the cache gate was presence-only — so a process killed mid-download left a partial file under the name a later run reports as <code>cached</code>, returns, and then breaks on (<code>[mask] rasterization failed</code>). Recovery was manual deletion of the specific <code>&lt;year&gt;_&lt;hash&gt;.nc</code>. Cache entries are now written to a unique temp file in the same directory and renamed into place only after a complete, validated write, so a killed fetch leaves at most a <code>*.tmp*</code> orphan that the gate can never serve. Latent on small AOIs, which is why it surfaced on long large-floodplain runs.</li>
+<li>
+<strong>The same fix lands on <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code></strong>, which had the identical defect and was not named in the issue. It is the more expensive path to lose — a cube entry is a multi-hour Sentinel-2 stream rather than a small annual raster.</li>
+<li>
+<strong>A second instance of the same bug, which the issue did not name: <code>force = TRUE</code> destroyed a good cache.</strong> It truncated the canonical file <em>before</em> writing, so an interrupted forced re-fetch lost an entry that had been perfectly valid — the exact situation in which someone reaches for <code>force</code>. There is a regression test.</li>
+<li>
+<strong>Concurrent fetches of the same key no longer interleave.</strong> Two sessions writing one canonical path previously produced a mixed file; a unique temp per writer makes it clean last-writer-wins.</li>
+<li>
+<strong>Cached entries are validated before they are served.</strong> Three damage shapes were measured rather than assumed, and no single cheaper check sees all of them: a tail-truncated or zero-byte file makes <code><a href="https://rspatial.github.io/terra/reference/rast.html" class="external-link">terra::rast()</a></code> <strong>error</strong>; the shape in the issue’s own traceback <strong>opens with a warning</strong> and a degenerate geotransform; and a content-damaged file whose size is preserved <strong>opens silently</strong>, with correct dim/res/CRS, masks fine, and returns plausible-looking values (<code>nNA = 0</code>) — its damage is visible <em>only</em> in the warning raised during the pixel read. So <code>tryCatch(terra::rast())</code> alone passes the second and third, and a geometry check alone passes the third. A failing entry is re-fetched with a warning naming the reason, never an abort telling the user to delete a file by hand.</li>
+<li>Two limits of that check are deliberate and documented at the call sites, so they are not later “tightened” by someone reading them as oversights. The open check catches <strong>errors only</strong>, never the multidim-API warning — that is a capability message, and failing on it would refuse healthy <code>.nc</code> entries across the whole cache. The empty-CRS check fires only <strong>in conjunction with</strong> an identity geotransform, since an absent CRS alone is not proof of damage and the cost of a false refusal is a silent, permanent re-download.</li>
+<li>
+<strong>The read probe samples rather than proves, and says so.</strong> It reads one row, so interior damage that leaves the container walkable can pass it; the guarantee against partial entries is the atomic write. On the cube path the probe is free and strictly stronger: <code>cube_check_nonempty()</code> already scans every pixel via <code><a href="https://rspatial.github.io/terra/reference/global.html" class="external-link">terra::global()</a></code>, so wrapping that existing call in a warning handler gives a whole-file check at no added cost. Validity is checked <em>before</em> it, so a truncated file that happens to read all-<code>NA</code> is reported as corrupt rather than as “your AOI does not overlap the collection”.</li>
+<li>
+<strong>No cache-format break.</strong> Unlike <a href="https://github.com/NewGraphEnvironment/drift/issues/51" class="external-link">#51</a>, nothing needs invalidating: all 168 entries in a real cache were checked and none is corrupt. The same 168 (123 <code>.nc</code>, 45 <code>.tif</code>) are the false-refusal control for the new validator — it rejects none of them, at 41 ms each.</li>
+<li>
+<code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> no longer strands per-tile files when <code>mosaic_tiles()</code> errors, and the GDAL PAM sidecar is carried across the rename (<code><a href="https://rspatial.github.io/terra/reference/writeRaster.html" class="external-link">terra::writeRaster()</a></code> emits one writing <code>.nc</code>, though not <code>.tif</code>), so it cannot be left behind under a dead temp name.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.10.0" id="drift-0100">drift 0.10.0<a class="anchor" aria-label="anchor" href="#drift-0100"></a></h2>
 <ul><li>

@@ -195,8 +195,10 @@ dft_stac_cube(
 
 - force:
 
-  Logical. Re-fetch even if cached, overwriting the cached raster
-  (default `FALSE`).
+  Logical. Re-fetch even if cached, replacing the cached raster (default
+  `FALSE`). The replacement is atomic, so an interrupted forced re-fetch
+  leaves the previous entry intact rather than destroying it — which
+  matters here, where rebuilding is a multi-hour stream.
 
 - sign_fn:
 
