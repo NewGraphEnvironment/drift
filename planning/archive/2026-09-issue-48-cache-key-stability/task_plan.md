@@ -56,7 +56,7 @@ Two of them would have shipped a broken key.
 
 - [x] Roxygen: keyed by content; digest pinned to a published vector where rlang disclaims stability; note `st_as_binary()` honours `st_precision()`
 - [x] **Correct `NEWS.md:20`**, which states in bold that cube caches are unaffected — this change invalidates them
-- [x] NEWS: rlang root cause, one-time migration (~451 MB / ~20 min), `attr(,"cache_key")` format **and length** change, new `digest` Import, no rlang pin needed
+- [x] NEWS: rlang root cause, one-time migration (all 204 entries / 1.09 GB superseded; ~10 s each, on demand), `attr(,"cache_key")` format **and length** change, new `digest` Import, no rlang pin needed
 - [x] `R/dft_cache.R` docs: the `v2/` scheme and `scheme=` argument
 - [x] `devtools::document()`
 - [x] Version bump (final commit)
