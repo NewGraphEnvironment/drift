@@ -303,6 +303,34 @@ test_that("bundled tile: a Trees -> Rangeland sliver survives patch_area_min = 5
   expect_equal(round(sliver$width_px, 2), 1.44)
 })
 
+test_that("does not pull in lwgeom (sf::st_perimeter would, on projected data)", {
+  if ("lwgeom" %in% loadedNamespaces()) try(unloadNamespace("lwgeom"), silent = TRUE)
+  skip_if("lwgeom" %in% loadedNamespaces())    # could not unload; nothing to prove
+  res <- artifact_fixture_river()
+  p <- dft_transition_vectors(res$raster, changes_only = TRUE)
+  out <- dft_transition_artifact(p, res$raster)
+  expect_false("lwgeom" %in% loadedNamespaces())
+  expect_equal(out$width_px, c(2 * 4000 / 820 / 10, 2 * 4000 / 820 / 10))
+})
+
+test_that("levels table is read by position for the id, by name for the label", {
+  res <- artifact_fixture_shift()
+  p <- dft_transition_vectors(res$raster, changes_only = TRUE)
+  ct <- terra::cats(res$raster)[[1]]
+  r2 <- res$raster
+  names(ct)[1] <- "value"                        # a user raster's id column name
+  terra::set.cats(r2, layer = 1, value = ct)
+  out <- dft_transition_artifact(p, r2)
+  expect_equal(out$boundary_frac, 1)
+
+  ct2 <- ct
+  names(ct2)[2] <- "label"
+  terra::set.cats(r2, layer = 1, value = ct2)
+  # "level column" pins THIS guard; a bare "transition" also matches the
+  # unknown-label abort that fires when the guard is deleted (round-3 review)
+  expect_error(dft_transition_artifact(p, r2), "level column")
+})
+
 # ---- validation ----------------------------------------------------------------
 
 test_that("errors on bad inputs", {

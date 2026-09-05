@@ -33,15 +33,15 @@ so they touch only when the river is one pixel wide.
 - [x] Stable rows get `NA` metrics; zero-row input returns the full schema; error paths (non-sf, non-factor raster, CRS mismatch, duplicated `patch_id`, bad params)
 
 ## Phase 2: Implement `dft_transition_artifact()`
-- [ ] `R/dft_transition_artifact.R` — validation, width, boundary (focal per to-class + rasterize + zonal), reciprocity (`st_is_within_distance` on reverse-label subset), column assembly
-- [ ] roxygen: params, `@return` column table, `@details` on each signature and on the unfiltered-raster requirement, `@seealso` to `dft_transition_vectors()` / `dft_transition_attribute()` and the trajectory vignette as the independent spectral route; runnable `@examples` on bundled data including the caller-composed `flag_artifact` one-liner
-- [ ] `devtools::document()` — confirm exactly one new `export()` and one new `.Rd`
-- [ ] All Phase 1 tests pass; `lintr::lint_package()` clean on the new file
+- [x] `R/dft_transition_artifact.R` — validation, width, boundary (focal per to-class + rasterize + zonal), reciprocity (`st_is_within_distance` on reverse-label subset), column assembly
+- [x] roxygen: params, `@return` column table, `@details` on each signature and on the unfiltered-raster requirement, `@seealso` to `dft_transition_vectors()` / `dft_transition_attribute()` and the trajectory vignette as the independent spectral route; runnable `@examples` on bundled data including the caller-composed `flag_artifact` one-liner
+- [x] `devtools::document()` — confirm exactly one new `export()` and one new `.Rd`
+- [x] All Phase 1 tests pass; `lintr::lint_package()` clean on the new file
 
 ## Phase 3: Documentation
-- [ ] `vignettes/land-cover-change.Rmd`: new subsection after "Filtering Classification Noise" — table of the surviving `patch_area_min = 5000` sliver, share of patches vs share of area under 1.5 px, a map of flagged patches, and the pointer to the trajectory vignette's "outline with no red" as the spectral confirmation
-- [ ] `@seealso` back-links from `dft_transition_vectors()` and `dft_transition_attribute()`
-- [ ] Render the vignette locally (`devtools::install()` first) and read the output
+- [x] `vignettes/land-cover-change.Rmd`: new subsection after "Filtering Classification Noise" — table of the surviving `patch_area_min = 5000` sliver, share of patches vs share of area under 1.5 px, a map of flagged patches, and the pointer to the trajectory vignette's "outline with no red" as the spectral confirmation
+- [x] `@seealso` back-links from `dft_transition_vectors()` and `dft_transition_attribute()`
+- [x] Render the vignette locally (`devtools::install()` first) and read the output
 
 ## Validation
 
