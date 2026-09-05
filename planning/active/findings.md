@@ -133,16 +133,16 @@ one-line guard on a documented mechanism with a direct pin, and was not sent for
 `co_ff04`, 386.5 km², 16000 x 12000 at 10 m (192M cells), IO LULC 2017-2023 via
 `dft_stac_fetch(tile_size = 20000)`: 30 tiles/year, 1,414 s.
 
-| stage | run 2 (pre-spill) | run 3 (committed code) |
+| stage | run 2 (pre-spill) | run 4 (committed script and code) |
 |---|---|---|
-| fetch (cached) | 31.9 s | 30.5 s |
-| classify | 8.0 s | 8.0 s |
-| `dft_rast_break_class()` | 91.7 s | 101.2 s (86.7 s in the final probe) |
-| category crosstab | 35.9 s | 34.9 s |
-| `dft_transition_vectors(changes_only = TRUE)` | 25.6 s | 25.6 s |
-| `dft_transition_artifact()` | 160.3 s | 163.1 s |
-| per-patch zonal | 24.3 s | 24.5 s |
-| pipeline peak RSS (KiB / 1024²) | 21.3 GiB | 20.8 GiB |
+| fetch (cached) | 31.9 s | 28.7 s |
+| classify | 8.0 s | 8.2 s |
+| `dft_rast_break_class()` | 91.7 s | 90.1 s (86.7-101.2 across runs) |
+| category crosstab | 35.9 s | 36.5 s |
+| `dft_transition_vectors(changes_only = TRUE)` | 25.6 s | 26.0 s |
+| `dft_transition_artifact()` | 160.3 s | 160.2 s |
+| per-patch zonal | 24.3 s | 24.2 s |
+| pipeline peak RSS (KiB / 1024²) | 21.3 GiB | 20.9 GiB |
 
 Result: 21,710 change patches, 4,620.4 ha (#44 on the pre-clipped assets: 21,701 / 4,625).
 Of the endpoint-changed cells: **sustained break 19.69% (910 ha), endpoint-odd-year break

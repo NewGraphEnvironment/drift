@@ -1,8 +1,8 @@
 "stage","seconds"
-"fetch",30.5
-"classify",8
-"break_class",101.2
-"category_crosstab",34.9
-"transition_vectors",25.6
-"transition_artifact",163.1
-"patch_zonal",24.5
+"fetch",28.7
+"classify",8.2
+"break_class",90.1
+"category_crosstab",36.5
+"transition_vectors",26
+"transition_artifact",160.2
+"patch_zonal",24.2
