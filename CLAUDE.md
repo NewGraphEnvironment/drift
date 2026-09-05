@@ -2277,6 +2277,51 @@ Related: prefer GeoJSON over GeoPackage for a **tracked** layer. Git deltas text
 new copy of binary SQLite on every write — four commits of one 196 KB layer had already put 692 KB
 of blobs into history. Ship the gpkg as a gitignored rebuild.
 
+### `sf::st_perimeter()` needs lwgeom on projected data, and lwgeom is not a dependency of sf
+
+An exported sf function whose body branches on `requireNamespace("lwgeom")` is an
+undeclared dependency: `R CMD check` does not report it, and a test suite cannot see it
+on a machine that happens to have lwgeom installed. `st_perimeter()` is the live case —
+on a projected CRS it delegates to lwgeom and errors without it (sf 1.1.2), so a package
+that rejects lon/lat input takes that branch on **every** call. Caught 2026-09-04 in
+drift#44 by a review round, not by tests: the suite was green, the exported function
+would have failed on first use for any install without lwgeom, and the pkgdown CI
+(Imports + Suggests only) would have gone red on the examples.
+
+```r
+as.numeric(sf::st_length(sf::st_boundary(sf::st_geometry(x))))   # no lwgeom
+```
+
+Measured identical to `st_perimeter()` (max abs diff 0) across 93 raster-derived patches
+including 21 MULTIPOLYGON and 2 with holes; `numeric(0)` on zero rows. **Bare `st_length()`
+on polygons returns 0**, silently. Pin it with a test that `"lwgeom" %in% loadedNamespaces()`
+is `FALSE` after the call (unload first; it goes red with `st_perimeter()` restored).
+
+Same shape in `st_geod_*`, `st_minimum_bounding_circle()`, `st_split()`, `st_subdivide()`:
+the function is in sf's namespace, so `sf::` reads as a declared dependency while the branch
+needs one nobody declared. Read the body for `requireNamespace` before relying on it. This is
+"A fixture that cannot reach the failure mode" arriving through the *environment*: no fixture
+varies which packages are installed.
+
+### terra keeps a result in memory whenever it fits, so a per-class loop over a large grid accumulates full-grid rasters
+
+`ifel()`, `focal()`, arithmetic and `rasterize()` return in-memory SpatRasters whenever the
+result fits under `memfrac` (60% of RAM by default). On a 169M-cell grid each one is 1.35 GB,
+and a loop that computes two per class and never frees them holds 2.7 GB per iteration —
+measured 11.3 GB peak for **one** class and killed for memory at eight on a 64 GB machine
+(drift#44, 2026-09-05, the BULK floodplain at 10 m, 97.7% NA). `inMemory()` was `TRUE` on
+every intermediate. Unit tests on a 40x40 fixture cannot reach this; only a run at scale did.
+
+Pass `filename = tempfile(fileext = ".tif")` to every intermediate that is not the return
+value (`app`, `focal`, `rasterize`, `segregate` all take it) so terra streams in chunks, and
+`unlink()` them in `on.exit()`. Prefer one multi-layer pass over a per-class loop:
+`segregate(x, classes = ks, other = 0L)` gives a 0/1 layer per class in ascending order,
+`focal()` processes the stack per layer, and `zonal()` returns one column per layer — three
+calls in place of `3 * n_classes`. Same run afterwards: 143 s, peak set by the upstream
+stage. LZW-compressed intermediates measured ~0.2 bytes/cell/layer, so disk is not the
+constraint. Do not fix it with `terraOptions(memfrac = )` from library code — that is a
+global a caller did not ask you to change.
+
 
 # Code Check Conventions
 
