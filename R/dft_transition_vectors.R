@@ -33,8 +33,11 @@
 #'   When `patch_area_min` or `changes_only` drop patches, `patch_id` is numbered
 #'   over the surviving patches (dense `1..n`), not the pre-filter grid.
 #'
-#' @seealso [dft_transition_attribute()] to tag the returned patches from an
-#'   overlay polygon layer (fire perimeters, cutblocks, ...).
+#' @seealso [dft_transition_artifact()] to tag the returned patches with
+#'   geometric misregistration evidence (sliver width, boundary-hugging,
+#'   reciprocal pairs) — the axis `patch_area_min` cannot see;
+#'   [dft_transition_attribute()] to tag them from an overlay polygon layer
+#'   (fire perimeters, cutblocks, ...).
 #'
 #' @export
 #' @examples

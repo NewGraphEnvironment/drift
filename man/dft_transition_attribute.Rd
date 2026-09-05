@@ -150,5 +150,8 @@ tagged_2017_2020 <- dft_transition_attribute(
 )
 }
 \seealso{
-\code{\link[=dft_transition_vectors]{dft_transition_vectors()}} for producing the input patches.
+\code{\link[=dft_transition_vectors]{dft_transition_vectors()}} for producing the input patches;
+\code{\link[=dft_transition_artifact]{dft_transition_artifact()}} to flag geometric misregistration artifacts
+among them first (run it before \code{match_mode = "all"}, which duplicates
+\code{patch_id}).
 }
