@@ -400,6 +400,35 @@ prevented it.
 - Applies to every replacement form — `attr<-`, `[[<-`, `dim<-`, `st_crs<-`. If
   the left side has two calls, one of them has to move to its own line.
 
+### `download.file(quiet = TRUE)` never tells you the HTTP status — read it from `curl`
+
+`utils::download.file(method = "libcurl")` sets `CURLOPT_FAILONERROR`, so on a 4xx with a
+body libcurl aborts before writing it and R raises, in order, a *warning*
+(`downloaded length 0 != reported length 842`), a second warning carrying the status
+(`HTTP status was '404 Not Found'`), and an error. With `quiet = TRUE` the error text is
+just `cannot open URL '…'`. So:
+
+- a `tryCatch(warning = …)` unwinds on the **first** warning and never sees the status;
+- a `tryCatch(error = …)` with warnings suppressed sees an error with no status in it.
+
+Either way a text classifier reads a permanent 404 as a transient failure — or the
+reverse. The dead-URL fixture that would expose it is exactly the one nobody keeps; an
+httpbin `/status/410` has `Content-Length: 0`, skips the length warning, and passes.
+
+Measured 2026-09-05 in knowledge#5: a fix that matched `HTTP status was '4..` classified
+two ACAT 404s as `fetch_failed` and stopped a run that should have continued. The fix
+that held reads the status explicitly:
+
+```r
+h    <- curl::new_handle(followlocation = TRUE, timeout = 120)
+resp <- tryCatch(curl::curl_fetch_disk(url, dest, handle = h), error = function(e) NULL)
+# NULL -> transport failure; else resp$status_code, and dest holds the error BODY on a
+# non-200 (curl does not set FAILONERROR), so unlink(dest) on every non-ok path
+```
+
+Same shape for page fetches: `xml2::read_html(url)` on a 403 throws a message you would
+have to parse; `curl_fetch_memory()` gives the code and `read_html(resp$content)` the page.
+
 ### `on.exit()` at a script's top level never fires
 - `on.exit()` registers a handler on the *current frame*. At the top level of a
   file run with `Rscript`, that frame is the global environment, which never
@@ -1071,6 +1100,27 @@ countable instead of becoming disk nobody can attribute. Route *every* path-cons
 site through one helper — the clear/reclaim function is the one that gets missed, and
 left pointing at the superseded generation it reports success having deleted nothing.
 
+### `vapply(..., USE.NAMES = FALSE)` strips ALL dimnames, row names included
+
+A named `FUN.VALUE` looks like it guarantees row names on the returned matrix. It does not
+survive `USE.NAMES = FALSE`, which drops the whole `dimnames` attribute rather than only the
+column names taken from `X`:
+
+```r
+f <- function(x) c(path = paste0("p", x), n = "1")
+r <- vapply(c("a", "b"), f, c(path = "", n = ""), USE.NAMES = FALSE)
+is.null(dimnames(r))          #> TRUE
+r["path", ]                   #> Error: no 'dimnames' attribute for array
+```
+
+Measured on R 4.5, 2026-09-04. The tell is that the error names `dimnames` while the code
+that looks wrong is the `FUN.VALUE`, so the fix gets attempted on the wrong line — a first
+attempt here shipped a code comment asserting the opposite, and only running the function
+caught it.
+
+Keep the default (`USE.NAMES = TRUE`) when you index rows by name; the column names it adds
+are the input strings and cost nothing. Index positionally only with a comment saying why.
+
 
 # Code Check — Shell
 
@@ -1078,6 +1128,34 @@ Tool-level traps in bash, sed, git and `gh`. These load everywhere because they
 are about the shell the agent runs commands in, not about `.sh` files in the repo.
 The general mechanisms — a guard that fails toward pass, a fixture that cannot
 reach the failure mode — live in `code-check.md`; this file is the quirks.
+
+### `git diff a..b` compares TIPS; a change on `a` shows up as the branch's
+
+Two-dot is the difference between two commits. Three-dot (`a...b`) is the difference from
+their **merge base** — what the branch actually did, and what GitHub shows in a PR.
+
+So anything that landed on the base since the branch forked appears **inverted** in a
+two-dot diff: a file `main` *deleted* reads as a file the branch *added*.
+
+Measured 2026-09-04 in rtj. A branch touched four files. `git diff --stat main..branch`
+listed five, the extra being a one-line addition to a CSV. `main` had removed that line in a
+merged PR; the branch had never touched the file at all:
+
+```
+two-dot   : CLAUDE.md docs/… env/prod/main.tf progress.md manifest.csv
+three-dot : CLAUDE.md docs/… env/prod/main.tf progress.md
+```
+
+It cost a wrong merge-order rationale written into a PR description ("merge #279 first,
+both touch this file"), caught by the PR reviewer reading the diff GitHub renders. The
+failure is quiet because the two-dot output is *correct* — it answers a question nobody
+asked.
+
+- Use `a...b` for "what does this branch change", which is nearly always the question.
+- `git log a..b` is the opposite convention and two-dot is right there — it lists commits
+  reachable from `b` and not `a`. The asymmetry between `log` and `diff` is the trap.
+- Confirm against the branch's own commits when it matters:
+  `git log --oneline a...b -- <path>` shows *which* side touched a file.
 
 ### git pathspec excludes: use the long form
 - `:!path` is short-form magic, and git keeps parsing magic characters after the
@@ -2436,7 +2514,13 @@ else. And running a generator is not committing what it generated: a build in a 
 dir leaves the repo's artifact stale while the author truthfully reports having
 verified it.
 
-One worktree per session (`-b <new-branch>`, chained with `&&`). Assert the branch
+One worktree per session (`-b <new-branch>`, chained with `&&`). **The tag and release
+step needs a worktree too.** Every example here is an edit, so a reader who follows the
+rule still runs `git checkout main && git tag` in the shared checkout — which was on
+another session's branch with 281 lines of its uncommitted work when it happened
+(soul#141, 2026-09-01; nothing broke, by luck). Release from a throwaway tree detached
+at `origin/main`, push `HEAD:main` and the tag from there, and leave the shared
+checkout's `main` alone; `gh-pr-merge` step 5 carries the form. Assert the branch
 before any commit or flip. Stage by path. Generate from the committed tree, never the
 checkout — a mid-edit source is internally inconsistent, which is worse than stale.
 Verify the artifact after a push, not the push output.
@@ -2533,6 +2617,7 @@ every widening broke and every narrowing held.
 | 2026-08-27 | rtj#221 | **Do not build an exact-match edit from a formatted display** — `sed 's/^/  /'` padded the read; the replace matched nothing; two failed rounds before `repr()` showed two spaces where the display implied four |
 | 2026-09-01 | flooded#52 | **A claim flagged as under-evidenced gets repaired by widening, and widening is what breaks** — six review rounds, 36 findings; every fix added a quantifier over a ragged dataset×resolution×lineage grid; terminated by reproducing the old behaviour to the digit and measuring every row |
 | 2026-09-03 | rtj#243 | **A defect rate is a claim about the population filter first, and the subject second** — a photo-reference audit reported 142 of 290 references (49%) dangling on the server, which flipped a design conclusion and was one command from being written into another repo's issue as fact. The filter for the *reference* side was right; the filter for the *server* side required the path to contain a `photos/` directory, so every image stored elsewhere was invisible and counted as missing. Re-run on all image extensions, case-insensitive: **6 of 290, 2%** — and those six reconciled exactly to an already-filed issue about bare filenames. A 49% failure rate in a shipped project was the tell, and the reconciliation that catches it is cheap: **count both sides of a ratio with independently-justified filters, and re-run the denominator's filter one notch looser before believing a rate**. Sibling of the positive control above — here the control is a *second, more lenient* population, not a known-good item |
+| 2026-09-04 | rtj#282/#283/#284 | **And the filter can be right while the *predicate* is wrong** — the refinement of the row above, met three times in one session on one number. A photo manifest reported 142 of 290 present; the count then moved to 35, to 11, to **0 genuinely lost**, and no step was an arithmetic error. First the resolver named three directories photos were known to live in and the project also had a fourth. Then the denominator included **form-template placeholders** — six dummy filenames on a worked-example record, which is why three different projects reported *exactly six* missing, a tell sitting in my own summary table unexamined. Then the predicate itself: `exists in the project directory` was standing in for *is this photo safe*, while photos are **deliberately moved off** to control project size — so the check penalised the housekeeping it should encourage, on the gate that precedes destroying a generation. **Ask what the predicate is a proxy for before trusting the rate**, and when several independent subjects report an identical count, that equality is the finding. Each correction came from workflow knowledge no amount of re-measuring would have supplied — so when a rate survives one correction, ask who else knows what the number means |
 | 2026-09-05 | rfp#268/#271 | **When you cannot list, read the PRODUCER — "unlistable" is not "unknowable"** — a bucket answered `403 AccessDenied` to a list (correct for a `s3:GetObject`-only policy), so the artifact was reported as unconfirmable and a shipped feature was documented as blocked on it, with a follow-up issue filed saying so. The job that writes the object recorded the exact key in its own source; one `HEAD` on it returned **200, 66,635,819 bytes, staged the previous day**. The reasoning was "guessing a key is the construct-the-sibling-path antipattern" — true of a key *derived from a pattern*, and the opposite of true for one *read from the code that writes it*, which is that rule's own remedy. **Before concluding an artifact's presence is unknowable, grep the producer for the path it writes**; and treat a self-filed "blocked on X" as a claim to check rather than a conclusion, since nothing downstream will ever re-test it |
 | 2026-09-04 | rfp | **An error naming its own remedy, mapped onto a remembered failure instead of read** — a memory note said `op read` "times out on authorization"; the actual error was `couldn't connect to the 1Password desktop app… update to the latest version and restart the app`, and the app was running with `--just-updated --should-restart`. Not a timeout, not an authorization problem, and the fix was in the text. Cost: the *preferred* documented route was abandoned for the last-rank fallback, the user was escalated to, and then the credential's **name** was doubted — it had been right all along. Two tells, both cheap: the error prescribed an action nobody took, and the remembered failure mode had a different **shape** (a hang) than the one observed (an immediate error). **Read the error's own words before matching it to a prior**, and when a convention ranks routes, confirm the preferred route's prerequisite is genuinely absent rather than merely erroring once |
 | 2026-09-03 | drift#48 | **A sibling guard that passes is only a control if it was pinned before the event** — two frozen cache-key goldens, one red and one green, and the green one was read as evidence that the shared inputs were fine. It was not: it had been **re-pinned after** the environment moved, so it could only ever agree. Recomputing its *contemporaneous* predecessor showed that value had moved too, which flipped the diagnosis from "one key's inputs changed" to "the hash function changed under all of them" and changed the fix entirely. The filed issue had reasoned from the green tick and named the wrong cause. **Before treating a passing sibling as a control, date its pin against the event** — a guard re-pinned afterwards is a photograph of the new world, not a witness to the old one. Same family as the vendored-witness rule below, arriving through a re-pin rather than a stale copy |
@@ -3811,6 +3896,16 @@ Skip planning for single-file edits, quick fixes, or tasks with obvious next ste
    Asking for a file the agent cannot produce costs a round-trip, and — worse — sets you up to read an absent file as an absent review. Check the agent type's tools before writing the instruction.
 
    **Review the fixes, not just the code.** The second pass is where the value concentrates, because a fix written under a wrong assumption reproduces the same defect. Measured on gq#52: pass 1 found 13 defects, pass 2 found 7 more — including a blocker sitting *inside the fix* for pass 1's blocker, the same class twice (`lty`, then `fill_alpha`) because completeness was reasoned about rather than computed. Pass 3, scoped narrowly to the file edited most, found no new instances; **convergence is the signal to stop, not a fixed number of rounds.**
+
+   Convergence is measured, not felt — a quiet round and an exhausted reviewer look
+   identical. The rule that terminated trap#28 (five rounds; each of the first four
+   found its best defect *inside the previous round's fix*) was to **enumerate the
+   candidate set mechanically and show nothing sits above its source of truth**: parse
+   the files and walk every `cli_abort`/`warning`/`stop` rather than recalling them, so
+   "all of them are pinned" is a count. `code-check.md` states it under "A guard's
+   scope, escape hatches, and remedies" — terminate by enumeration, not by a reviewer
+   saying you have converged. `/code-check` treats three rounds as the floor and keeps
+   going while a round finds a defect inside the previous fix.
 
    Ask for the **mechanism**, not more instances. Pass 3's best finding was that an invariant was enforced by two lists happening to agree — which is what had produced instances two and three.
 
