@@ -431,6 +431,157 @@ cat("Patches inside AOI:", nrow(patches_zoned), "of", nrow(patches), "total\n")
 #> Patches inside AOI: 165 of 165 total
 ```
 
+## Geometric Artifacts
+
+`patch_area_min` is a one-dimensional test on a two-dimensional problem.
+Area is width times length, and the classification artifacts that
+inflate change on a floodplain are pathological in *width*: a class
+boundary that moved by one pixel between epochs leaves a one-pixel band
+of “change” along its whole length, and a channel that shifted leaves
+`Trees -> Water` on one bank and `Water -> Trees` on the other. A
+one-pixel band along a 5 km bank at 30 m is 15 ha — thirty times the
+5,000 m² threshold used above — while a genuine 0.5 ha cutblock is
+discarded as speckle. No value of `patch_area_min` fixes both.
+
+[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+adds evidence for three geometric signatures to the patches from
+[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+and drops nothing — the caller decides. All three are read from the
+transition raster alone, so they cost no extra fetch.
+
+``` r
+
+changes <- dft_transition_vectors(result$raster, changes_only = TRUE)
+tagged <- dft_transition_artifact(changes, result$raster)
+
+by_sliver <- sf::st_drop_geometry(tagged) |>
+  dplyr::mutate(width = ifelse(flag_sliver, "Under 1.5 px", "1.5 px or wider")) |>
+  dplyr::group_by(width) |>
+  dplyr::summarise(n_patches = dplyr::n(), area_ha = sum(area_ha), .groups = "drop") |>
+  dplyr::mutate(pct_patches = 100 * n_patches / sum(n_patches),
+                pct_area = 100 * area_ha / sum(area_ha))
+
+knitr::kable(by_sliver, digits = 1, col.names = c(
+  "Effective width", "Patches", "Area (ha)", "% of patches", "% of area"
+), caption = "Change patches 2017--2023 by effective width (2 x area / perimeter).")
+```
+
+| Effective width | Patches | Area (ha) | % of patches | % of area |
+|:----------------|--------:|----------:|-------------:|----------:|
+| 1.5 px or wider |      18 |      28.4 |         19.4 |      83.5 |
+| Under 1.5 px    |      75 |       5.6 |         80.6 |      16.5 |
+
+Change patches 2017–2023 by effective width (2 x area / perimeter).
+{.table}
+
+**Sliver width.** Effective width `2 * area / perimeter` is about the
+short side of a thin rectangle: a single pixel scores 0.5 px, a
+one-pixel band just under 1 px, a 20 x 20 block 10 px. On this reach 75
+of 93 change patches are under 1.5 px wide, but they hold only 16% of
+the change area — many patches, little ground.
+
+**Boundary-hugging.** Width alone cannot tell a misregistration band
+from a new road or a harvested buffer strip, which are also thin. The
+discriminator is *where* the thin patch sits: a registration artifact
+traces a boundary that already existed in the earlier epoch, while a
+real thin change cuts across one. `boundary_frac` is the share of a
+patch’s cells adjacent (within `boundary_dist_max` cells) to a
+from-epoch cell of the patch’s *to* class. Here 48 of the 75 slivers
+trace a pre-existing boundary; the other 27 do not, and deserve a look
+before being dismissed.
+
+**Reciprocity.** An `A -> B` patch with a `B -> A` partner of comparable
+area nearby is the channel-shift signature — the net change is close to
+zero. The two bands sit on opposite banks with the stable channel
+between them, so the search is by proximity (`reciprocal_dist_max`, in
+pixels) rather than adjacency. This is a relationship between two
+patches, which no per-pixel test can express. 5 patches here have a
+partner.
+
+``` r
+
+tagged$evidence <- dplyr::case_when(
+  tagged$flag_sliver & tagged$flag_reciprocal ~ "Sliver, reciprocal partner",
+  tagged$flag_sliver & tagged$flag_boundary ~ "Sliver on a pre-existing boundary",
+  tagged$flag_sliver ~ "Sliver, crosses classes",
+  TRUE ~ "1.5 px or wider"
+)
+pal <- c(
+  "Sliver on a pre-existing boundary" = "#d7301f",
+  "Sliver, reciprocal partner" = "#7b3294",
+  "Sliver, crosses classes" = "#fdae61",
+  "1.5 px or wider" = "#9e9e9e"
+)
+par(mar = c(0, 0, 0, 0))
+plot(sf::st_geometry(tagged), col = pal[tagged$evidence],
+     border = pal[tagged$evidence], lwd = 2)
+plot(aoi_proj, add = TRUE, border = "black", lwd = 1)
+legend("topleft", fill = pal, legend = names(pal), bty = "n", cex = 0.8)
+```
+
+![Change patches 2017--2023 by artifact evidence. Slivers on a
+pre-existing boundary (red) are the misregistration shape; slivers that
+cross class boundaries (orange) are thin but not explained by a shift;
+patches with a reciprocal partner (purple) are the channel-shift
+shape.](land-cover-change_files/figure-html/plot-artifact-1.png)
+
+Change patches 2017–2023 by artifact evidence. Slivers on a pre-existing
+boundary (red) are the misregistration shape; slivers that cross class
+boundaries (orange) are thin but not explained by a shift; patches with
+a reciprocal partner (purple) are the channel-shift shape.
+
+The two axes compose. Below are the change patches that survive the
+5,000 m² area filter used above, with their artifact evidence: one of
+them is a `Trees -> Rangeland` band 0.75 ha in area and under 1.5 px
+wide that traces the 2017 forest edge — exactly the patch the area
+filter exists to remove, walking through it on length alone. With width
+and boundary evidence in hand, `patch_area_min` can be lowered to
+recover small real changes without readmitting the slivers.
+
+``` r
+
+large <- dft_transition_vectors(result$raster, changes_only = TRUE,
+                                patch_area_min = patch_min)
+large <- dft_transition_artifact(large, result$raster)
+
+knitr::kable(
+  sf::st_drop_geometry(large)[, c("patch_id", "transition", "area_ha", "width_px",
+                                  "boundary_frac", "flag_sliver", "flag_boundary")],
+  digits = 2,
+  col.names = c("Patch", "Transition", "Area (ha)", "Width (px)",
+                "Boundary frac.", "Sliver", "On boundary"),
+  caption = paste0("Change patches surviving patch_area_min = ",
+                   format(patch_min, big.mark = ","), " m\u00b2, with artifact evidence.")
+)
+```
+
+| Patch | Transition | Area (ha) | Width (px) | Boundary frac. | Sliver | On boundary |
+|---:|:---|---:|---:|---:|:---|:---|
+| 1 | Trees -\> Rangeland | 0.70 | 2.41 | 0.10 | FALSE | FALSE |
+| 2 | Trees -\> Rangeland | 0.94 | 2.35 | 0.00 | FALSE | FALSE |
+| 3 | Crops -\> Rangeland | 9.96 | 6.78 | 0.01 | FALSE | FALSE |
+| 4 | Trees -\> Water | 0.55 | 2.12 | 0.49 | FALSE | FALSE |
+| 5 | Trees -\> Rangeland | 2.41 | 3.71 | 0.00 | FALSE | FALSE |
+| 6 | Trees -\> Rangeland | 0.75 | 1.44 | 0.71 | TRUE | TRUE |
+| 7 | Trees -\> Rangeland | 1.51 | 2.19 | 0.10 | FALSE | FALSE |
+| 8 | Trees -\> Rangeland | 0.81 | 2.79 | 0.21 | FALSE | FALSE |
+| 9 | Trees -\> Rangeland | 7.99 | 4.87 | 0.11 | FALSE | FALSE |
+| 10 | Trees -\> Rangeland | 0.53 | 2.41 | 0.00 | FALSE | FALSE |
+
+Change patches surviving patch_area_min = 5,000 m², with artifact
+evidence. {.table}
+
+The independent check is spectral. The *Trajectories as a Check on
+Land-Cover Change* vignette runs
+[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+on a Sentinel-2 kNDVI cube over the same reach and reads a mapped
+`Trees -> Rangeland` outline with no spectral break as a label change
+rather than trees coming off. That route confirms or refutes individual
+patches but needs a cube, cannot separate riparian deciduous trees from
+grass in peak summer, and cannot see the reciprocal relationship at all.
+The geometric tags are the free, categorical-only complement — use them
+to rank what to look at, and the trajectories to settle it.
+
 ## Interactive Map
 
 Toggle between classified time periods and overlay tree loss transition

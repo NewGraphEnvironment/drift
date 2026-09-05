@@ -664,12 +664,267 @@ practice this would be sub-basins, parcels, or management units.</p>
 <span><span class="co">#&gt; Patches inside AOI: 165 of 165 total</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="geometric-artifacts">Geometric Artifacts<a class="anchor" aria-label="anchor" href="#geometric-artifacts"></a>
+</h2>
+<p><code>patch_area_min</code> is a one-dimensional test on a
+two-dimensional problem. Area is width times length, and the
+classification artifacts that inflate change on a floodplain are
+pathological in <em>width</em>: a class boundary that moved by one pixel
+between epochs leaves a one-pixel band of “change” along its whole
+length, and a channel that shifted leaves <code>Trees -&gt; Water</code>
+on one bank and <code>Water -&gt; Trees</code> on the other. A one-pixel
+band along a 5 km bank at 30 m is 15 ha — thirty times the 5,000 m²
+threshold used above — while a genuine 0.5 ha cutblock is discarded as
+speckle. No value of <code>patch_area_min</code> fixes both.</p>
+<p><code><a href="../reference/dft_transition_artifact.html">dft_transition_artifact()</a></code> adds evidence for three
+geometric signatures to the patches from
+<code><a href="../reference/dft_transition_vectors.html">dft_transition_vectors()</a></code> and drops nothing — the caller
+decides. All three are read from the transition raster alone, so they
+cost no extra fetch.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">changes</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_vectors.html">dft_transition_vectors</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span>, changes_only <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">tagged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_artifact.html">dft_transition_artifact</a></span><span class="op">(</span><span class="va">changes</span>, <span class="va">result</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">by_sliver</span> <span class="op">&lt;-</span> <span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_geometry.html" class="external-link">st_drop_geometry</a></span><span class="op">(</span><span class="va">tagged</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>width <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">flag_sliver</span>, <span class="st">"Under 1.5 px"</span>, <span class="st">"1.5 px or wider"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">width</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>n_patches <span class="op">=</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/context.html" class="external-link">n</a></span><span class="op">(</span><span class="op">)</span>, area_ha <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">area_ha</span><span class="op">)</span>, .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>pct_patches <span class="op">=</span> <span class="fl">100</span> <span class="op">*</span> <span class="va">n_patches</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">n_patches</span><span class="op">)</span>,</span>
+<span>                pct_area <span class="op">=</span> <span class="fl">100</span> <span class="op">*</span> <span class="va">area_ha</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">area_ha</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">by_sliver</span>, digits <span class="op">=</span> <span class="fl">1</span>, col.names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Effective width"</span>, <span class="st">"Patches"</span>, <span class="st">"Area (ha)"</span>, <span class="st">"% of patches"</span>, <span class="st">"% of area"</span></span>
+<span><span class="op">)</span>, caption <span class="op">=</span> <span class="st">"Change patches 2017--2023 by effective width (2 x area / perimeter)."</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<caption>Change patches 2017–2023 by effective width (2 x area /
+perimeter).</caption>
+<thead><tr class="header">
+<th align="left">Effective width</th>
+<th align="right">Patches</th>
+<th align="right">Area (ha)</th>
+<th align="right">% of patches</th>
+<th align="right">% of area</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">1.5 px or wider</td>
+<td align="right">18</td>
+<td align="right">28.4</td>
+<td align="right">19.4</td>
+<td align="right">83.5</td>
+</tr>
+<tr class="even">
+<td align="left">Under 1.5 px</td>
+<td align="right">75</td>
+<td align="right">5.6</td>
+<td align="right">80.6</td>
+<td align="right">16.5</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Sliver width.</strong> Effective width
+<code>2 * area / perimeter</code> is about the short side of a thin
+rectangle: a single pixel scores 0.5 px, a one-pixel band just under 1
+px, a 20 x 20 block 10 px. On this reach 75 of 93 change patches are
+under 1.5 px wide, but they hold only 16% of the change area — many
+patches, little ground.</p>
+<p><strong>Boundary-hugging.</strong> Width alone cannot tell a
+misregistration band from a new road or a harvested buffer strip, which
+are also thin. The discriminator is <em>where</em> the thin patch sits:
+a registration artifact traces a boundary that already existed in the
+earlier epoch, while a real thin change cuts across one.
+<code>boundary_frac</code> is the share of a patch’s cells adjacent
+(within <code>boundary_dist_max</code> cells) to a from-epoch cell of
+the patch’s <em>to</em> class. Here 48 of the 75 slivers trace a
+pre-existing boundary; the other 27 do not, and deserve a look before
+being dismissed.</p>
+<p><strong>Reciprocity.</strong> An <code>A -&gt; B</code> patch with a
+<code>B -&gt; A</code> partner of comparable area nearby is the
+channel-shift signature — the net change is close to zero. The two bands
+sit on opposite banks with the stable channel between them, so the
+search is by proximity (<code>reciprocal_dist_max</code>, in pixels)
+rather than adjacency. This is a relationship between two patches, which
+no per-pixel test can express. 5 patches here have a partner.</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">tagged</span><span class="op">$</span><span class="va">evidence</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/case-and-replace-when.html" class="external-link">case_when</a></span><span class="op">(</span></span>
+<span>  <span class="va">tagged</span><span class="op">$</span><span class="va">flag_sliver</span> <span class="op">&amp;</span> <span class="va">tagged</span><span class="op">$</span><span class="va">flag_reciprocal</span> <span class="op">~</span> <span class="st">"Sliver, reciprocal partner"</span>,</span>
+<span>  <span class="va">tagged</span><span class="op">$</span><span class="va">flag_sliver</span> <span class="op">&amp;</span> <span class="va">tagged</span><span class="op">$</span><span class="va">flag_boundary</span> <span class="op">~</span> <span class="st">"Sliver on a pre-existing boundary"</span>,</span>
+<span>  <span class="va">tagged</span><span class="op">$</span><span class="va">flag_sliver</span> <span class="op">~</span> <span class="st">"Sliver, crosses classes"</span>,</span>
+<span>  <span class="cn">TRUE</span> <span class="op">~</span> <span class="st">"1.5 px or wider"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">pal</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Sliver on a pre-existing boundary"</span> <span class="op">=</span> <span class="st">"#d7301f"</span>,</span>
+<span>  <span class="st">"Sliver, reciprocal partner"</span> <span class="op">=</span> <span class="st">"#7b3294"</span>,</span>
+<span>  <span class="st">"Sliver, crosses classes"</span> <span class="op">=</span> <span class="st">"#fdae61"</span>,</span>
+<span>  <span class="st">"1.5 px or wider"</span> <span class="op">=</span> <span class="st">"#9e9e9e"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_geometry.html" class="external-link">st_geometry</a></span><span class="op">(</span><span class="va">tagged</span><span class="op">)</span>, col <span class="op">=</span> <span class="va">pal</span><span class="op">[</span><span class="va">tagged</span><span class="op">$</span><span class="va">evidence</span><span class="op">]</span>,</span>
+<span>     border <span class="op">=</span> <span class="va">pal</span><span class="op">[</span><span class="va">tagged</span><span class="op">$</span><span class="va">evidence</span><span class="op">]</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">aoi_proj</span>, add <span class="op">=</span> <span class="cn">TRUE</span>, border <span class="op">=</span> <span class="st">"black"</span>, lwd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/legend.html" class="external-link">legend</a></span><span class="op">(</span><span class="st">"topleft"</span>, fill <span class="op">=</span> <span class="va">pal</span>, legend <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">pal</span><span class="op">)</span>, bty <span class="op">=</span> <span class="st">"n"</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="land-cover-change_files/figure-html/plot-artifact-1.png" class="r-plt" alt="Change patches 2017--2023 by artifact evidence. Slivers on a pre-existing boundary (red) are the misregistration shape; slivers that cross class boundaries (orange) are thin but not explained by a shift; patches with a reciprocal partner (purple) are the channel-shift shape." width="672"><p class="caption">
+Change patches 2017–2023 by artifact evidence. Slivers on a pre-existing
+boundary (red) are the misregistration shape; slivers that cross class
+boundaries (orange) are thin but not explained by a shift; patches with
+a reciprocal partner (purple) are the channel-shift shape.
+</p>
+</div>
+<p>The two axes compose. Below are the change patches that survive the
+5,000 m² area filter used above, with their artifact evidence: one of
+them is a <code>Trees -&gt; Rangeland</code> band 0.75 ha in area and
+under 1.5 px wide that traces the 2017 forest edge — exactly the patch
+the area filter exists to remove, walking through it on length alone.
+With width and boundary evidence in hand, <code>patch_area_min</code>
+can be lowered to recover small real changes without readmitting the
+slivers.</p>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">large</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_vectors.html">dft_transition_vectors</a></span><span class="op">(</span><span class="va">result</span><span class="op">$</span><span class="va">raster</span>, changes_only <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>                                patch_area_min <span class="op">=</span> <span class="va">patch_min</span><span class="op">)</span></span>
+<span><span class="va">large</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_artifact.html">dft_transition_artifact</a></span><span class="op">(</span><span class="va">large</span>, <span class="va">result</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span></span>
+<span>  <span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_geometry.html" class="external-link">st_drop_geometry</a></span><span class="op">(</span><span class="va">large</span><span class="op">)</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"patch_id"</span>, <span class="st">"transition"</span>, <span class="st">"area_ha"</span>, <span class="st">"width_px"</span>,</span>
+<span>                                  <span class="st">"boundary_frac"</span>, <span class="st">"flag_sliver"</span>, <span class="st">"flag_boundary"</span><span class="op">)</span><span class="op">]</span>,</span>
+<span>  digits <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  col.names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Patch"</span>, <span class="st">"Transition"</span>, <span class="st">"Area (ha)"</span>, <span class="st">"Width (px)"</span>,</span>
+<span>                <span class="st">"Boundary frac."</span>, <span class="st">"Sliver"</span>, <span class="st">"On boundary"</span><span class="op">)</span>,</span>
+<span>  caption <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Change patches surviving patch_area_min = "</span>,</span>
+<span>                   <span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">patch_min</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span>, <span class="st">" m\u00b2, with artifact evidence."</span><span class="op">)</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<caption>Change patches surviving patch_area_min = 5,000 m², with
+artifact evidence.</caption>
+<colgroup>
+<col width="7%">
+<col width="23%">
+<col width="12%">
+<col width="13%">
+<col width="18%">
+<col width="8%">
+<col width="15%">
+</colgroup>
+<thead><tr class="header">
+<th align="right">Patch</th>
+<th align="left">Transition</th>
+<th align="right">Area (ha)</th>
+<th align="right">Width (px)</th>
+<th align="right">Boundary frac.</th>
+<th align="left">Sliver</th>
+<th align="left">On boundary</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.70</td>
+<td align="right">2.41</td>
+<td align="right">0.10</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.94</td>
+<td align="right">2.35</td>
+<td align="right">0.00</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="left">Crops -&gt; Rangeland</td>
+<td align="right">9.96</td>
+<td align="right">6.78</td>
+<td align="right">0.01</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="left">Trees -&gt; Water</td>
+<td align="right">0.55</td>
+<td align="right">2.12</td>
+<td align="right">0.49</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">2.41</td>
+<td align="right">3.71</td>
+<td align="right">0.00</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.75</td>
+<td align="right">1.44</td>
+<td align="right">0.71</td>
+<td align="left">TRUE</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">7</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">1.51</td>
+<td align="right">2.19</td>
+<td align="right">0.10</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="even">
+<td align="right">8</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.81</td>
+<td align="right">2.79</td>
+<td align="right">0.21</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="odd">
+<td align="right">9</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">7.99</td>
+<td align="right">4.87</td>
+<td align="right">0.11</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+<tr class="even">
+<td align="right">10</td>
+<td align="left">Trees -&gt; Rangeland</td>
+<td align="right">0.53</td>
+<td align="right">2.41</td>
+<td align="right">0.00</td>
+<td align="left">FALSE</td>
+<td align="left">FALSE</td>
+</tr>
+</tbody>
+</table>
+<p>The independent check is spectral. The <em>Trajectories as a Check on
+Land-Cover Change</em> vignette runs <code><a href="../reference/dft_rast_break.html">dft_rast_break()</a></code> on a
+Sentinel-2 kNDVI cube over the same reach and reads a mapped
+<code>Trees -&gt; Rangeland</code> outline with no spectral break as a
+label change rather than trees coming off. That route confirms or
+refutes individual patches but needs a cube, cannot separate riparian
+deciduous trees from grass in peak summer, and cannot see the reciprocal
+relationship at all. The geometric tags are the free, categorical-only
+complement — use them to rank what to look at, and the trajectories to
+settle it.</p>
+</div>
+<div class="section level2">
 <h2 id="interactive-map">Interactive Map<a class="anchor" aria-label="anchor" href="#interactive-map"></a>
 </h2>
 <p>Toggle between classified time periods and overlay tree loss
 transition layers to ground-truth change against multiple satellite
 basemaps.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tree_trans</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span>,</span>
 <span>                                  from_class <span class="op">=</span> <span class="st">"Trees"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/dft_map_interactive.html">dft_map_interactive</a></span><span class="op">(</span><span class="va">classified</span>, aoi <span class="op">=</span> <span class="va">aoi</span>, transition <span class="op">=</span> <span class="va">tree_trans</span>,</span>

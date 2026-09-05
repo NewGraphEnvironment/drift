@@ -143,7 +143,10 @@ axis.
 ## See also
 
 [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
-for producing the input patches.
+for producing the input patches;
+[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+to flag geometric misregistration artifacts among them first (run it
+before `match_mode = "all"`, which duplicates `patch_id`).
 
 ## Examples
 

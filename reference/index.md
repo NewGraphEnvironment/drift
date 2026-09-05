@@ -36,6 +36,8 @@
   : Fetch a masked spectral-index cube from a STAC catalog
 - [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
   : Fetch STAC-hosted rasters via gdalcubes
+- [`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+  : Tag transition patches with geometric misregistration evidence
 - [`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
   : Attribute transition patches from an overlay polygon layer
 - [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)

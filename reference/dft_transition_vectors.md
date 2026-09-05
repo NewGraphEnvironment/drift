@@ -75,9 +75,13 @@ per-class memory cost.
 
 ## See also
 
+[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+to tag the returned patches with geometric misregistration evidence
+(sliver width, boundary-hugging, reciprocal pairs) — the axis
+`patch_area_min` cannot see;
 [`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
-to tag the returned patches from an overlay polygon layer (fire
-perimeters, cutblocks, ...).
+to tag them from an overlay polygon layer (fire perimeters, cutblocks,
+...).
 
 ## Examples
 
