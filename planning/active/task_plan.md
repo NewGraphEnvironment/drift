@@ -5,21 +5,22 @@
 Function name approved by the user in plan mode: **`dft_rast_break_class()`**. Return shape: `list(raster = <factor transition layer, from*1000+to>, breaks = <break_year, n_before, n_after, n_flips>, summary = tibble)`, so `result$raster` feeds `dft_transition_vectors()` / `dft_transition_artifact()` verbatim. No threshold parameter — raw measurements, the caller composes.
 
 ## Phase 1: Fixtures and failing tests
-- [ ] `tests/testthat/helper-break_class.R` — build a named 7-layer list (2017:2023) from a cells x 7 code matrix on the synthetic 4-class table from `helper-artifact.R`; 10 m EPSG:32609 grid
-- [ ] `tests/testthat/test-dft_rast_break_class.R` — one pixel per case: clean switch at each of the six possible break years, stable, flicker (`A/B/A/B/A/B/A`, 6 flips), settling flicker (`A A B A B B B`, 3 flips, no break), last year alone differs (`n_after == 1`), first year alone differs (`n_before == 1`), NA in one year -> NA everywhere
-- [ ] Tests for `summary`: status/`break_year` rows, `n_cells` reconcile to the pixel count, `pct` sums to 100
-- [ ] Invariant test: `$raster` identical in values and levels to `dft_rast_transition(x, from = "2017", to = "2023")$raster`
-- [ ] Interop test: `dft_transition_vectors($raster, changes_only = TRUE)` then `dft_transition_artifact()` run without conversion
-- [ ] Input guards: single SpatRaster, < 2 layers, names not parseable as years, unsorted names (sorted, not error), geographic CRS, differing extents (resampled)
-- [ ] Datatype/streaming: output written to file (`terra::inMemory()` FALSE), layer names as documented
+- [x] `tests/testthat/helper-break_class.R` — build a named 7-layer list (2017:2023) from a cells x 7 code matrix on the synthetic 4-class table from `helper-artifact.R`; 10 m EPSG:32609 grid
+- [x] `tests/testthat/test-dft_rast_break_class.R` — one pixel per case: clean switch at each of the six possible break years, stable, flicker (`A/B/A/B/A/B/A`, 6 flips), settling flicker (`A A B A B B B`, 3 flips, no break), last year alone differs (`n_after == 1`), first year alone differs (`n_before == 1`), NA in one year -> NA everywhere
+- [x] Tests for `summary`: status/`break_year` rows, `n_cells` reconcile to the pixel count, `pct` sums to 100
+- [x] Invariant test: `$raster` identical in values and levels to `dft_rast_transition(x, from = "2017", to = "2023")$raster`
+- [x] Interop test: `dft_transition_vectors($raster, changes_only = TRUE)` then `dft_transition_artifact()` run without conversion
+- [x] Input guards: single SpatRaster, < 2 layers, names not parseable as years, unsorted names (sorted, not error), geographic CRS, differing extents (resampled)
+- [x] Datatype/streaming: output written to file (`terra::inMemory()` FALSE), layer names as documented
+- [x] Review pins (rounds 1-7): 5-column pad, overflow abort strands nothing, ESA code range, caller unmutated, file-backed no-warning, empty-cleanup guard, scan closure refuses a vector
 
 ## Phase 2: Implement `dft_rast_break_class()`
-- [ ] `R/dft_rast_break_class.R` per Design above; `app()` `fun` starts with `matrix(V, ncol = n)` and uses `drop = FALSE` (terra probes with a bare vector and 1-row chunks)
-- [ ] Summary computed with `crosstab(useNA = TRUE)` before `set.cats()`; `wopt = list(datatype = "INT2S")`
-- [ ] Roxygen with runnable `@examples` on the bundled 7-year series (lands in Phase 3 — write against 2017/2020/2023 first, extend after)
-- [ ] `devtools::document()`; read the output; `git diff NAMESPACE` shows exactly one new export
-- [ ] `@seealso` cross-links on `dft_rast_consensus()`, `dft_rast_break()`, `dft_transition_artifact()`, `dft_rast_transition()`
-- [ ] `lintr::lint_package()` clean on new files; Phase 1 tests green
+- [x] `R/dft_rast_break_class.R` per Design above; `app()` `fun` starts with `matrix(V, ncol = n)` and uses `drop = FALSE` (terra probes with a bare vector and 1-row chunks)
+- [x] Summary computed with `crosstab(useNA = TRUE)` before `set.cats()`; `wopt = list(datatype = "INT4S", gdal = "COMPRESS=LZW", steps = )` (INT2S overflowed at code 33)
+- [x] Roxygen with runnable `@examples` on the bundled 7-year series (lands in Phase 3 — write against 2017/2020/2023 first, extend after)
+- [x] `devtools::document()`; read the output; `git diff NAMESPACE` shows exactly one new export
+- [x] `@seealso` cross-links on `dft_rast_consensus()`, `dft_rast_break()`, `dft_transition_artifact()`, `dft_rast_transition()`
+- [x] `lintr::lint_package()` clean on new files; Phase 1 tests green
 
 ## Phase 3: Bundled seven-year series
 - [ ] `data-raw/example_years_extend.R` — fetch IO LULC 2018, 2019, 2021, 2022 for the bundled AOI on the exact grid of `inst/extdata/example_2017.tif` (cube view from its `ext()`, `dx = dy = 10`, EPSG:32609), mask to `example_aoi.gpkg`, write `INT1U`; re-fetch 2017 as a control and assert it equals the bundled file

@@ -19,3 +19,4 @@ inst/extdata/*.aux.xml
 data-raw/logs/**/*.log
 data-raw/logs/**/*.tif
 data-raw/logs/**/*.rds
+data-raw/logs/**/*.gpkg

@@ -124,11 +124,13 @@ categorical-only. They are complements.
 }
 \section{Memory}{
 
-The boundary signature is computed with streamed \code{terra} operations
-(\code{focal}, \code{rasterize}, \code{zonal}) — one focal pass per distinct \emph{to} class
-among the change patches, never one per patch — and no full-grid vector is
-pulled into R. The reciprocal search is an \code{sf} spatial-index query per
-transition pair.
+The boundary signature is computed with streamed \code{terra} operations —
+\code{segregate} into one layer per distinct \emph{to} class among the change
+patches, a single \code{focal} pass over that stack, \code{rasterize} + \code{zonal} for
+the per-patch fraction — with every intermediate written to a temporary
+file so nothing full-grid is held in memory or pulled into R. Measured on
+a 169M-cell floodplain grid (the BULK watershed group at 10 m). The
+reciprocal search is an \code{sf} spatial-index query per transition pair.
 }
 
 \examples{

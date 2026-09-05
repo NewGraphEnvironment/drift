@@ -30,9 +30,10 @@ before running \code{\link[=dft_rast_transition]{dft_rast_transition()}}.
 Mode smoothing filters single-year misclassification but cannot
 distinguish noise from real change. A pixel that genuinely transitions
 mid-window may be voted back to its original class if the pre-change
-years outnumber the post-change years. See
-\href{https://github.com/NewGraphEnvironment/drift/issues/9}{drift#9}
-for discussion of weighted and breakpoint approaches.
+years outnumber the post-change years. \code{\link[=dft_rast_break_class]{dft_rast_break_class()}} scans the
+same series for a sustained switch instead, dating it and separating it
+from flicker, and is the right tool when the question is \emph{when} a pixel
+changed rather than which class dominates the window.
 }
 \examples{
 # Build 3 classified rasters from example data
@@ -50,4 +51,8 @@ terra::plot(cons)
 # With confidence layer
 cons2 <- dft_rast_consensus(classified, confidence = TRUE)
 terra::plot(cons2[["confidence"]])
+}
+\seealso{
+\code{\link[=dft_rast_break_class]{dft_rast_break_class()}} for the per-pixel switch-vs-flicker scan
+that a mode filter cannot perform.
 }

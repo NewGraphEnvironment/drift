@@ -64,12 +64,18 @@ Relates to #8 (temporal mode filter this generalises), #30 (spectral route), #44
 - **The BULK STAC item `bulk_co_ff04` carries only `classified_2017/2020/2023`**, not the
   seven years the issue body claims (queried live at images.a11s.one). The scale run has to
   fetch 2017:2023 for the `floodplain` asset polygon via `dft_stac_fetch()`.
-- **`terra::app()` probes `fun` with a plain numeric vector, then a small matrix, then the
-  real chunk; a 1-row chunk drops to a vector** (Plan-agent measurement, terra 1.9.34).
-  `fun` must open with `V <- matrix(V, ncol = n)` and use `drop = FALSE`.
+- ~~`terra::app()` probes `fun` with a plain numeric vector, then a small matrix~~ — **wrong,
+  and the opposite is the trap** (code-check round 1, terra 1.9.34, `selectMethod("app",
+  "SpatRaster")`): `app()` first tries `apply(chunk, 1, fun)` — one R call per CELL — and
+  falls back to `fun(chunk)` only when that errors. A `fun` that tolerates a bare vector
+  therefore runs per cell: measured 360,013 calls / 6.96 s vs 2 calls / 0.12 s on a
+  600 x 600 x 7 stack (57x). `fun` must *refuse* a non-matrix input. Chunks always arrive
+  as matrices (`readValues(mat = TRUE)`), including single-cell ones.
 - **`terra::crosstab()` drops the NA column unless `useNA = TRUE`**, and returns labels once
   cats are set — compute the summary before `set.cats()`.
-- `app()` writes `FLT4S` by default (3.4 GB for 169M x 5); `wopt = list(datatype = "INT2S")`.
+- `app()` writes `FLT4S` by default; `INT2S` overflows at class code 33 (`33 * 1000 + 33 >
+  32767`) and terra writes NA with a *warning*, breaking ESA WorldCover (codes 10-100) silently
+  (round 1). Now `INT4S` + `COMPRESS=LZW`, with the overflow warning promoted to an abort.
 - `dft_transition_vectors()` / `dft_transition_artifact()` need a single-layer factor raster
   whose first cats column is the id and whose label column is `transition`
   (`R/dft_transition_vectors.R:65-71`, `R/dft_transition_artifact.R:207-223`), hence the
@@ -85,3 +91,38 @@ Relates to #8 (temporal mode filter this generalises), #30 (spectral route), #44
 
 | Error | Resolution |
 |-------|------------|
+| Invariant test: interior-NA pixel gave transition `NA` where `dft_rast_transition()` gives `2003` | Design decision: the transition layer is `NA` only where an endpoint is `NA`; an interior `NA` blanks the four evidence layers and reports `status = NA` in the summary. Keeps `$raster` identical to the two-epoch comparison. |
+| `s[s$status == "break", ]` returned NA rows once `status` could be `NA` | `%in%` in the tests and the benchmark script |
+| `expect_equal(..., info = yr)` errored inside the failure path (`info` must be character), so a restored bug reported as ERROR not FAIL | `info = as.character(yr)`; restore-the-bug then reads 8 failed / 98 passed |
+| Code-check round 1: `scan()` ran once per cell (see the corrected `app()` note above); INT2S overflow; a different projected CRS stacked by cell position with only a warning; multi-layer elements died in `names<-` | `if (!is.matrix(v)) stop()`; INT4S + LZW + overflow handler; `terra::same.crs()` guard; `nlyr == 1` guard; tests for each |
+| Code-check round 2: the overflow abort fires from `writeValues()` before `writeStop()`, leaving a partial output file that `on.exit` skipped because `out_file` was kept off the cleanup list; the vectorised-path guard had no test (restore stayed green at 113) | `out_file` stays on the cleanup list until each return; scan closure hoisted to `break_class_scan(n, years)` and its vector refusal pinned directly, plus a stranded-file test |
+| Code-check round 3 (mechanism + 19-row enumeration of every terra call): `app()` infers output shape from a test chunk of `min(ncol, 13)` cells and reads a 5-column return on a 5-column raster as transposed — silent scrambling, 0 warnings; the stranded-file test aborted before `out_file` existed, so it passed for nothing | pad a 5-column stack by one NA column (`extend` -> scan -> `crop`), 4/5/6-column test against `dft_rast_transition()`; stranded-file test now drives a real INT4S overflow (code 3e6) |
+| Code-check round 4 (scoped to the pad fix): `levels<- NULL` leaves the colour table, and `extend()` writing the padded stack made GDAL warn twice on every 5-column call | strip `coltab` too; `expect_no_warning` test |
+| BULK run 1: peak RSS 16.3 GB during the scan (#44's whole pipeline peaked at 10.7 GB). Probe on 7 x 16M in-memory cells: `deepcopy` +1.7 GB, `rast(list)` +2.4 GB, `app()` default chunking +4.4 GB (R-side chunk matrices); `steps = 4` cut the app share to +1 GB | stack first and strip levels/coltab on the stack (one copy, caller unmutated — pinned), `wopt$steps = ceiling(ncell / 1e7)` |
+| BULK run 1 stalled in the benchmark script's own `cat_fun`, which tolerated a bare vector — the round-1 per-cell path, reproduced in the script that measures it | `if (!is.matrix(v)) stop()` there too; killed and relaunched |
+| Code-check round 5 (scoped to the stack-first strip): `coltab<-` on a stack strips layer 1 only, and the caller-unmutated test could not go red because terra's `levels<-`/`coltab<-` deepcopy before stripping — only `set.cats(NULL)` mutates in place | levels stripped in place per layer with `set.cats(layer = i, value = NULL)` (no copy; the test now guards placement); colour tables stripped per layer only on the pad path, where the stack is written |
+| BULK probe: all seven fetched inputs are in memory (`inMemory()` TRUE), and `rast(list)` copies in-memory sources — the function added +12.6 GB (9.0 -> 21.6 GB) however the levels were stripped | in-memory inputs are spilled to LZW INT4S temp files (deepcopy -> strip -> `writeRaster`) before stacking, a one-layer transient instead of a seven-layer copy |
+| After the spill, file-backed integer sources arrive in `scan()` as an INTEGER matrix, and `code * 1000L` overflowed in R (NA + "NAs produced by integer overflow") before terra's writer — the overflow test went green-by-accident-free: it FAILED (no abort, NA transitions) | encoding computed in double; closure test on an integer matrix with code 3e6 |
+| Code-check round 6: `resample()` of a factor input writes a RAT sidecar (`.tif.aux.xml`) beside the intermediate that `unlink(files)` missed; the spill's `set.cats(NULL)` was unpinned (it prevents the same sidecar); the spill transient was two copies (explicit `deepcopy` + `coltab<-`'s own) | `strip_copy()`: `coltab<-` first (the one copy), `set.cats(NULL)` in place on it, used before both `resample()` and the spill write; cleanup also unlinks `<file>.aux.xml`; tempdir-count pins on the resample and spill tests; a file-backed classified series pins the stack strip |
+| BULK stage trace (file-backed inputs, 192M cells): `app()` with 9.6M-cell chunks peaked ~10 GB above a 0.3 GB floor; crosstab flat at ~7 GB | chunk target lowered to 2.5e6 cells (`steps`) |
+| Code-check round 7: with `files` empty, `paste0(character(0), ".aux.xml")` is `".aux.xml"` and the exit handler unlinked that name in the caller's working directory on the file-backed-first + CRS-mismatch path (the zero-length `paste0` row in `code-check.md`); the cats half of `strip_copy()` is redundant with the cleanup | `if (length(files))` guard, pinned by planting `.aux.xml` in a temp cwd and driving that error; comments say the cats strip is belt and braces |
+| `sf::st_read(floodplain.gpkg)` auto-selected `co_ff02` (344.7 km2), not the `co_ff04` (386.5 km2) #44 measured | `layer = "co_ff04"` pinned in the benchmark script; first fetch killed and restarted |
+
+## Phase 1-2 measurements (2026-09-05)
+
+- 106 assertions in `test-dft_rast_break_class.R`; full suite 802 pass / 0 fail / 13 skip.
+- Restore-the-bug on `n_after` (`n - idx + 1L` instead of `n - idx`): 8 failed / 98 passed via
+  `testthat::test_file()`; fix restored: 106 / 0.
+- `devtools::document()` also regenerated `man/dft_transition_artifact.Rd`, whose *Memory*
+  section had been updated in the #44 roxygen without the Rd being rebuilt on main — a
+  pre-existing stale artifact, carried along here.
+- Bundled-tile extension: refetched 2017 reproduces `example_2017.tif` with 0 differing cells
+  and 0 NA mismatches; 2018/2019/2021/2022 written at ~6 KB each (LZW) on the identical grid.
+
+## Review spend
+
+Seven `/code-check` rounds plus one plan-mode reviewer on this commit — past the ~5-per-task
+bound in `karpathy.md` §6, deliberately: rounds 2-7 each found a defect inside the previous
+round's fix (the stopping rule's continue condition), all of one class. Round 3 delivered the
+enumeration; rounds 4-7 were scoped to the change since the previous round. Round 7's fix is a
+one-line guard on a documented mechanism with a direct pin, and was not sent for an eighth.
