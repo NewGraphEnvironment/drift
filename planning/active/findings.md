@@ -105,6 +105,7 @@ Relates to #8 (temporal mode filter this generalises), #30 (spectral route), #44
 | After the spill, file-backed integer sources arrive in `scan()` as an INTEGER matrix, and `code * 1000L` overflowed in R (NA + "NAs produced by integer overflow") before terra's writer — the overflow test went green-by-accident-free: it FAILED (no abort, NA transitions) | encoding computed in double; closure test on an integer matrix with code 3e6 |
 | Code-check round 6: `resample()` of a factor input writes a RAT sidecar (`.tif.aux.xml`) beside the intermediate that `unlink(files)` missed; the spill's `set.cats(NULL)` was unpinned (it prevents the same sidecar); the spill transient was two copies (explicit `deepcopy` + `coltab<-`'s own) | `strip_copy()`: `coltab<-` first (the one copy), `set.cats(NULL)` in place on it, used before both `resample()` and the spill write; cleanup also unlinks `<file>.aux.xml`; tempdir-count pins on the resample and spill tests; a file-backed classified series pins the stack strip |
 | BULK stage trace (file-backed inputs, 192M cells): `app()` with 9.6M-cell chunks peaked ~10 GB above a 0.3 GB floor; crosstab flat at ~7 GB | chunk target lowered to 2.5e6 cells (`steps`) |
+| Docs review (round 8, Phases 3-5): one RSS sample quoted as 20.8 and 21.3 in two units; patch-group numbers in NEWS not emitted by the committed script (medians printed); "five rounds / six defects" restated from memory (seven / ten); 6.4 min truncated (6.5); a transport error would leave a truncated `floodplain.gpkg` under the trusted name | GiB throughout; script writes `summary_patch_groups.csv`; NEWS counts from the record; fetch to a temp file and rename on 200 |
 | Code-check round 7: with `files` empty, `paste0(character(0), ".aux.xml")` is `".aux.xml"` and the exit handler unlinked that name in the caller's working directory on the file-backed-first + CRS-mismatch path (the zero-length `paste0` row in `code-check.md`); the cats half of `strip_copy()` is redundant with the cleanup | `if (length(files))` guard, pinned by planting `.aux.xml` in a temp cwd and driving that error; comments say the cats strip is belt and braces |
 | `sf::st_read(floodplain.gpkg)` auto-selected `co_ff02` (344.7 km2), not the `co_ff04` (386.5 km2) #44 measured | `layer = "co_ff04"` pinned in the benchmark script; first fetch killed and restarted |
 
@@ -141,7 +142,7 @@ one-line guard on a documented mechanism with a direct pin, and was not sent for
 | `dft_transition_vectors(changes_only = TRUE)` | 25.6 s | 25.6 s |
 | `dft_transition_artifact()` | 160.3 s | 163.1 s |
 | per-patch zonal | 24.3 s | 24.5 s |
-| pipeline peak RSS | 21.8 GB | 21.3 GB |
+| pipeline peak RSS (KiB / 1024²) | 21.3 GiB | 20.8 GiB |
 
 Result: 21,710 change patches, 4,620.4 ha (#44 on the pre-clipped assets: 21,701 / 4,625).
 Of the endpoint-changed cells: **sustained break 19.69% (910 ha), endpoint-odd-year break

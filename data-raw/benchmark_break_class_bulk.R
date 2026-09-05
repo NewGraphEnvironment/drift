@@ -18,7 +18,8 @@
 # the CSVs are the committed evidence record):
 #   summary_pixels.csv  - res$summary (from, to, status, break_year, cells, ha)
 #   summary_change.csv  - endpoint-changed pixels by category
-#   summary_patches.csv - per-patch temporal evidence joined to #44's geometric tags
+#   summary_patches.csv - per-patch temporal evidence joined to #44's geometric tags (gitignored)
+#   summary_patch_groups.csv - the per-group summary of it that NEWS quotes
 #   timings.csv         - stage timings
 
 suppressMessages({
@@ -48,12 +49,18 @@ tick <- function(label, start) {
 gpkg <- file.path(out_dir, "floodplain.gpkg")
 if (!file.exists(gpkg)) {
   url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/floodplain.gpkg"
+  # fetch to a temp file and rename on 200 only: a transport error mid-body
+  # would otherwise leave a truncated gpkg under the name the next run trusts
+  tmp <- tempfile(fileext = ".gpkg")
   h <- curl::new_handle(followlocation = TRUE, timeout = 300)
-  resp <- curl::curl_fetch_disk(url, gpkg, handle = h)
+  resp <- tryCatch(curl::curl_fetch_disk(url, tmp, handle = h),
+                   error = function(e) { unlink(tmp); stop("floodplain.gpkg fetch failed: ",
+                                                            conditionMessage(e)) })
   if (resp$status_code != 200L) {
-    unlink(gpkg)
+    unlink(tmp)
     stop("floodplain.gpkg fetch returned HTTP ", resp$status_code)
   }
+  stopifnot(file.rename(tmp, gpkg))
 }
 # co_ff04 is the layer #44 measured (386.5 km2); the file also carries ff02/ff06
 aoi <- sf::st_read(gpkg, layer = "co_ff04", quiet = TRUE)
@@ -145,11 +152,23 @@ tot_ha <- sum(tagged$area_ha)
 brk_ha <- sum(tagged$area_ha * tagged$break_frac, na.rm = TRUE)
 message(sprintf("patch-weighted: %.1f of %.1f ha (%.1f%%) of 2017->2023 change is a clean break",
                 brk_ha, tot_ha, 100 * brk_ha / tot_ha))
+# the #44 geometric signature vs the temporal evidence, per group: this table
+# is the committed evidence for the release-note sentence
 art <- tagged$flag_sliver & (tagged$flag_boundary | tagged$flag_reciprocal)
 art[is.na(art)] <- FALSE
-message(sprintf("break_frac, artifact-signature patches: median %.2f; other patches: median %.2f",
-                stats::median(tagged$break_frac[art], na.rm = TRUE),
-                stats::median(tagged$break_frac[!art], na.rm = TRUE)))
+grp <- function(sel, label) {
+  q <- tagged[sel, ]
+  data.frame(group = label, n_patches = nrow(q), area_ha = round(sum(q$area_ha), 1),
+             break_frac_area_wtd = round(stats::weighted.mean(q$break_frac, q$area_ha, na.rm = TRUE), 3),
+             pct_no_break_cell = round(100 * mean(q$break_frac == 0, na.rm = TRUE), 1),
+             pct_all_break = round(100 * mean(q$break_frac == 1, na.rm = TRUE), 1),
+             n_flips_area_wtd = round(stats::weighted.mean(q$n_flips_mean, q$area_ha, na.rm = TRUE), 2))
+}
+groups <- rbind(grp(art, "artifact_signature"), grp(!art, "other"),
+                grp(tagged$flag_sliver, "sliver"), grp(!tagged$flag_sliver, "wider"),
+                grp(tagged$area_ha >= 0.5, "ge_0.5_ha"), grp(rep(TRUE, nrow(tagged)), "all"))
+print(groups)
+utils::write.csv(groups, file.path(out_dir, "summary_patch_groups.csv"), row.names = FALSE)
 byyr <- res$summary[res$summary$status %in% "break", ]
 byyr <- stats::aggregate(area ~ break_year, byyr, sum)
 print(byyr)
