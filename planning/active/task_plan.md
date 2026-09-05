@@ -23,9 +23,9 @@ Function name approved by the user in plan mode: **`dft_rast_break_class()`**. R
 - [x] `lintr::lint_package()` clean on new files; Phase 1 tests green
 
 ## Phase 3: Bundled seven-year series
-- [ ] `data-raw/example_years_extend.R` — fetch IO LULC 2018, 2019, 2021, 2022 for the bundled AOI on the exact grid of `inst/extdata/example_2017.tif` (cube view from its `ext()`, `dx = dy = 10`, EPSG:32609), mask to `example_aoi.gpkg`, write `INT1U`; re-fetch 2017 as a control and assert it equals the bundled file
-- [ ] Commit `inst/extdata/example_2018/2019/2021/2022.tif`; update the `data-raw/example_aoi.R` header comment and CLAUDE.md `inst/extdata` size line
-- [ ] Examples, vignette load chunk and one test use the full 2017:2023 series; pin the bundled-tile numbers (n clean breaks, n flicker, share of 2017 -> 2023 change area) in a test
+- [x] `data-raw/example_years_extend.R` — fetch IO LULC 2018, 2019, 2021, 2022 for the bundled AOI on the exact grid of `inst/extdata/example_2017.tif` (cube view from its `ext()`, `dx = dy = 10`, EPSG:32609), mask to `example_aoi.gpkg`, write `INT1U`; re-fetch 2017 as a control and assert it equals the bundled file
+- [x] Commit `inst/extdata/example_2018/2019/2021/2022.tif`; update the `data-raw/example_aoi.R` header comment and CLAUDE.md `inst/extdata` size line
+- [x] Examples, vignette load chunk and one test use the full 2017:2023 series; pin the bundled-tile numbers (n clean breaks, n flicker, share of 2017 -> 2023 change area) in a test
 
 ## Phase 4: Scale run on the BULK floodplain
 - [ ] `data-raw/benchmark_break_class_bulk.R` — download the `floodplain` asset of `bulk_co_ff04`, `dft_stac_fetch(years = 2017:2023, tile_size = ...)`, `dft_rast_classify()`, `dft_rast_break_class()`, then `dft_transition_vectors(changes_only = TRUE)`; RSS sampler (`ps -o rss=` every 2 s) and timings to `data-raw/logs/benchmark_break_class/`
@@ -35,7 +35,7 @@ Function name approved by the user in plan mode: **`dft_rast_break_class()`**. R
 ## Phase 5: Documentation
 - [ ] New section in `vignettes/land-cover-change.Rmd` after *Geometric Artifacts*: the third leg — run on the 7-year series, table of clean/flicker/endpoint shares of the 2017 -> 2023 change, per-patch break fraction via `terra::zonal()` joined to the artifact-tagged patches, one map of `break_year`
 - [ ] `NEWS.md` entry (0.14.0 heading; version bump itself is the final commit per conventions) with the bundled-tile and BULK measurements
-- [ ] CLAUDE.md pipeline snippet: add the `dft_rast_break_class()` line under the categorical block
+- [x] CLAUDE.md pipeline snippet: add the `dft_rast_break_class()` line under the categorical block (landed with the Phase 3 commit alongside the extdata size line)
 - [ ] Correct the issue body's "seven `classified_*` years are two downloads away" claim (edit, not comment)
 
 ## Validation

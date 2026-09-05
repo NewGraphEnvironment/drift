@@ -87,7 +87,8 @@
 #'
 #' @export
 #' @examples
-#' years <- c(2017, 2020, 2023)
+#' # the bundled Neexdzii Kwa reach ships every IO LULC year 2017-2023
+#' years <- 2017:2023
 #' rasters <- lapply(years, function(yr) {
 #'   terra::rast(system.file("extdata", paste0("example_", yr, ".tif"),
 #'                           package = "drift"))
@@ -96,11 +97,19 @@
 #' classified <- dft_rast_classify(rasters, source = "io-lulc")
 #'
 #' res <- dft_rast_break_class(classified)
-#' res$summary
+#' head(res$summary)
 #'
-#' # dated switches vs flicker among pixels that differ between the endpoints
+#' # of the pixels the 2017 -> 2023 comparison calls change, how much is a
+#' # clean, dated switch and how much never settled?
+#' changed <- res$summary[res$summary$from_class != res$summary$to_class, ]
+#' tapply(changed$area, changed$status, sum)
+#'
+#' # a switch is only as sure as its shorter side: n_after == 1 means the last
+#' # year alone differs
+#' ev <- terra::values(res$breaks)
+#' table(pmin(ev[, "n_before"], ev[, "n_after"]))
+#'
 #' terra::plot(res$breaks[["break_year"]])
-#' terra::plot(res$breaks[["n_flips"]])
 #'
 #' # the transition layer feeds the patch tools unchanged
 #' patches <- dft_transition_vectors(res$raster, changes_only = TRUE)

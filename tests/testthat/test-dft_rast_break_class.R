@@ -365,3 +365,32 @@ test_that("an abort before any temp file exists deletes nothing in the working d
   expect_error(dft_rast_break_class(fx, class_table = ct), "share the CRS")
   expect_true(file.exists(".aux.xml"))
 })
+
+test_that("bundled seven-year series: pinned numbers", {
+  # inst/extdata/example_{2017..2023}.tif on one grid (data-raw/example_years_extend.R).
+  # Live IO LULC data: re-pin deliberately if the bundled files are regenerated.
+  years7 <- 2017:2023
+  x <- lapply(years7, function(yr) {
+    terra::rast(system.file("extdata", paste0("example_", yr, ".tif"), package = "drift"))
+  })
+  names(x) <- years7
+  x <- dft_rast_classify(x, source = "io-lulc")
+  res <- dft_rast_break_class(x)
+  s <- res$summary
+  chg <- s[s$from_class != s$to_class, ]
+  expect_equal(sum(chg$n_cells), 3403L)                       # #44: 93 patches / 34.03 ha
+  expect_equal(sum(chg$n_cells[chg$status %in% "break"]), 2138L)
+  expect_equal(sum(chg$n_cells[chg$status %in% "flicker"]), 1265L)
+  expect_equal(sum(s$n_cells[s$status %in% "flicker" & s$from_class == s$to_class]), 2791L)
+  ev <- terra::values(res$breaks)
+  one <- !is.na(ev[, "n_flips"]) & ev[, "n_flips"] == 1
+  expect_equal(sum(one), 2138L)
+  expect_equal(sum(one & pmin(ev[, "n_before"], ev[, "n_after"]) >= 2), 1098L)
+  expect_equal(sum(one & ev[, "n_after"] == 1), 776L)
+  expect_equal(sum(one & ev[, "n_before"] == 1), 264L)
+  byyr <- tapply(s$area[s$status %in% "break"], s$break_year[s$status %in% "break"], sum)
+  expect_equal(as.vector(byyr[c("2018", "2020", "2023")]), c(2.64, 7.12, 7.76))
+  patches <- dft_transition_vectors(res$raster, changes_only = TRUE)
+  expect_equal(nrow(patches), 93L)
+  expect_equal(sum(patches$area_ha), 34.03, tolerance = 1e-6)
+})

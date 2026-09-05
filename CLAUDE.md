@@ -16,7 +16,7 @@ Detecting Riparian and Inland Floodplain Transitions — track land cover change
 - `R/` — package functions, `tests/testthat/` — testthat 3e tests, `vignettes/` — worked examples
 - `inst/lulc_classes/` — shipped CSV class tables (code, class_name, color, description)
 - `inst/indices/` — spectral-index registry CSV (ndvi, kndvi, ndmi) read by `dft_index_table()`
-- `inst/extdata/` — small test rasters (Neexdzii Kwa reach, 204KB total)
+- `inst/extdata/` — small test rasters (Neexdzii Kwa reach; IO LULC for every year 2017–2023 on one grid, 237KB total)
 - `inst/notes/` — durable technical reference (see Reference docs below)
 - `data-raw/` — scripts to regenerate test data (flooded + gdalcubes) and vignette artifacts
 
@@ -38,6 +38,14 @@ result  <- dft_rast_transition(classified, from = "2017", to = "2023")   # $rast
 patches <- dft_transition_vectors(result$raster, changes_only = TRUE)     # sf, one row per 8-connected change patch
 patches <- dft_transition_artifact(patches, result$raster)  # v0.13.0: width / boundary-hugging / reciprocal evidence; tags, never drops
 patches <- dft_transition_attribute(patches, overlay, cols = "fire_year") # tag from any overlay polygon layer
+```
+
+Temporal evidence across the annual series (v0.14.0; the third QA leg beside `patch_area_min` and the geometric tags):
+
+```r
+bc <- dft_rast_break_class(classified)   # names(classified) are years; $raster is the first->last transition,
+                                         # $breaks has break_year / n_before / n_after / n_flips, $summary by status
+patches <- dft_transition_vectors(bc$raster, changes_only = TRUE)   # unchanged downstream
 ```
 
 Continuous index-trajectory change (v0.3.0; see the `trajectory-break-detection` vignette):
