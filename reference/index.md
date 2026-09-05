@@ -18,6 +18,8 @@
   : Interactive leaflet map for classified rasters and transitions
 - [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
   : Detect per-pixel index-trajectory breakpoints
+- [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  : Detect sustained class switches across an annual classified series
 - [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
   : Classify a raster with factor levels and colors
 - [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)

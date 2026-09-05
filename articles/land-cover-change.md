@@ -582,6 +582,178 @@ grass in peak summer, and cannot see the reciprocal relationship at all.
 The geometric tags are the free, categorical-only complement — use them
 to rank what to look at, and the trajectories to settle it.
 
+## Temporal Evidence: Switch or Flicker?
+
+The area filter and the geometric tags both work on the two-epoch
+comparison, and a two-epoch comparison cannot see time. A
+boundary-hugging sliver that is `Rangeland` in every year but one is
+label noise; one that has been `Rangeland` every year since 2020 is a
+real conversion; the geometry is identical. IO LULC is annual, so the
+third leg is free: scan each pixel’s class sequence across every year
+and ask whether it *settled*.
+
+[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+reports, per pixel, whether the series is stable, a clean switch (one
+class for N years, then another for M years, and nothing else) or
+flicker (more than one change), and dates the clean switches. Its
+`$raster` is the same `from -> to` transition layer
+[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+produces for the two endpoints, so the patch tools above take it
+unchanged. The bundled tile ships all seven years.
+
+``` r
+
+years_all <- 2017:2023
+series <- lapply(years_all, function(yr) {
+  terra::rast(system.file("extdata", paste0("example_", yr, ".tif"),
+                          package = "drift"))
+})
+names(series) <- years_all
+series <- dft_rast_classify(series, source = "io-lulc")
+
+bc <- dft_rast_break_class(series)
+
+changed <- bc$summary |>
+  dplyr::filter(from_class != to_class) |>
+  dplyr::group_by(status) |>
+  dplyr::summarise(n_cells = sum(n_cells), area_ha = sum(area), .groups = "drop") |>
+  dplyr::mutate(pct_area = 100 * area_ha / sum(area_ha))
+
+knitr::kable(changed, digits = 1, col.names = c(
+  "Status", "Cells", "Area (ha)", "% of changed area"
+), caption = "Pixels that differ between 2017 and 2023, by what the years in between say.")
+```
+
+| Status  | Cells | Area (ha) | % of changed area |
+|:--------|------:|----------:|------------------:|
+| break   |  2138 |      21.4 |              62.8 |
+| flicker |  1265 |      12.7 |              37.2 |
+
+Pixels that differ between 2017 and 2023, by what the years in between
+say. {.table}
+
+37% of the ground the two-epoch comparison reports as changed never
+settled: the label switched back and forth across the seven years. That
+is the categorical-only reading of the trajectory vignette’s “outline
+with no red” — a borderline pixel changing label, not trees coming off —
+and it needs no cube.
+
+The clean breaks are dated, and the date matters as much as the count. A
+switch whose new class holds for a single year is a clean break with
+`n_after == 1`: the last year alone differs, and one more year of data
+could turn it into flicker. Confidence is `min(n_before, n_after)`.
+
+``` r
+
+brk <- bc$summary |>
+  dplyr::filter(status == "break") |>
+  dplyr::group_by(break_year) |>
+  dplyr::summarise(area_ha = sum(area), .groups = "drop")
+
+ev <- terra::values(bc$breaks)
+one <- !is.na(ev[, "n_flips"]) & ev[, "n_flips"] == 1
+n_sustained <- sum(one & pmin(ev[, "n_before"], ev[, "n_after"]) >= 2)
+n_endpoint <- sum(one & pmin(ev[, "n_before"], ev[, "n_after"]) == 1)
+
+knitr::kable(brk, digits = 2, col.names = c("Break year", "Area (ha)"),
+             caption = "Clean switches by the first year of the new class.")
+```
+
+| Break year | Area (ha) |
+|-----------:|----------:|
+|       2018 |      2.64 |
+|       2019 |      1.65 |
+|       2020 |      7.12 |
+|       2021 |      0.39 |
+|       2022 |      1.82 |
+|       2023 |      7.76 |
+
+Clean switches by the first year of the new class. {.table}
+
+Of the 2138 clean-break pixels, 1098 hold the new class for at least two
+years on each side of the switch and 1040 have 2017 or 2023 as the odd
+year out — 776 of them are `2023` alone differing. The 2017 -\> 2023
+change on this reach is therefore three different things: a sustained,
+dated conversion (32% of the changed area), an endpoint that may itself
+be the noisy year, and flicker.
+
+The scan also finds what no two-epoch comparison can: pixels that
+switched and switched back read as *stable* on the endpoints and are
+flicker here — 2,791 cells on this reach, none of them in any transition
+table.
+
+``` r
+
+codes <- terra::deepcopy(bc$raster)
+levels(codes) <- NULL
+is_changed <- (codes %/% 1000L) != (codes %% 1000L)
+flick <- terra::ifel(is_changed & bc$breaks[["n_flips"]] >= 2, 1L, NA)
+pal_yr <- hcl.colors(6, "Viridis")
+par(mar = c(0, 0, 0, 0))
+plot(aoi_proj, border = "black", lwd = 1)
+terra::plot(flick, col = "#bdbdbd", legend = FALSE, add = TRUE)
+terra::plot(bc$breaks[["break_year"]], col = pal_yr, type = "classes",
+            legend = FALSE, add = TRUE)
+# terra::plot(add = TRUE) leaves a coordinate system in which a keyword
+# position can land off-frame, so anchor the legend in the empty lower right
+u <- par("usr")
+legend(x = u[1] + 0.74 * (u[2] - u[1]), y = u[3] + 0.42 * (u[4] - u[3]),
+       title = "First year of new class", fill = c(pal_yr, "#bdbdbd"),
+       legend = c(2018:2023, "Flickers"), bty = "n", cex = 0.8, xpd = NA)
+```
+
+![Break year for pixels with a clean switch (one class, then another,
+nothing else). Grey pixels changed between 2017 and 2023 but flicker in
+between.](land-cover-change_files/figure-html/plot-break-year-1.png)
+
+Break year for pixels with a clean switch (one class, then another,
+nothing else). Grey pixels changed between 2017 and 2023 but flicker in
+between.
+
+Per patch, the three legs compose.
+[`terra::zonal()`](https://rspatial.github.io/terra/reference/zonal.html)
+gives each change patch the share of its cells that are a clean break,
+alongside the width and boundary evidence from the section above.
+
+``` r
+
+patches7 <- dft_transition_vectors(bc$raster, changes_only = TRUE)
+patches7 <- dft_transition_artifact(patches7, bc$raster)
+pid <- terra::rasterize(terra::vect(patches7), bc$raster, field = "patch_id")
+is_break <- terra::ifel(bc$breaks[["n_flips"]] == 1, 1L, 0L)
+z <- terra::zonal(c(is_break, bc$breaks[["n_flips"]]), pid, fun = "mean", na.rm = TRUE)
+names(z) <- c("patch_id", "break_frac", "n_flips_mean")
+patches7 <- dplyr::left_join(patches7, z, by = "patch_id")
+
+by_evidence <- sf::st_drop_geometry(patches7) |>
+  dplyr::mutate(geometry = ifelse(flag_sliver & (flag_boundary | flag_reciprocal),
+                                  "Artifact signature", "Other")) |>
+  dplyr::group_by(geometry) |>
+  # weighted mean first: a summarised `area_ha` would shadow the column
+  dplyr::summarise(break_frac = stats::weighted.mean(break_frac, area_ha),
+                   n_patches = dplyr::n(), area_ha = sum(area_ha),
+                   .groups = "drop") |>
+  dplyr::select(geometry, n_patches, area_ha, break_frac)
+
+knitr::kable(by_evidence, digits = 2, col.names = c(
+  "Geometric evidence", "Patches", "Area (ha)", "Clean-break share of cells"
+), caption = "Change patches by geometric signature, with the area-weighted share of their cells that are a clean temporal break.")
+```
+
+| Geometric evidence | Patches | Area (ha) | Clean-break share of cells |
+|:-------------------|--------:|----------:|---------------------------:|
+| Artifact signature |      48 |      4.07 |                       0.45 |
+| Other              |      45 |     29.96 |                       0.65 |
+
+Change patches by geometric signature, with the area-weighted share of
+their cells that are a clean temporal break. {.table}
+
+Neither leg is proof. A patch that traces a pre-existing boundary *and*
+never settled is the artifact shape twice over; one that is thin but
+holds a dated break for three years is thin for a reason worth finding.
+The spectral route in the trajectory vignette is the third witness where
+it matters.
+
 ## Interactive Map
 
 Toggle between classified time periods and overlay tree loss transition

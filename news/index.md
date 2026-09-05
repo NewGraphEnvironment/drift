@@ -1,5 +1,131 @@
 # Changelog
 
+## drift 0.14.0
+
+- **New:
+  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  scans the annual class series per pixel for a sustained switch versus
+  flicker, and dates the switch
+  ([\#9](https://github.com/NewGraphEnvironment/drift/issues/9)).** This
+  is the temporal, categorical-only leg of change QA, beside the spatial
+  one
+  ([`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md),
+  [\#44](https://github.com/NewGraphEnvironment/drift/issues/44)) and
+  the spectral one
+  ([`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md),
+  [\#30](https://github.com/NewGraphEnvironment/drift/issues/30)). For
+  each pixel across a named list of classified years it reports
+  `n_flips` (0 stable, 1 a clean switch, 2 or more flicker),
+  `break_year` (the first year of the new class), and `n_before` /
+  `n_after` (years in the old and new class either side of it —
+  confidence is their minimum). Its `$raster` is the
+  first-year-to-last-year transition layer in the same
+  `from * 1000 + to` encoding as
+  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md),
+  so
+  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  and
+  [`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+  take it unchanged; `$breaks` holds the four evidence layers and
+  `$summary` tabulates area by transition, status and break year.
+  Nothing is thresholded: the caller composes,
+  e.g. `n_flips == 1 & pmin(n_before, n_after) >= 2`.
+- **Why a mode filter cannot do this.**
+  [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)
+  votes a pixel that genuinely switched mid-window back to its old class
+  whenever the pre-change years outnumber the post-change ones, and
+  cannot say *when* anything changed. The scan keeps the switch and
+  dates it, and separates it from label noise that the two-epoch
+  comparison reports as change.
+- **Measured on the whole BULK floodplain** (the `co_ff04` polygon of
+  stac-floodplains-bc, 386.5 km², IO LULC 2017-2023 fetched through
+  `dft_stac_fetch(tile_size = 20000)`: seven years in 23.6 min, a 16000
+  x 12000 grid at 10 m, 192M cells): the 2017 -\> 2023 comparison
+  reports 4,620 ha of change in 21,710 patches. **Only 19.7% of that
+  area is a switch sustained for at least two years on each side.**
+  36.4% is a clean switch whose new or old class holds for a single year
+  — 2017 or 2023 is itself the odd year out (922 ha broke in 2018,
+  i.e. 2017 alone differs; 757 ha in 2023) — and **44.0% flickers**: the
+  label went back and forth and never settled. A further 3,187 ha
+  flickers while reading *stable* on the endpoints, invisible to any
+  two-epoch table. On the bundled Neexdzii Kwa tile (34 ha of change)
+  the split is 32% sustained, 31% endpoint-only, 37% flicker.
+- **The temporal leg and the geometric leg are mostly independent, which
+  is the point of having both.** On BULK, patches carrying the
+  [\#44](https://github.com/NewGraphEnvironment/drift/issues/44)
+  artifact signature (`sliver & (boundary | reciprocal)`, 15,047
+  patches, 826 ha) have an area-weighted clean-break share of 0.50
+  against 0.58 for the rest; 46% of them contain no clean-break cell at
+  all, but 31% are entirely clean — one-pixel bands that moved once and
+  stayed. Geometry ranks what to look at; the years say whether it
+  settled.
+- **Scale numbers.** One streamed
+  [`terra::app()`](https://rspatial.github.io/terra/reference/app.html)
+  pass to an LZW-compressed INT4S temp file and one
+  [`crosstab()`](https://rspatial.github.io/terra/reference/crosstab.html);
+  nothing full-grid enters R. BULK scan 90 s (87-101 s across runs); the
+  whole pipeline (fetch from cache, classify, scan, vectors, artifact
+  tags, per-patch zonal) ran in 6.2 min. Bundled tile: 0.15 s. Evidence:
+  `data-raw/logs/benchmark_break_class/`, every number above derived
+  from its CSVs by the committed script.
+- **Seven review rounds found ten defects the suite could not, all of
+  the same shape: a terra internal contract assumed rather than
+  measured.**
+  [`terra::app()`](https://rspatial.github.io/terra/reference/app.html)
+  tries `apply(chunk, 1, fun)` — one R call per cell — before
+  `fun(chunk)`, and a `fun` that tolerates a bare vector silently runs
+  per cell (57x slower; the scan closure now refuses anything but a
+  matrix, and the benchmark script reproduced the same bug in its own
+  helper). `INT2S` overflows at class code 33 (`33 * 1000 + 33 > 32767`,
+  i.e. every ESA WorldCover code) and terra *warns* rather than errors,
+  writing `NA` — output is INT4S and the warning is promoted to an
+  abort.
+  [`resample()`](https://rspatial.github.io/terra/reference/resample.html)
+  aligns grids but does not reproject, so a different projected CRS was
+  scanned by cell position — refused now.
+  [`app()`](https://rspatial.github.io/terra/reference/app.html) infers
+  output shape from a test chunk of `min(ncol, 13)` cells and reads a
+  5-column return on a 5-column raster as *transposed*, scrambling cells
+  across layers with no warning — such a stack is padded by one column
+  for the scan. The overflow abort fires from
+  [`writeValues()`](https://rspatial.github.io/terra/reference/readwrite.html)
+  before
+  [`writeStop()`](https://rspatial.github.io/terra/reference/readwrite.html),
+  so the partial output had to join the cleanup list. `coltab<-` on a
+  stack strips layer 1 only, and `levels<-` deep-copies before it
+  strips, so the in-place form `set.cats(NULL)` is the one a
+  caller-unmutated test can guard.
+  [`resample()`](https://rspatial.github.io/terra/reference/resample.html)
+  of a factor writes a RAT sidecar beside the intermediate. And
+  `paste0(character(0), ".aux.xml")` is `".aux.xml"`, which an unguarded
+  cleanup would unlink in the caller’s working directory. Round 3’s
+  deliverable was an enumeration of every terra call in the function
+  with its assumption and how it was measured; it lives in the archived
+  planning directory.
+- **Memory.** On in-memory inputs, per-layer
+  [`deepcopy()`](https://rspatial.github.io/terra/reference/deepcopy.html)
+  and then `rast(list)` each copied the whole series, and
+  [`app()`](https://rspatial.github.io/terra/reference/app.html) left to
+  its memory heuristic takes a 192M-cell grid in one or two chunks whose
+  R-side matrices alone cost ~10 GB. In-memory inputs are now spilled to
+  LZW temp files before stacking (a one-layer transient; the caller’s
+  rasters keep their levels and colours — pinned), levels are stripped
+  in place on the stack, and `wopt$steps` bounds chunks to 2.5M cells.
+  Measured on BULK with RSS sampled every 2 s: the seven fetched inputs
+  set an 8.5-20 GB floor that belongs to the caller; from a 0.3 GB
+  file-backed floor the scan peaked at ~10 GB with 9.6M-cell chunks and
+  the crosstab was flat at 7 GB; on the shipped code with in-memory
+  inputs the spill peaks at 20.9 GiB for a few seconds and the scan runs
+  at 12-19 GiB — that spill sample is also the whole-pipeline peak (RSS
+  in KiB / 1024², the same convention as
+  [\#44](https://github.com/NewGraphEnvironment/drift/issues/44)’s 10.7
+  GB on a smaller grid from pre-clipped files).
+- The bundled example series now covers every IO LULC year 2017-2023 on
+  the one grid (`data-raw/example_years_extend.R`; a refetched 2017
+  reproduced the bundled file cell for cell), and the land-cover
+  vignette gains a *Temporal Evidence: Switch or Flicker?* section as
+  the third leg beside `patch_area_min` and the geometric tags.
+
 ## drift 0.13.0
 
 - **New:

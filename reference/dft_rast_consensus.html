@@ -82,9 +82,15 @@ raster: <code>"consensus"</code> (factor) and <code>"confidence"</code> (numeric
     <p>Mode smoothing filters single-year misclassification but cannot
 distinguish noise from real change. A pixel that genuinely transitions
 mid-window may be voted back to its original class if the pre-change
-years outnumber the post-change years. See
-<a href="https://github.com/NewGraphEnvironment/drift/issues/9" class="external-link">drift#9</a>
-for discussion of weighted and breakpoint approaches.</p>
+years outnumber the post-change years. <code><a href="dft_rast_break_class.html">dft_rast_break_class()</a></code> scans the
+same series for a sustained switch instead, dating it and separating it
+from flicker, and is the right tool when the question is <em>when</em> a pixel
+changed rather than which class dominates the window.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="dft_rast_break_class.html">dft_rast_break_class()</a></code> for the per-pixel switch-vs-flicker scan
+that a mode filter cannot perform.</p></div>
     </div>
 
     <div class="section level2">

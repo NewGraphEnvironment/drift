@@ -38,9 +38,17 @@ with the modal class. When `confidence = TRUE`, a two-layer raster:
 Mode smoothing filters single-year misclassification but cannot
 distinguish noise from real change. A pixel that genuinely transitions
 mid-window may be voted back to its original class if the pre-change
-years outnumber the post-change years. See
-[drift#9](https://github.com/NewGraphEnvironment/drift/issues/9) for
-discussion of weighted and breakpoint approaches.
+years outnumber the post-change years.
+[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+scans the same series for a sustained switch instead, dating it and
+separating it from flicker, and is the right tool when the question is
+*when* a pixel changed rather than which class dominates the window.
+
+## See also
+
+[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+for the per-pixel switch-vs-flicker scan that a mode filter cannot
+perform.
 
 ## Examples
 

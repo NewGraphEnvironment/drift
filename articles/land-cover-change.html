@@ -919,12 +919,219 @@ complement — use them to rank what to look at, and the trajectories to
 settle it.</p>
 </div>
 <div class="section level2">
+<h2 id="temporal-evidence-switch-or-flicker">Temporal Evidence: Switch or Flicker?<a class="anchor" aria-label="anchor" href="#temporal-evidence-switch-or-flicker"></a>
+</h2>
+<p>The area filter and the geometric tags both work on the two-epoch
+comparison, and a two-epoch comparison cannot see time. A
+boundary-hugging sliver that is <code>Rangeland</code> in every year but
+one is label noise; one that has been <code>Rangeland</code> every year
+since 2020 is a real conversion; the geometry is identical. IO LULC is
+annual, so the third leg is free: scan each pixel’s class sequence
+across every year and ask whether it <em>settled</em>.</p>
+<p><code><a href="../reference/dft_rast_break_class.html">dft_rast_break_class()</a></code> reports, per pixel, whether the
+series is stable, a clean switch (one class for N years, then another
+for M years, and nothing else) or flicker (more than one change), and
+dates the clean switches. Its <code>$raster</code> is the same
+<code>from -&gt; to</code> transition layer
+<code><a href="../reference/dft_rast_transition.html">dft_rast_transition()</a></code> produces for the two endpoints, so
+the patch tools above take it unchanged. The bundled tile ships all
+seven years.</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">years_all</span> <span class="op">&lt;-</span> <span class="fl">2017</span><span class="op">:</span><span class="fl">2023</span></span>
+<span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">years_all</span>, <span class="kw">function</span><span class="op">(</span><span class="va">yr</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/rast.html" class="external-link">rast</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"example_"</span>, <span class="va">yr</span>, <span class="st">".tif"</span><span class="op">)</span>,</span>
+<span>                          package <span class="op">=</span> <span class="st">"drift"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">years_all</span></span>
+<span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_classify.html">dft_rast_classify</a></span><span class="op">(</span><span class="va">series</span>, source <span class="op">=</span> <span class="st">"io-lulc"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">bc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_break_class.html">dft_rast_break_class</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">changed</span> <span class="op">&lt;-</span> <span class="va">bc</span><span class="op">$</span><span class="va">summary</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">from_class</span> <span class="op">!=</span> <span class="va">to_class</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">status</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>n_cells <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">n_cells</span><span class="op">)</span>, area_ha <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">area</span><span class="op">)</span>, .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>pct_area <span class="op">=</span> <span class="fl">100</span> <span class="op">*</span> <span class="va">area_ha</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">area_ha</span><span class="op">)</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">changed</span>, digits <span class="op">=</span> <span class="fl">1</span>, col.names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Status"</span>, <span class="st">"Cells"</span>, <span class="st">"Area (ha)"</span>, <span class="st">"% of changed area"</span></span>
+<span><span class="op">)</span>, caption <span class="op">=</span> <span class="st">"Pixels that differ between 2017 and 2023, by what the years in between say."</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<caption>Pixels that differ between 2017 and 2023, by what the years in
+between say.</caption>
+<thead><tr class="header">
+<th align="left">Status</th>
+<th align="right">Cells</th>
+<th align="right">Area (ha)</th>
+<th align="right">% of changed area</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">break</td>
+<td align="right">2138</td>
+<td align="right">21.4</td>
+<td align="right">62.8</td>
+</tr>
+<tr class="even">
+<td align="left">flicker</td>
+<td align="right">1265</td>
+<td align="right">12.7</td>
+<td align="right">37.2</td>
+</tr>
+</tbody>
+</table>
+<p>37% of the ground the two-epoch comparison reports as changed never
+settled: the label switched back and forth across the seven years. That
+is the categorical-only reading of the trajectory vignette’s “outline
+with no red” — a borderline pixel changing label, not trees coming off —
+and it needs no cube.</p>
+<p>The clean breaks are dated, and the date matters as much as the
+count. A switch whose new class holds for a single year is a clean break
+with <code>n_after == 1</code>: the last year alone differs, and one
+more year of data could turn it into flicker. Confidence is
+<code>min(n_before, n_after)</code>.</p>
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">brk</span> <span class="op">&lt;-</span> <span class="va">bc</span><span class="op">$</span><span class="va">summary</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">status</span> <span class="op">==</span> <span class="st">"break"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">break_year</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>area_ha <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">area</span><span class="op">)</span>, .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">ev</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/values.html" class="external-link">values</a></span><span class="op">(</span><span class="va">bc</span><span class="op">$</span><span class="va">breaks</span><span class="op">)</span></span>
+<span><span class="va">one</span> <span class="op">&lt;-</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">ev</span><span class="op">[</span>, <span class="st">"n_flips"</span><span class="op">]</span><span class="op">)</span> <span class="op">&amp;</span> <span class="va">ev</span><span class="op">[</span>, <span class="st">"n_flips"</span><span class="op">]</span> <span class="op">==</span> <span class="fl">1</span></span>
+<span><span class="va">n_sustained</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">one</span> <span class="op">&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmin</a></span><span class="op">(</span><span class="va">ev</span><span class="op">[</span>, <span class="st">"n_before"</span><span class="op">]</span>, <span class="va">ev</span><span class="op">[</span>, <span class="st">"n_after"</span><span class="op">]</span><span class="op">)</span> <span class="op">&gt;=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="va">n_endpoint</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">one</span> <span class="op">&amp;</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmin</a></span><span class="op">(</span><span class="va">ev</span><span class="op">[</span>, <span class="st">"n_before"</span><span class="op">]</span>, <span class="va">ev</span><span class="op">[</span>, <span class="st">"n_after"</span><span class="op">]</span><span class="op">)</span> <span class="op">==</span> <span class="fl">1</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">brk</span>, digits <span class="op">=</span> <span class="fl">2</span>, col.names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Break year"</span>, <span class="st">"Area (ha)"</span><span class="op">)</span>,</span>
+<span>             caption <span class="op">=</span> <span class="st">"Clean switches by the first year of the new class."</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<caption>Clean switches by the first year of the new class.</caption>
+<thead><tr class="header">
+<th align="right">Break year</th>
+<th align="right">Area (ha)</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="right">2018</td>
+<td align="right">2.64</td>
+</tr>
+<tr class="even">
+<td align="right">2019</td>
+<td align="right">1.65</td>
+</tr>
+<tr class="odd">
+<td align="right">2020</td>
+<td align="right">7.12</td>
+</tr>
+<tr class="even">
+<td align="right">2021</td>
+<td align="right">0.39</td>
+</tr>
+<tr class="odd">
+<td align="right">2022</td>
+<td align="right">1.82</td>
+</tr>
+<tr class="even">
+<td align="right">2023</td>
+<td align="right">7.76</td>
+</tr>
+</tbody>
+</table>
+<p>Of the 2138 clean-break pixels, 1098 hold the new class for at least
+two years on each side of the switch and 1040 have 2017 or 2023 as the
+odd year out — 776 of them are <code>2023</code> alone differing. The
+2017 -&gt; 2023 change on this reach is therefore three different
+things: a sustained, dated conversion (32% of the changed area), an
+endpoint that may itself be the noisy year, and flicker.</p>
+<p>The scan also finds what no two-epoch comparison can: pixels that
+switched and switched back read as <em>stable</em> on the endpoints and
+are flicker here — 2,791 cells on this reach, none of them in any
+transition table.</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">codes</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/deepcopy.html" class="external-link">deepcopy</a></span><span class="op">(</span><span class="va">bc</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/factors.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">codes</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
+<span><span class="va">is_changed</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="va">codes</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fl">1000L</span><span class="op">)</span> <span class="op">!=</span> <span class="op">(</span><span class="va">codes</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fl">1000L</span><span class="op">)</span></span>
+<span><span class="va">flick</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/ifelse.html" class="external-link">ifel</a></span><span class="op">(</span><span class="va">is_changed</span> <span class="op">&amp;</span> <span class="va">bc</span><span class="op">$</span><span class="va">breaks</span><span class="op">[[</span><span class="st">"n_flips"</span><span class="op">]</span><span class="op">]</span> <span class="op">&gt;=</span> <span class="fl">2</span>, <span class="fl">1L</span>, <span class="cn">NA</span><span class="op">)</span></span>
+<span><span class="va">pal_yr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/grDevices/palettes.html" class="external-link">hcl.colors</a></span><span class="op">(</span><span class="fl">6</span>, <span class="st">"Viridis"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span>mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">0</span>, <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">aoi_proj</span>, border <span class="op">=</span> <span class="st">"black"</span>, lwd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">flick</span>, col <span class="op">=</span> <span class="st">"#bdbdbd"</span>, legend <span class="op">=</span> <span class="cn">FALSE</span>, add <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/plot.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">bc</span><span class="op">$</span><span class="va">breaks</span><span class="op">[[</span><span class="st">"break_year"</span><span class="op">]</span><span class="op">]</span>, col <span class="op">=</span> <span class="va">pal_yr</span>, type <span class="op">=</span> <span class="st">"classes"</span>,</span>
+<span>            legend <span class="op">=</span> <span class="cn">FALSE</span>, add <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co"># terra::plot(add = TRUE) leaves a coordinate system in which a keyword</span></span>
+<span><span class="co"># position can land off-frame, so anchor the legend in the empty lower right</span></span>
+<span><span class="va">u</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/par.html" class="external-link">par</a></span><span class="op">(</span><span class="st">"usr"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/legend.html" class="external-link">legend</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">u</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="op">+</span> <span class="fl">0.74</span> <span class="op">*</span> <span class="op">(</span><span class="va">u</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span> <span class="op">-</span> <span class="va">u</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span><span class="op">)</span>, y <span class="op">=</span> <span class="va">u</span><span class="op">[</span><span class="fl">3</span><span class="op">]</span> <span class="op">+</span> <span class="fl">0.42</span> <span class="op">*</span> <span class="op">(</span><span class="va">u</span><span class="op">[</span><span class="fl">4</span><span class="op">]</span> <span class="op">-</span> <span class="va">u</span><span class="op">[</span><span class="fl">3</span><span class="op">]</span><span class="op">)</span>,</span>
+<span>       title <span class="op">=</span> <span class="st">"First year of new class"</span>, fill <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">pal_yr</span>, <span class="st">"#bdbdbd"</span><span class="op">)</span>,</span>
+<span>       legend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2018</span><span class="op">:</span><span class="fl">2023</span>, <span class="st">"Flickers"</span><span class="op">)</span>, bty <span class="op">=</span> <span class="st">"n"</span>, cex <span class="op">=</span> <span class="fl">0.8</span>, xpd <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span></span></code></pre></div>
+<div class="figure">
+<img src="land-cover-change_files/figure-html/plot-break-year-1.png" class="r-plt" alt="Break year for pixels with a clean switch (one class, then another, nothing else). Grey pixels changed between 2017 and 2023 but flicker in between." width="672"><p class="caption">
+Break year for pixels with a clean switch (one class, then another,
+nothing else). Grey pixels changed between 2017 and 2023 but flicker in
+between.
+</p>
+</div>
+<p>Per patch, the three legs compose. <code><a href="https://rspatial.github.io/terra/reference/zonal.html" class="external-link">terra::zonal()</a></code> gives
+each change patch the share of its cells that are a clean break,
+alongside the width and boundary evidence from the section above.</p>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">patches7</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_vectors.html">dft_transition_vectors</a></span><span class="op">(</span><span class="va">bc</span><span class="op">$</span><span class="va">raster</span>, changes_only <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">patches7</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_transition_artifact.html">dft_transition_artifact</a></span><span class="op">(</span><span class="va">patches7</span>, <span class="va">bc</span><span class="op">$</span><span class="va">raster</span><span class="op">)</span></span>
+<span><span class="va">pid</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/rasterize.html" class="external-link">rasterize</a></span><span class="op">(</span><span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/vect.html" class="external-link">vect</a></span><span class="op">(</span><span class="va">patches7</span><span class="op">)</span>, <span class="va">bc</span><span class="op">$</span><span class="va">raster</span>, field <span class="op">=</span> <span class="st">"patch_id"</span><span class="op">)</span></span>
+<span><span class="va">is_break</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/ifelse.html" class="external-link">ifel</a></span><span class="op">(</span><span class="va">bc</span><span class="op">$</span><span class="va">breaks</span><span class="op">[[</span><span class="st">"n_flips"</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="fl">1</span>, <span class="fl">1L</span>, <span class="fl">0L</span><span class="op">)</span></span>
+<span><span class="va">z</span> <span class="op">&lt;-</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/zonal.html" class="external-link">zonal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">is_break</span>, <span class="va">bc</span><span class="op">$</span><span class="va">breaks</span><span class="op">[[</span><span class="st">"n_flips"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span>, <span class="va">pid</span>, fun <span class="op">=</span> <span class="st">"mean"</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rspatial.github.io/terra/reference/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">z</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"patch_id"</span>, <span class="st">"break_frac"</span>, <span class="st">"n_flips_mean"</span><span class="op">)</span></span>
+<span><span class="va">patches7</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">patches7</span>, <span class="va">z</span>, by <span class="op">=</span> <span class="st">"patch_id"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">by_evidence</span> <span class="op">&lt;-</span> <span class="fu">sf</span><span class="fu">::</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_geometry.html" class="external-link">st_drop_geometry</a></span><span class="op">(</span><span class="va">patches7</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>geometry <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="va">flag_sliver</span> <span class="op">&amp;</span> <span class="op">(</span><span class="va">flag_boundary</span> <span class="op">|</span> <span class="va">flag_reciprocal</span><span class="op">)</span>,</span>
+<span>                                  <span class="st">"Artifact signature"</span>, <span class="st">"Other"</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html" class="external-link">group_by</a></span><span class="op">(</span><span class="va">geometry</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="co"># weighted mean first: a summarised `area_ha` would shadow the column</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarise</a></span><span class="op">(</span>break_frac <span class="op">=</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/weighted.mean.html" class="external-link">weighted.mean</a></span><span class="op">(</span><span class="va">break_frac</span>, <span class="va">area_ha</span><span class="op">)</span>,</span>
+<span>                   n_patches <span class="op">=</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/context.html" class="external-link">n</a></span><span class="op">(</span><span class="op">)</span>, area_ha <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">area_ha</span><span class="op">)</span>,</span>
+<span>                   .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">geometry</span>, <span class="va">n_patches</span>, <span class="va">area_ha</span>, <span class="va">break_frac</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">by_evidence</span>, digits <span class="op">=</span> <span class="fl">2</span>, col.names <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"Geometric evidence"</span>, <span class="st">"Patches"</span>, <span class="st">"Area (ha)"</span>, <span class="st">"Clean-break share of cells"</span></span>
+<span><span class="op">)</span>, caption <span class="op">=</span> <span class="st">"Change patches by geometric signature, with the area-weighted share of their cells that are a clean temporal break."</span><span class="op">)</span></span></code></pre></div>
+<table class="table">
+<caption>Change patches by geometric signature, with the area-weighted
+share of their cells that are a clean temporal break.</caption>
+<thead><tr class="header">
+<th align="left">Geometric evidence</th>
+<th align="right">Patches</th>
+<th align="right">Area (ha)</th>
+<th align="right">Clean-break share of cells</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">Artifact signature</td>
+<td align="right">48</td>
+<td align="right">4.07</td>
+<td align="right">0.45</td>
+</tr>
+<tr class="even">
+<td align="left">Other</td>
+<td align="right">45</td>
+<td align="right">29.96</td>
+<td align="right">0.65</td>
+</tr>
+</tbody>
+</table>
+<p>Neither leg is proof. A patch that traces a pre-existing boundary
+<em>and</em> never settled is the artifact shape twice over; one that is
+thin but holds a dated break for three years is thin for a reason worth
+finding. The spectral route in the trajectory vignette is the third
+witness where it matters.</p>
+</div>
+<div class="section level2">
 <h2 id="interactive-map">Interactive Map<a class="anchor" aria-label="anchor" href="#interactive-map"></a>
 </h2>
 <p>Toggle between classified time periods and overlay tree loss
 transition layers to ground-truth change against multiple satellite
 basemaps.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tree_trans</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span>,</span>
 <span>                                  from_class <span class="op">=</span> <span class="st">"Trees"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/dft_map_interactive.html">dft_map_interactive</a></span><span class="op">(</span><span class="va">classified</span>, aoi <span class="op">=</span> <span class="va">aoi</span>, transition <span class="op">=</span> <span class="va">tree_trans</span>,</span>

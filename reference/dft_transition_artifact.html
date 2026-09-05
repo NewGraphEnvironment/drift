@@ -188,11 +188,13 @@ categorical-only. They are complements.</p>
     <h2 id="memory">Memory<a class="anchor" aria-label="anchor" href="#memory"></a></h2>
 
 
-<p>The boundary signature is computed with streamed <code>terra</code> operations
-(<code>focal</code>, <code>rasterize</code>, <code>zonal</code>) — one focal pass per distinct <em>to</em> class
-among the change patches, never one per patch — and no full-grid vector is
-pulled into R. The reciprocal search is an <code>sf</code> spatial-index query per
-transition pair.</p>
+<p>The boundary signature is computed with streamed <code>terra</code> operations —
+<code>segregate</code> into one layer per distinct <em>to</em> class among the change
+patches, a single <code>focal</code> pass over that stack, <code>rasterize</code> + <code>zonal</code> for
+the per-patch fraction — with every intermediate written to a temporary
+file so nothing full-grid is held in memory or pulled into R. Measured on
+a 169M-cell floodplain grid (the BULK watershed group at 10 m). The
+reciprocal search is an <code>sf</code> spatial-index query per transition pair.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
