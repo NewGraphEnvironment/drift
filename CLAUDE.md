@@ -31,6 +31,15 @@ summary    <- dft_rast_summarize(classified, unit = "ha")
 dft_map_interactive(classified, aoi = aoi)
 ```
 
+Transitions between two epochs, as raster, patches, and per-patch QA (see the `land-cover-change` vignette):
+
+```r
+result  <- dft_rast_transition(classified, from = "2017", to = "2023")   # $raster (factor, id = from*1000+to), $summary, $removed
+patches <- dft_transition_vectors(result$raster, changes_only = TRUE)     # sf, one row per 8-connected change patch
+patches <- dft_transition_artifact(patches, result$raster)  # v0.13.0: width / boundary-hugging / reciprocal evidence; tags, never drops
+patches <- dft_transition_attribute(patches, overlay, cols = "fire_year") # tag from any overlay polygon layer
+```
+
 Continuous index-trajectory change (v0.3.0; see the `trajectory-break-detection` vignette):
 
 ```r
@@ -57,7 +66,7 @@ trend  <- dft_rast_trend(cube)                        # gradual change (Theil-Se
 
 ```r
 devtools::document()   # after roxygen changes
-devtools::test()       # ~300 tests; network/bfast tests skip by default (opt-in via env var)
+devtools::test()       # ~700 tests; network/bfast tests skip by default (opt-in via env var)
 devtools::install()    # needed before rendering vignettes
 ```
 
@@ -70,6 +79,19 @@ devtools::install()    # needed before rendering vignettes
 **Why:** Groups related parameters by prefix (`patch_area_min`, `patch_area_max`, `patch_count`) so they autocomplete together and read as a family.
 
 **How to apply:** When adding a parameter that could have siblings, lead with the noun/concept, then the modifier — same spirit as the NGE `noun_verb-detail` convention.
+
+### Scale-test raster functions on the BULK floodplain before the PR
+
+The bundled Neexdzii Kwa tile is 600 x 600 cells and cannot reach memory or runtime failure modes. A real floodplain-scale pair is two downloads away — the BULK watershed group item on stac-floodplains-bc, already clipped to the floodplain, ~1.2 MB each:
+
+- `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2017.tif`
+- `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2023.tif`
+
+Shape: 14651 x 11552 at 10 m (EPSG:32609), 169M cells, 97.7% `NA` outside the floodplain threads. Reference timings (2026-09-05, 64 GB machine): `dft_rast_transition()` 4 s, `dft_transition_vectors(changes_only = TRUE)` 12 s → 21,701 change patches / 4,625 ha, `dft_transition_artifact()` 143 s, pipeline peak 10.7 GB RSS. Item listing at `https://images.a11s.one/collections/stac-floodplains-bc/items` — paginate with `limit=10`; `limit=50` returned an empty body.
+
+**Why:** the first `dft_transition_artifact()` held one in-memory 169M-cell raster per class per intermediate and was killed for memory here at eight classes, with 125 unit assertions green (#44). Only a run at scale finds that class of bug.
+
+**How to apply:** run any new or changed raster-pipeline function on this pair with an RSS sampler (`ps -o rss= -p $PID` every 2 s) before opening the PR, and record the numbers in the PR body. Write terra intermediates with `filename =` (see `code-check-spatial.md`).
 
 ### SRED cross-reference
 
