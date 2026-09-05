@@ -33,14 +33,14 @@ Function name approved by the user in plan mode: **`dft_rast_break_class()`**. R
 - [x] Fix anything the run finds before the PR (the #44 precedent)
 
 ## Phase 5: Documentation
-- [ ] New section in `vignettes/land-cover-change.Rmd` after *Geometric Artifacts*: the third leg — run on the 7-year series, table of clean/flicker/endpoint shares of the 2017 -> 2023 change, per-patch break fraction via `terra::zonal()` joined to the artifact-tagged patches, one map of `break_year`
-- [ ] `NEWS.md` entry (0.14.0 heading; version bump itself is the final commit per conventions) with the bundled-tile and BULK measurements
+- [x] New section in `vignettes/land-cover-change.Rmd` after *Geometric Artifacts*: the third leg — run on the 7-year series, table of clean/flicker/endpoint shares of the 2017 -> 2023 change, per-patch break fraction via `terra::zonal()` joined to the artifact-tagged patches, one map of `break_year`
+- [x] `NEWS.md` entry (0.14.0 heading; version bump itself is the final commit per conventions) with the bundled-tile and BULK measurements
 - [x] CLAUDE.md pipeline snippet: add the `dft_rast_break_class()` line under the categorical block (landed with the Phase 3 commit alongside the extdata size line)
-- [ ] Correct the issue body's "seven `classified_*` years are two downloads away" claim (edit, not comment)
+- [x] Correct the issue body's "seven `classified_*` years are two downloads away" claim (edit, not comment)
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass (854 full suite before Phase 3; 171 in the new file)
+- [x] `/code-check` clean on each commit (seven rounds on the function commit; one round over the data/docs commits before the PR)
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion

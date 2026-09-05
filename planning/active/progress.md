@@ -16,3 +16,6 @@
 - Phase 4 ran alongside the reviews: BULK fetched (23.6 min) and measured three times as the
   memory fixes landed; numbers in findings.md and the benchmark CSVs
 - Next: Phase 4 commit (benchmark script + evidence), Phase 5 docs, archive, PR
+- Phase 4 committed (5369b8f); Phase 5: vignette section (rendered, figure self-reviewed),
+  NEWS 0.14.0 entry, issue #9 body corrected
+- Next: one review round over the Phase 3-5 diffs, /planning-archive, /gh-pr-push
