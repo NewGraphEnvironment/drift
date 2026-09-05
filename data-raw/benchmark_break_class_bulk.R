@@ -53,9 +53,13 @@ if (!file.exists(gpkg)) {
   # would otherwise leave a truncated gpkg under the name the next run trusts
   tmp <- tempfile(fileext = ".gpkg")
   h <- curl::new_handle(followlocation = TRUE, timeout = 300)
-  resp <- tryCatch(curl::curl_fetch_disk(url, tmp, handle = h),
-                   error = function(e) { unlink(tmp); stop("floodplain.gpkg fetch failed: ",
-                                                            conditionMessage(e)) })
+  resp <- tryCatch(
+    curl::curl_fetch_disk(url, tmp, handle = h),
+    error = function(e) {
+      unlink(tmp)
+      stop("floodplain.gpkg fetch failed: ", conditionMessage(e))
+    }
+  )
   if (resp$status_code != 200L) {
     unlink(tmp)
     stop("floodplain.gpkg fetch returned HTTP ", resp$status_code)
