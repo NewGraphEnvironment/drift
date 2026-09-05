@@ -74,6 +74,9 @@ changes <- dft_transition_vectors(result$raster, changes_only = TRUE)
 head(changes)
 }
 \seealso{
-\code{\link[=dft_transition_attribute]{dft_transition_attribute()}} to tag the returned patches from an
-overlay polygon layer (fire perimeters, cutblocks, ...).
+\code{\link[=dft_transition_artifact]{dft_transition_artifact()}} to tag the returned patches with
+geometric misregistration evidence (sliver width, boundary-hugging,
+reciprocal pairs) — the axis \code{patch_area_min} cannot see;
+\code{\link[=dft_transition_attribute]{dft_transition_attribute()}} to tag them from an overlay polygon layer
+(fire perimeters, cutblocks, ...).
 }
