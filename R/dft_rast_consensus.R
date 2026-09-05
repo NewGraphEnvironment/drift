@@ -9,9 +9,13 @@
 #' Mode smoothing filters single-year misclassification but cannot
 #' distinguish noise from real change. A pixel that genuinely transitions
 #' mid-window may be voted back to its original class if the pre-change
-#' years outnumber the post-change years. See
-#' \href{https://github.com/NewGraphEnvironment/drift/issues/9}{drift#9}
-#' for discussion of weighted and breakpoint approaches.
+#' years outnumber the post-change years. [dft_rast_break_class()] scans the
+#' same series for a sustained switch instead, dating it and separating it
+#' from flicker, and is the right tool when the question is *when* a pixel
+#' changed rather than which class dominates the window.
+#'
+#' @seealso [dft_rast_break_class()] for the per-pixel switch-vs-flicker scan
+#'   that a mode filter cannot perform.
 #'
 #' @param x A named list of classified `SpatRaster`s (e.g. from
 #'   [dft_rast_classify()]). Rasters with slightly different extents are

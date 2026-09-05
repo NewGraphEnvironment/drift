@@ -13,6 +13,10 @@
 #   inst/extdata/example_2017.tif
 #   inst/extdata/example_2020.tif
 #   inst/extdata/example_2023.tif
+#
+# The remaining IO LULC years (2018, 2019, 2021, 2022) are added on the same
+# grid by data-raw/example_years_extend.R, which needs neither the database
+# nor the DEM.
 
 library(terra)
 library(sf)

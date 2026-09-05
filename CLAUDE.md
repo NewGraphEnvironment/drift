@@ -16,7 +16,7 @@ Detecting Riparian and Inland Floodplain Transitions — track land cover change
 - `R/` — package functions, `tests/testthat/` — testthat 3e tests, `vignettes/` — worked examples
 - `inst/lulc_classes/` — shipped CSV class tables (code, class_name, color, description)
 - `inst/indices/` — spectral-index registry CSV (ndvi, kndvi, ndmi) read by `dft_index_table()`
-- `inst/extdata/` — small test rasters (Neexdzii Kwa reach, 204KB total)
+- `inst/extdata/` — small test rasters (Neexdzii Kwa reach; IO LULC for every year 2017–2023 on one grid, 237KB total)
 - `inst/notes/` — durable technical reference (see Reference docs below)
 - `data-raw/` — scripts to regenerate test data (flooded + gdalcubes) and vignette artifacts
 
@@ -38,6 +38,14 @@ result  <- dft_rast_transition(classified, from = "2017", to = "2023")   # $rast
 patches <- dft_transition_vectors(result$raster, changes_only = TRUE)     # sf, one row per 8-connected change patch
 patches <- dft_transition_artifact(patches, result$raster)  # v0.13.0: width / boundary-hugging / reciprocal evidence; tags, never drops
 patches <- dft_transition_attribute(patches, overlay, cols = "fire_year") # tag from any overlay polygon layer
+```
+
+Temporal evidence across the annual series (v0.14.0; the third QA leg beside `patch_area_min` and the geometric tags):
+
+```r
+bc <- dft_rast_break_class(classified)   # names(classified) are years; $raster is the first->last transition,
+                                         # $breaks has break_year / n_before / n_after / n_flips, $summary by status
+patches <- dft_transition_vectors(bc$raster, changes_only = TRUE)   # unchanged downstream
 ```
 
 Continuous index-trajectory change (v0.3.0; see the `trajectory-break-detection` vignette):
@@ -87,7 +95,7 @@ The bundled Neexdzii Kwa tile is 600 x 600 cells and cannot reach memory or runt
 - `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2017.tif`
 - `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2023.tif`
 
-Shape: 14651 x 11552 at 10 m (EPSG:32609), 169M cells, 97.7% `NA` outside the floodplain threads. Reference timings (2026-09-05, 64 GB machine): `dft_rast_transition()` 4 s, `dft_transition_vectors(changes_only = TRUE)` 12 s → 21,701 change patches / 4,625 ha, `dft_transition_artifact()` 143 s, pipeline peak 10.7 GB RSS. Item listing at `https://images.a11s.one/collections/stac-floodplains-bc/items` — paginate with `limit=10`; `limit=50` returned an empty body.
+Shape: 14651 x 11552 at 10 m (EPSG:32609), 169M cells, 97.7% `NA` outside the floodplain threads. The item carries **three** classified years (2017/2020/2023); for an annual series, fetch IO LULC 2017-2023 for its `floodplain.gpkg` (`layer = "co_ff04"` — the file also holds ff02/ff06 and `st_read()` silently takes ff02) with `dft_stac_fetch(tile_size = 20000)`: 30 tiles/year, 23.6 min for seven, a 16000 x 12000 grid (192M cells) — `data-raw/benchmark_break_class_bulk.R` (#9). The seven come back in memory (~1.5 GB each), an 8.5-20 GB RSS floor before any function runs. Reference timings (2026-09-05, 64 GB machine): `dft_rast_transition()` 4 s, `dft_transition_vectors(changes_only = TRUE)` 12 s → 21,701 change patches / 4,625 ha, `dft_transition_artifact()` 143 s, pipeline peak 10.7 GB RSS. Item listing at `https://images.a11s.one/collections/stac-floodplains-bc/items` — paginate with `limit=10`; `limit=50` returned an empty body.
 
 **Why:** the first `dft_transition_artifact()` held one in-memory 169M-cell raster per class per intermediate and was killed for memory here at eight classes, with 125 unit assertions green (#44). Only a run at scale finds that class of bug.
 
