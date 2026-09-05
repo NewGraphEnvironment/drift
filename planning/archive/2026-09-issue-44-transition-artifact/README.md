@@ -44,4 +44,4 @@ the to-class elsewhere and pinning a fractional 4/20.
 review rounds with every numeric pin independently re-measured; `tests/testthat/test-dft_transition_artifact.R`
 pins the bundled-tile numbers above.
 
-Closed by: branch `44-detect-geometric-edge-misregistration-art` (commits 7bbb86e, 4716154, a776cf8, 3b575ea) / PR pending
+Closed by: branch `44-detect-geometric-edge-misregistration-art` (commits 7bbb86e, 4716154, a776cf8, 3b575ea) / PR #60
