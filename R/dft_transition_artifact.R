@@ -87,11 +87,13 @@
 #' categorical-only. They are complements.
 #'
 #' @section Memory:
-#' The boundary signature is computed with streamed `terra` operations
-#' (`focal`, `rasterize`, `zonal`) — one focal pass per distinct *to* class
-#' among the change patches, never one per patch — and no full-grid vector is
-#' pulled into R. The reciprocal search is an `sf` spatial-index query per
-#' transition pair.
+#' The boundary signature is computed with streamed `terra` operations —
+#' `segregate` into one layer per distinct *to* class among the change
+#' patches, a single `focal` pass over that stack, `rasterize` + `zonal` for
+#' the per-patch fraction — with every intermediate written to a temporary
+#' file so nothing full-grid is held in memory or pulled into R. Measured on
+#' a 169M-cell floodplain grid (the BULK watershed group at 10 m). The
+#' reciprocal search is an `sf` spatial-index query per transition pair.
 #'
 #' @return `patches` with eight columns appended (geometry stays last):
 #'   - `width_m`, `width_px` (numeric) — effective width `2 * area / perimeter`
@@ -280,26 +282,48 @@ dft_transition_artifact <- function(patches,
 #' Share of each change patch lying within `dist` cells of the from-epoch
 #' interface with its to-class
 #'
-#' One focal pass per distinct to-class among the patches: `near_k` marks the
-#' cells within `dist` of a from-epoch cell of class `k`; restricted to a patch
-#' (whose cells are all its from-class) that is exactly "from-class cells
-#' adjacent to the to-class in the from epoch". Aggregated per patch with
-#' `zonal()` over a rasterized patch-id layer, which round-trips the
-#' raster-aligned polygons exactly. Streamed throughout.
+#' One 0/1 layer per distinct to-class among the patches (`segregate`), a single
+#' focal-max pass over that stack marking the cells within `dist` of a
+#' from-epoch cell of each class, and a single `zonal` over a rasterized
+#' patch-id layer (which round-trips the raster-aligned polygons exactly).
+#' Restricted to a patch — whose cells are all its from-class — the layer for
+#' its to-class is exactly "from-class cells adjacent to the to-class in the
+#' from epoch".
+#'
+#' Every intermediate is written to a temp file rather than held in memory:
+#' each one is a full-grid raster, and on a floodplain-scale grid (BULK,
+#' 169M cells) holding them in memory peaked at 11 GB for a single class and
+#' was killed at eight. Disk-backed, terra streams them in chunks.
 #' @noRd
 artifact_boundary_frac <- function(patches_chg, transition, to_code, dist) {
-  code_from <- (transition * 1L) %/% 1000L
-  pid <- terra::rasterize(terra::vect(patches_chg), transition, field = "patch_id")
+  files <- character(0)
+  on.exit(unlink(files), add = TRUE)
+  tmpf <- function() {
+    f <- tempfile(pattern = "dft_artifact_", fileext = ".tif")
+    files <<- c(files, f)
+    f
+  }
+
+  # from-epoch class codes (id %/% 1000), as a plain (non-factor) raster on disk
+  codes <- terra::deepcopy(transition)
+  levels(codes) <- NULL
+  code_from <- terra::app(codes, fun = function(x) x %/% 1000L, filename = tmpf())
+
+  pid <- terra::rasterize(terra::vect(patches_chg), transition,
+                          field = "patch_id", filename = tmpf())
+
+  ks <- sort(unique(to_code))
+  # one 0/1 layer per to-class; NA stays NA where the raster is NA
+  seg <- terra::segregate(code_from, classes = ks, other = 0L, filename = tmpf())
   w <- 2L * as.integer(dist) + 1L
+  near <- terra::focal(seg, w = w, fun = "max", na.rm = TRUE, filename = tmpf())
+  z <- terra::zonal(near, pid, fun = "mean", na.rm = TRUE)   # patch_id, then one col per class
 
   frac <- rep(NA_real_, nrow(patches_chg))
-  for (k in unique(to_code)) {
-    # 1 at from-epoch cells of class k, 0 elsewhere, NA where the raster is NA
-    mask_k <- terra::ifel(code_from == k, 1L, 0L)
-    near_k <- terra::focal(mask_k, w = w, fun = "max", na.rm = TRUE)
-    z <- terra::zonal(near_k, pid, fun = "mean", na.rm = TRUE)
-    sel <- to_code == k
-    frac[sel] <- z[[2]][match(patches_chg$patch_id[sel], z[[1]])]
+  row <- match(patches_chg$patch_id, z[[1]])
+  for (i in seq_along(ks)) {
+    sel <- to_code == ks[i]
+    frac[sel] <- z[[i + 1L]][row[sel]]
   }
   frac
 }
