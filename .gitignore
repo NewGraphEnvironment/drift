@@ -20,3 +20,4 @@ data-raw/logs/**/*.log
 data-raw/logs/**/*.tif
 data-raw/logs/**/*.rds
 data-raw/logs/**/*.gpkg
+data-raw/logs/benchmark_break_class/summary_patches.csv

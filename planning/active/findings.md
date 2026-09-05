@@ -126,3 +126,33 @@ bound in `karpathy.md` §6, deliberately: rounds 2-7 each found a defect inside 
 round's fix (the stopping rule's continue condition), all of one class. Round 3 delivered the
 enumeration; rounds 4-7 were scoped to the change since the previous round. Round 7's fix is a
 one-line guard on a documented mechanism with a direct pin, and was not sent for an eighth.
+
+## BULK measurements (2026-09-05)
+
+`co_ff04`, 386.5 km², 16000 x 12000 at 10 m (192M cells), IO LULC 2017-2023 via
+`dft_stac_fetch(tile_size = 20000)`: 30 tiles/year, 1,414 s.
+
+| stage | run 2 (pre-spill) | run 3 (committed code) |
+|---|---|---|
+| fetch (cached) | 31.9 s | 30.5 s |
+| classify | 8.0 s | 8.0 s |
+| `dft_rast_break_class()` | 91.7 s | 101.2 s (86.7 s in the final probe) |
+| category crosstab | 35.9 s | 34.9 s |
+| `dft_transition_vectors(changes_only = TRUE)` | 25.6 s | 25.6 s |
+| `dft_transition_artifact()` | 160.3 s | 163.1 s |
+| per-patch zonal | 24.3 s | 24.5 s |
+| pipeline peak RSS | 21.8 GB | 21.3 GB |
+
+Result: 21,710 change patches, 4,620.4 ha (#44 on the pre-clipped assets: 21,701 / 4,625).
+Of the endpoint-changed cells: **sustained break 19.69% (910 ha), endpoint-odd-year break
+36.35% (1,680 ha), flicker 43.95% (2,031 ha)**; stable-endpoint flicker 3,186.6 ha; break
+area by year 2018 922.7, 2019 304.9, 2020 174.8, 2021 197.9, 2022 232.4, 2023 757.0 ha.
+Patch-weighted clean-break share 56.0%; artifact-signature patches (15,047; 826 ha)
+area-weighted `break_frac` 0.496 vs 0.575 for the rest; 46% of them have no clean-break cell,
+31% are entirely clean; slivers 0.465 vs wider 0.590; patches >= 0.5 ha 0.600.
+
+Memory attribution (scratch probes, RSS every 2 s): the seven fetched inputs are in memory
+(`inMemory()` TRUE) and set an 8.5-20 GB floor; pre-spill code added +12.6 GB on them; from a
+0.3 GB file-backed floor the scan peaked ~10 GB at 9.6M-cell chunks with the crosstab flat at
+7 GB; committed code on in-memory inputs: spill transient to 20.8 GB, scan 12-19 GB at
+2.5M-cell chunks.

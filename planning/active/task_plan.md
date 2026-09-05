@@ -28,9 +28,9 @@ Function name approved by the user in plan mode: **`dft_rast_break_class()`**. R
 - [x] Examples, vignette load chunk and one test use the full 2017:2023 series; pin the bundled-tile numbers (n clean breaks, n flicker, share of 2017 -> 2023 change area) in a test
 
 ## Phase 4: Scale run on the BULK floodplain
-- [ ] `data-raw/benchmark_break_class_bulk.R` — download the `floodplain` asset of `bulk_co_ff04`, `dft_stac_fetch(years = 2017:2023, tile_size = ...)`, `dft_rast_classify()`, `dft_rast_break_class()`, then `dft_transition_vectors(changes_only = TRUE)`; RSS sampler (`ps -o rss=` every 2 s) and timings to `data-raw/logs/benchmark_break_class/`
-- [ ] Record: share of the 2017 -> 2023 change area (the 4,625 ha from #44) that is a clean break vs flicker vs endpoint-odd-year; break-year distribution; runtime and peak RSS; compare against the #44 numbers
-- [ ] Fix anything the run finds before the PR (the #44 precedent)
+- [x] `data-raw/benchmark_break_class_bulk.R` — download the `floodplain` asset of `bulk_co_ff04`, `dft_stac_fetch(years = 2017:2023, tile_size = ...)`, `dft_rast_classify()`, `dft_rast_break_class()`, then `dft_transition_vectors(changes_only = TRUE)`; RSS sampler (`ps -o rss=` every 2 s) and timings to `data-raw/logs/benchmark_break_class/`
+- [x] Record: share of the 2017 -> 2023 change area (the 4,625 ha from #44) that is a clean break vs flicker vs endpoint-odd-year; break-year distribution; runtime and peak RSS; compare against the #44 numbers
+- [x] Fix anything the run finds before the PR (the #44 precedent)
 
 ## Phase 5: Documentation
 - [ ] New section in `vignettes/land-cover-change.Rmd` after *Geometric Artifacts*: the third leg — run on the 7-year series, table of clean/flicker/endpoint shares of the 2017 -> 2023 change, per-patch break fraction via `terra::zonal()` joined to the artifact-tagged patches, one map of `break_year`
