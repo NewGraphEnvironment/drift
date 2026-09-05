@@ -23,14 +23,14 @@ boundary" — the river case has the two bands on opposite banks separated by th
 so they touch only when the river is one pixel wide.
 
 ## Phase 1: Fixtures and failing tests
-- [ ] `tests/testthat/helper-artifact.R`: `make_transition(from_mat, to_mat, res = 10)` builds a projected (EPSG:32609) two-layer classified list and returns `dft_rast_transition(...)` with a synthetic `class_table` (Trees/Rangeland/Water/Bare) — proves "any factor raster", not IO LULC
-- [ ] Fixture A — one-sided 1-px shift of a Trees|Rangeland boundary → one `Trees -> Rangeland` band: `flag_sliver`, `boundary_frac == 1`, `flag_boundary`, no reciprocal
-- [ ] Fixture B — 5-px river shifted 1 px → `Water -> Trees` and `Trees -> Water` bands, equal area, 4 px apart: both flagged reciprocal, each the other's `reciprocal_id`; `reciprocal_dist_max = 3` un-flags them; `reciprocal = FALSE` yields `NA` columns
-- [ ] Fixture C — 1-px road (`-> Bare`) cutting across the Fixture A boundary: road patch is `flag_sliver` **but not** `flag_boundary` (`boundary_frac == 0`); the band still is
-- [ ] Fixture D — 20×20 interior clearing: no flags; width 10 px
-- [ ] Width metric pinned on known shapes (0.50 / 0.95 / 10.0 px); `boundary_dist_max = 2` grows `boundary_frac` on a 2-px band
-- [ ] Bundled-data test: 2017→2023 `changes_only`, `expect_identical(sum(width_px < 1.5), 75L)`; with `patch_area_min = 5000` the surviving `Trees -> Rangeland` sliver has `width_px < 1.5`
-- [ ] Stable rows get `NA` metrics; zero-row input returns the full schema; error paths (non-sf, non-factor raster, CRS mismatch, duplicated `patch_id`, bad params)
+- [x] `tests/testthat/helper-artifact.R`: `make_transition(from_mat, to_mat, res = 10)` builds a projected (EPSG:32609) two-layer classified list and returns `dft_rast_transition(...)` with a synthetic `class_table` (Trees/Rangeland/Water/Bare) — proves "any factor raster", not IO LULC
+- [x] Fixture A — one-sided 1-px shift of a Trees|Rangeland boundary → one `Trees -> Rangeland` band: `flag_sliver`, `boundary_frac == 1`, `flag_boundary`, no reciprocal
+- [x] Fixture B — 5-px river shifted 1 px → `Water -> Trees` and `Trees -> Water` bands, equal area, 4 px apart: both flagged reciprocal, each the other's `reciprocal_id`; `reciprocal_dist_max = 3` un-flags them; `reciprocal = FALSE` yields `NA` columns
+- [x] Fixture C — 1-px road (`-> Bare`) cutting across the Fixture A boundary: road patch is `flag_sliver` **but not** `flag_boundary` (`boundary_frac == 0`); the band still is
+- [x] Fixture D — 20×20 interior clearing: no flags; width 10 px
+- [x] Width metric pinned on known shapes (0.50 / 0.95 / 10.0 px); `boundary_dist_max = 2` grows `boundary_frac` on a 2-px band
+- [x] Bundled-data test: 2017→2023 `changes_only`, `expect_identical(sum(width_px < 1.5), 75L)`; with `patch_area_min = 5000` the surviving `Trees -> Rangeland` sliver has `width_px < 1.5`
+- [x] Stable rows get `NA` metrics; zero-row input returns the full schema; error paths (non-sf, non-factor raster, CRS mismatch, duplicated `patch_id`, bad params)
 
 ## Phase 2: Implement `dft_transition_artifact()`
 - [ ] `R/dft_transition_artifact.R` — validation, width, boundary (focal per to-class + rasterize + zonal), reciprocity (`st_is_within_distance` on reverse-label subset), column assembly
