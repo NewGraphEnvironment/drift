@@ -1484,6 +1484,16 @@ silent direction is the dangerous one.
   `printf` the resolved path from inside the backgrounded shell so the parent can
   read it from output.
 - Hit twice in one floodplains session (2026-08-27) launching detached runs.
+- **The same shape makes `$!` the wrong PID, and that failure hands you a plausible
+  number instead of an error.** `mkdir -p "$D" && : > "$D/rss.txt" && Rscript job.R &`
+  then `PID=$!` gives the *list's* subshell, not `Rscript` — so a sampler built on it
+  (`ps -o rss= -p $PID`) records the shell. Measured 2026-09-05 in drift#62: 39 samples
+  alternating 3104 / 1488 KiB, from a run whose R process peaked at 14.2 **GiB**. Nothing
+  errors, the trace is well-formed, and it was committed as the evidence record before a
+  reviewer compared its peak against the other three groups'. Start the long command
+  **alone** — `Rscript job.R > "$D/run.log" 2>&1 &` on its own line, every `mkdir`/`: >`
+  before it — and sanity-check the first sample's magnitude against what the job should
+  use, because the wrong-PID trace is off by three orders of magnitude and looks fine.
 
 ### `gh` CLI
 - **`gh pr create` resolves branch from CWD, not `--repo`**. Specifying `--repo NewGraphEnvironment/X` does NOT switch branch resolution — the command still reads the current working directory's checked-out branch. To open a PR in repo X, `cd` into X's checkout first, or pass `--head <branch>` explicitly.
@@ -1955,6 +1965,43 @@ shape is real state with no signal.
 The honest failure mode is that this rots because nobody runs it: run the probe at
 session start beside the CI scan, schedule it unattended, and commit the results per
 host so any machine can see what the others measured. Implementation is kdot#37 (soul#69).
+
+### An amd64-only image needs `--platform`, and it works on your machine because it is cached
+
+`docker run` resolves from the local image store before it reaches a registry, so on an
+arm64 Mac an amd64-only image runs fine once pulled — **and the command that pulled it is
+not necessarily the one in the code.** Measured 2026-09-05, macOS/arm64:
+
+```
+$ docker run --rm qgis/qgis:4.2 echo hi
+docker: no matching manifest for linux/arm64/v8 in the manifest list entries
+$ docker run --rm --platform linux/amd64 qgis/qgis:4.2 echo hi
+hi
+```
+
+It fails on a clean machine, a new laptop, CI, or after `docker system prune` — never on
+the machine it was written on. The tell is a `docker run` in code beside a `docker pull`
+in a README or a test helper, where only one carries the flag.
+
+That split is the usual shape: rfp's **test harness** passed `--platform linux/amd64` and
+resolved a pinned digest, while three **runtime** call sites did neither, so the shipped
+functions worked only while a rolling tag happened to be cached (rfp#282). A container
+invocation in test code and in runtime code are two invocations of one operation, and only
+the test one runs in CI — build the argv in one place.
+
+Two adjacent settings worth reading before blaming emulation for being slow, both **off by
+default** and both one checkbox:
+
+```bash
+python3 -c "import json;d=json.load(open('$HOME/Library/Group Containers/group.com.docker/settings.json'));
+print({k:d.get(k) for k in ['useVirtualizationFrameworkRosetta','useVirtualizationFrameworkVirtioFS']})"
+```
+
+`useVirtualizationFrameworkRosetta` false means x86_64 containers run on QEMU when Rosetta
+is available on the host; `useVirtualizationFrameworkVirtioFS` false puts bind mounts on
+gRPC-FUSE, which is the slow path for the many-small-file reads a container workload
+usually opens with. Check the Docker Desktop version too — 4.17.0 was still installed on a
+macOS 26.2 machine, so the Rosetta support present was its earliest form.
 
 
 # Code Check — Spatial
@@ -2654,6 +2701,7 @@ fire and one that must not. A guard nobody has seen fail is decoration.
 | 2026-09-03 | link#278 | **A driver default that selects a methodology, a data scope or a deployment target answers a question nobody asked** — distinct from an ordinary default: `verbose = FALSE` is a preference, `config = "bcfishpass"` picks which of two biological methodologies you shipped, and the tell is that the alternative would also have run cleanly and produced different, equally plausible numbers. Fifteen drivers in one package defaulted to a parity config while the operator expected the package's own, so six watershed groups were modelled on the wrong methodology into a product line already seventeen deep, caught by an offhand question afterwards. Worse when the default is *named* like the safe one (`bcfishpass` vs a config literally called `default`). The remedy is not a policy fixing each answer; it is **removing defaults that silently answer for you**: make the argument required, and where a default must stay, print the resolved decision at start-up with the alternative named. Review question for any driver diff: does this fallback choose a method, a scope or a target? A fleet sweep of the shape is soul#178 |
 | 2026-09-04 | floodplains#77 | **Widening a guard is how it starts refusing correct content, and case-insensitivity is the cheapest way in** — a catalogue-fact grep was widened after missing 5 of 12 restatements, and the new latitude pattern `\b\d{1,3}\.\d+\s*[NS]\b` ran under `re.IGNORECASE`, so `[NS]` also matched a lowercase **s**: `0.39 s`, a timing figure from the repo's own notes, was refused as a collection extent. Compile flags **per pattern**, not per sweep. Two habits that caught it: keep a **negative control set** of sentences the repo legitimately writes and assert they still pass, and check *what the guard reads* — this was the one arm of three not stripping `<script>`, so an embedded bootstrap payload with 30 CSS durations (`.15s`) sat one leading digit from failing a page that was fine |
 | 2026-09-05 | stac_floodplains_bc#61 | **A currency gate read from the artifact the assertion pins downgrades FAIL to SKIP** — a byte-identity assertion pinned a built `meta.json`'s digest and gated itself on that same file's `produced_datetime`, so it would skip whenever upstream had re-run. Any regression that moved or nulled that field — a broken provenance read, a lost section, a rename — therefore made the gate skip **under a message blaming upstream**, on the one arm that exists to notice the code moving the artifact. Read a currency gate from the independent source it is really about (the producer's own file), never from the subject. A pin needs one gate per **independent input** to the digest, too: the same assertion's second gate covers the local sf/GDAL/PROJ triple, because the areas and geometry inside that file are computed on the machine that runs it, and an ungated toolchain difference FAILS rather than skipping |
+| 2026-09-05 | rfp#281 | **A render or export API returns Success when its inputs silently failed to load** — `QgsLayoutExporter.exportToImage()` returned `ExportResult.Success` for a report figure whose basemap and every remote raster were missing: under `--network none` the same project read **42 invalid layers against 18** and exported in 3.6 s against 9.5 s, with the same return code both times. The result code answers *did the writer run*, never *is the output what was asked for* — and the degraded output is a plausible picture, so nothing downstream looks wrong either. Same for a missing font, an unresolved image path (three logos rendered as red-X placeholders, still Success) or a layer whose style failed to load. **Gate on the count of inputs that failed to resolve, not on the return code** — and gate it *differentially*, since real projects arrive already carrying some (18 here before anything was driven), the same reasoning as `.qgs_dangling_refs()`. The rendering sibling of "A wrapper's exit is not the work": there the wrapper lies about the work, here the work lies about itself |
 | — | — | **Silent Failures** — `\|\| true` hides real errors; an empty variable before `rm`/`destroy` needs `[ -n "$VAR" ] \|\| exit 1`; `grep` returning empty feeds downstream silently |
 
 ### A fixture that cannot reach the failure mode
@@ -2683,6 +2731,7 @@ favourable** member of the population, computed, not the vivid one you remember.
 | 2026-08-30 | fly#38 | **Check a threshold against the least favourable case, computed — not a remembered example** — tolerance set to 1.10 against a remembered 0.442; the binding case was 0.0949, `log(1.10)` is 0.0953, 0.4% too loose, and it let through the one input it existed to catch |
 | 2026-08 | rfp#168 | **Mocking the transport means the request is never built** — `local_mocked_bindings(.do_http=)` gives full coverage of response handling and none of the request; the wrong content type returned 400 on every Overpass endpoint with 130 tests green; make the wire format a pure function and assert it offline |
 | 2026-09-02 | floodplains#64 | **A fixture that varies the artifact but not the reader tests nothing reader-dependent** — two GeoTIFFs with different containers, both read with the same terra in the same process, digests asserted equal; delete both normalization lines and all nine assertions still passed, because storage type only varies with what the *reader* does, and the real trigger was a `.aux.xml` sidecar beside one file that the fixture had no reason to model; closed by asserting the property on plain vectors with no file I/O — name the axis the guard exists to test, then check the fixture actually varies it |
+| 2026-09-05 | rfp#265 | **An early return can make the defect unreachable for every input anyone exercises** — the fixture-blindness above with the short-circuit inside the code under test rather than in the data. `_project_files()` returns at `if (version is None or version == head)`, so a **HEAD read never executes the next line** — which passed a project *path* where the client wants a UUID. Measured with a control: `<project>@HEAD` returned 1029 files and `<same project>@HEAD-1` 404'd, as did an unrelated project's own `HEAD-1`, so it was the version and not the project. Every caller had only ever read HEAD, so a whole pinning design downstream worked by coincidence and would have broken the next time anyone bumped a version. The correct call sat 130 lines up in the same file **with a comment explaining it**, which is the tell that the branch was never walked rather than never understood. Ask which branch a realistic input takes before trusting a green suite, and test the case the early return skips — here a read at `HEAD - 1`, since a HEAD read structurally cannot fail |
 
 ### A proxy is not the property
 
@@ -2978,6 +3027,7 @@ exit status; pin only what has no other identity; resolve an identifier once per
 | — | drift#25 | **Cache keys must cover every output-affecting input** — rasters cached as `<source>/<year>.nc` with no AOI in the key; a second watershed received the first's raster masked to its extent, ~3% overlap looking plausible enough to almost ship; hash *resolved* values, sf geometry as WKB (`st_as_binary(…, endian = "little")`) with the CRS as a separate key member, `as.numeric()` first because `10L` and `10` hash differently, and canonicalize the geometry before serializing it (ring order and orientation are not fixed by topology — `code-check-spatial.md`) — and check the `force` escape hatch actually overwrites: drift#25's `force = TRUE` errored on the existing file, so prefer the writer's `overwrite = TRUE` over a bare `unlink()` |
 | 2026-09-01 | link#264 | **Making an optional field mandatory breaks every producer that legitimately left it empty** — four producers, three fine, the fourth `update_hosts.sh` installing from a tarball with no `Remote*` fields; the rejection landed after cloud instances were paid for |
 | 2026-09-01 | link | **Teaching a build or install step to record provenance is a change to a safety-critical path** — `R CMD INSTALL \| tail -3` wrote the pin for a build that failed; an env pin beat a checkout's own git state; nothing expired it; five findings inside one ~40-line fix |
+| 2026-09-05 | drift#62 | **A fix to a derived number does not reach the artifacts that already quoted it, and the ones outside the repo are the ones nobody re-reads** — a review replaced `100 / pct_sustained` (dividing an already-rounded share) with `changed_ha / sustained_ha`, and the generator was re-run, so every committed CSV and the note moved. Two GitHub issue bodies filed an hour earlier under a heading naming that same CSV kept the pre-fix cells, and the note asserted they carried the numbers. Nothing in the repo can see them: they are prose, in another system, and the tables *looked* current because three of four cells were unchanged. Same mechanism as a published record surviving a writer fix, arriving as **published prose** rather than as data — and worse, because a tracker body is what the next person plans from. Two habits: **when a derived value changes, enumerate every artifact that quotes it** — repo prose, release notes, PR descriptions, issue bodies in every repo you filed into — and **verify a filed body against the artifact it names by parsing it**, not by reading it, since `5.08` against `5.09` survives any number of careful re-reads |
 | 2026-08 | gq#57 | **An inventory is only complete relative to a boundary — name the boundary** — 9 lines in 6 files, verified twice, complete for gq; consumers read `soul/skills/cartography`, which shipped its own snippet naming the broken provider |
 | 2026-08-31 | flooded; flooded#49 | **A defect's magnitude is dataset-specific — measure it where it lands** — a 3.59x depth error measured as ~2x area on the 10 m fixture and 16% on the 30 m production watershed; percent-of-AOI moved 27.51 → 27.50 — but a ratio is stable only when its denominator is inside the affected region too: floodplain-as-percent-of-watershed fell 8.67 → 7.35 on the same defect, the same ~15% as the hectares, because the watershed does not shrink, and three report appendices publishing that ratio beside the absolute needed both numbers restated; ask what is in the denominator before calling a proportional claim safe |
 
