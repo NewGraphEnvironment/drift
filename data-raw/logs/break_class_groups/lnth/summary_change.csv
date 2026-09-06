@@ -1,0 +1,6 @@
+"changed","category","n_cells","area_ha","category_label","pct_of_changed"
+0,0,1279534,12795.34,"stable",NA
+0,3,157674,1576.74,"flicker",NA
+1,1,33516,335.16,"break_sustained",20.57
+1,2,50469,504.69,"break_endpoint",30.97
+1,3,78983,789.83,"flicker",48.47

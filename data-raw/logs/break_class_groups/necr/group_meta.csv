@@ -1,0 +1,2 @@
+"group","item","layer","crs","nrow","ncol","ncell","res_m","valid_cells","n_patches","date","terra","drift"
+"necr","necr_ch_ff04","ch_ff04","EPSG:32610",6288,8945,56246160,10,4183814,21990,"2026-09-05","1.9.34","0.14.0"

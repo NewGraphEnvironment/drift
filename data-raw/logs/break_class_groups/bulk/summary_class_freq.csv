@@ -1,0 +1,58 @@
+"year","class_name","n_cells"
+2017,"Water",628719
+2017,"Trees",2588476
+2017,"Flooded Vegetation",21235
+2017,"Crops",70866
+2017,"Built Area",61190
+2017,"Bare Ground",35634
+2017,"Snow/Ice",6340
+2017,"Clouds",280
+2017,"Rangeland",696232
+2018,"Water",644361
+2018,"Trees",2569971
+2018,"Flooded Vegetation",20249
+2018,"Crops",99156
+2018,"Built Area",84277
+2018,"Bare Ground",3721
+2018,"Snow/Ice",9
+2018,"Rangeland",687228
+2019,"Water",666734
+2019,"Trees",2507982
+2019,"Flooded Vegetation",27408
+2019,"Crops",93106
+2019,"Built Area",77299
+2019,"Bare Ground",4816
+2019,"Snow/Ice",4361
+2019,"Rangeland",727266
+2020,"Water",652630
+2020,"Trees",2498546
+2020,"Flooded Vegetation",25916
+2020,"Crops",63448
+2020,"Built Area",64061
+2020,"Bare Ground",10434
+2020,"Snow/Ice",39859
+2020,"Rangeland",754078
+2021,"Water",659621
+2021,"Trees",2556360
+2021,"Flooded Vegetation",32320
+2021,"Crops",73428
+2021,"Built Area",82090
+2021,"Bare Ground",2343
+2021,"Snow/Ice",9766
+2021,"Rangeland",693044
+2022,"Water",646577
+2022,"Trees",2540842
+2022,"Flooded Vegetation",20908
+2022,"Crops",58564
+2022,"Built Area",91093
+2022,"Bare Ground",5039
+2022,"Snow/Ice",16
+2022,"Rangeland",745933
+2023,"Water",655609
+2023,"Trees",2501728
+2023,"Flooded Vegetation",23867
+2023,"Crops",74296
+2023,"Built Area",88117
+2023,"Bare Ground",2445
+2023,"Snow/Ice",27
+2023,"Rangeland",762883
