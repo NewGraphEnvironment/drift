@@ -1,0 +1,11 @@
+"stage","seconds"
+"download",5.4
+"classify",5.1
+"class_freq",3.9
+"break_class",61.2
+"category_crosstab",32.9
+"transition_vectors",24.1
+"transition_artifact",152.8
+"patch_zonal",23
+"shape",3.8
+"wall",312.3

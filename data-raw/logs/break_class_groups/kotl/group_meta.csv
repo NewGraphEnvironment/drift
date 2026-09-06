@@ -1,0 +1,2 @@
+"group","item","layer","crs","nrow","ncol","ncell","res_m","valid_cells","n_patches","date","terra","drift"
+"kotl","kotl_bt_ff04","bt_ff04","EPSG:32611",13437,15219,204497703,10,6937760,17042,"2026-09-05","1.9.34","0.14.0"

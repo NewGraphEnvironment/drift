@@ -21,3 +21,9 @@ data-raw/logs/**/*.tif
 data-raw/logs/**/*.rds
 data-raw/logs/**/*.gpkg
 data-raw/logs/benchmark_break_class/summary_patches.csv
+
+# per-group temporal QA (data-raw/break_class_groups.R): the downloaded COGs,
+# item JSON and the per-patch table are regenerated; the summary CSVs and rss.txt
+# are the committed evidence record
+data-raw/logs/**/*.json
+data-raw/logs/break_class_groups/*/summary_patches.csv

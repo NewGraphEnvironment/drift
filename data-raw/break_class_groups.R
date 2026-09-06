@@ -1,0 +1,419 @@
+# Temporal QA across the watershed groups whose published annual IO LULC series
+# is complete (drift#62): does the BULK split (sustained break / endpoint-only
+# break / flicker) generalise?
+#
+# Reads the seven `classified_<year>` COGs of each stac-floodplains-bc item that
+# carries them (bulk_co_ff04, necr_ch_ff04, lnth_ch_ff04, kotl_bt_ff04 — PINE was
+# dropped upstream, floodplains#76), so there is no fetch and no AOI mask: the
+# published rasters are already clipped to the floodplain. Otherwise the BULK
+# pipeline (data-raw/benchmark_break_class_bulk.R) minus the fetch, plus the
+# floodplain-shape columns Q3 needs.
+#
+# Usage (from the repo root; one group per process so an RSS trace is per group):
+#   Rscript data-raw/break_class_groups.R necr        # or lnth, bulk, kotl
+#   Rscript data-raw/break_class_groups.R summarize   # assemble summary_groups.*
+#
+# Sample RSS from outside while a group runs (KiB every 2 s):
+#   Rscript data-raw/break_class_groups.R necr > data-raw/logs/break_class_groups/necr/run.log 2>&1 &
+#   PID=$!; while kill -0 $PID 2>/dev/null; do
+#     ps -o rss= -p $PID >> data-raw/logs/break_class_groups/necr/rss.txt; sleep 2; done
+#
+# Outputs, data-raw/logs/break_class_groups/<group>/ (the .tif, .gpkg, .json and
+# .log files and summary_patches.csv are gitignored; the other CSVs and rss.txt
+# are the committed evidence record):
+#   group_meta.csv           - grid, CRS, cells, run date, terra version
+#   summary_class_freq.csv   - cells per class per year (clouds, valid-cell parity)
+#   summary_pixels.csv       - res$summary (from, to, status, break_year, cells, area)
+#   summary_break_year.csv   - clean-break area by break_year (Q2)
+#   summary_change.csv       - endpoint-changed pixels by temporal category (Q1)
+#   summary_patch_groups.csv - per-patch temporal evidence by #44 geometric signature (Q4)
+#   summary_shape.csv        - floodplain ff02/ff04/ff06 areas, ff06/ff02, 2A/P width (Q3)
+#   timings.csv              - stage timings and wall clock
+# and from the summarize stage, in data-raw/logs/break_class_groups/:
+#   summary_groups.csv / .md - one row per group, every number the note quotes
+#   summary_bulk_reconcile.csv - the published-grid BULK run against the #9 run
+
+suppressMessages({
+  library(sf)
+  library(terra)
+  pkgload::load_all(".", quiet = TRUE)
+})
+
+groups <- c(bulk = "bulk_co_ff04", necr = "necr_ch_ff04",
+            lnth = "lnth_ch_ff04", kotl = "kotl_bt_ff04")
+years <- 2017:2023
+base_url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com"
+api_url <- "https://images.a11s.one/collections/stac-floodplains-bc/items"
+log_root <- file.path("data-raw", "logs", "break_class_groups")
+
+arg <- commandArgs(trailingOnly = TRUE)[1]
+if (is.na(arg) || !(arg %in% c(names(groups), "summarize"))) {
+  stop("usage: Rscript data-raw/break_class_groups.R <", paste(names(groups), collapse = "|"),
+       "|summarize>", call. = FALSE)
+}
+
+# --- helpers ---------------------------------------------------------------
+
+# fetch to a temp file and rename on 200 only: a transport error mid-body would
+# otherwise leave a truncated file under the name the next run trusts
+fetch_once <- function(url, dest) {
+  if (file.exists(dest) && file.size(dest) > 0) return(invisible(dest))
+  tmp <- tempfile(fileext = paste0(".", tools::file_ext(dest)))
+  h <- curl::new_handle(followlocation = TRUE, timeout = 600)
+  resp <- tryCatch(curl::curl_fetch_disk(url, tmp, handle = h),
+                   error = function(e) { unlink(tmp); stop(url, ": ", conditionMessage(e)) })
+  if (resp$status_code != 200L) { unlink(tmp); stop(url, " returned HTTP ", resp$status_code) }
+  stopifnot(file.rename(tmp, dest))
+  invisible(dest)
+}
+
+# the item's `file:checksum` is a sha256 multihash: 0x12 (sha2-256), 0x20 (32
+# bytes), then the digest. A 200 + rename says the transfer completed; this says
+# the bytes are the ones the catalogue published.
+verify_checksum <- function(path, asset, item_json) {
+  mh <- asset[["file:checksum"]]
+  stopifnot(is.character(mh), startsWith(mh, "1220"), nchar(mh) == 68)
+  got <- digest::digest(path, algo = "sha256", file = TRUE)
+  if (!identical(got, substr(mh, 5, 68))) {
+    # the cached item.json goes too: a mismatch after an upstream republish is
+    # a stale checksum, not a bad download, and keeping it would repeat this
+    # on every re-run
+    unlink(c(path, item_json))
+    stop(basename(path), ": sha256 ", got, " != published ", substr(mh, 5, 68),
+         " — deleted it and item.json; re-run to fetch both again")
+  }
+  invisible(TRUE)
+}
+
+# 1 = clean break sustained >= 2 years each side, 2 = clean break with one
+# endpoint the odd year out, 3 = flicker, 0 = stable (n_flips == 0). Copied
+# verbatim from data-raw/benchmark_break_class_bulk.R: that script is the
+# committed producer of the BULK evidence and is left as it ran; the summarize
+# stage's reconciliation row is what would show the two drifting apart.
+cat_fun <- function(v) {
+  # refuse a bare vector: terra::app() otherwise runs this once per CELL
+  if (!is.matrix(v)) stop("matrix chunks only")
+  nf <- v[, 4]
+  out <- rep(NA_integer_, nrow(v))
+  out[!is.na(nf) & nf == 0] <- 0L
+  out[!is.na(nf) & nf >= 2] <- 3L
+  one <- !is.na(nf) & nf == 1
+  out[one] <- ifelse(pmin(v[one, 2], v[one, 3]) >= 2, 1L, 2L)
+  out
+}
+cat_labels <- c("stable", "break_sustained", "break_endpoint", "flicker")
+
+# effective width of a polygon set in metres: 2 * area / perimeter (a rectangle
+# of width w and length L >> w gives ~w). st_length(st_boundary()) rather than
+# st_perimeter(), which needs lwgeom on projected data. Perimeter-dominated on a
+# fragmented floodplain, so the perimeter and polygon count are reported beside it.
+shape_row <- function(g, label) {
+  a <- as.numeric(sf::st_area(g))
+  p <- as.numeric(sf::st_length(sf::st_boundary(g)))
+  data.frame(layer = label, area_km2 = round(sum(a) / 1e6, 2), perimeter_km = round(sum(p) / 1e3, 1),
+             n_polygons = length(sf::st_cast(sf::st_geometry(g), "POLYGON")),
+             width_m = round(2 * sum(a) / sum(p), 1))
+}
+
+# --- summarize stage -------------------------------------------------------
+
+if (arg == "summarize") {
+  have <- names(groups)[file.exists(file.path(log_root, names(groups), "summary_change.csv"))]
+  if (length(have) < length(groups)) {
+    stop("missing summary_change.csv for: ", paste(setdiff(names(groups), have), collapse = ", "))
+  }
+  pick <- function(df, sel, col) { x <- df[sel, col]; if (length(x) == 1) x else NA_real_ }
+  shares <- function(chg) {
+    chg1 <- chg[chg$changed == 1, ]
+    changed_ha <- sum(chg1$area_ha)
+    pct <- function(lbl) round(100 * pick(chg1, chg1$category_label == lbl, "area_ha") / changed_ha, 1)
+    list(valid_ha = sum(chg$area_ha), changed_ha = changed_ha,
+         pct_sustained = pct("break_sustained"), pct_endpoint = pct("break_endpoint"),
+         pct_flicker = pct("flicker"),
+         # unrounded, for the derived columns: dividing by a share already
+         # rounded to one decimal moves the last digit of the factor
+         sustained_ha = pick(chg1, chg1$category_label == "break_sustained", "area_ha"),
+         stable_flicker_ha = pick(chg, chg$changed == 0 & chg$category_label == "flicker", "area_ha"))
+  }
+  rows <- lapply(have, function(g) {
+    d <- file.path(log_root, g)
+    meta <- utils::read.csv(file.path(d, "group_meta.csv"))
+    sh <- shares(utils::read.csv(file.path(d, "summary_change.csv")))
+    byyr <- utils::read.csv(file.path(d, "summary_break_year.csv"))
+    pg <- utils::read.csv(file.path(d, "summary_patch_groups.csv"))
+    shp <- utils::read.csv(file.path(d, "summary_shape.csv"))
+    freq <- utils::read.csv(file.path(d, "summary_class_freq.csv"))
+    tim <- utils::read.csv(file.path(d, "timings.csv"))
+    rss <- file.path(d, "rss.txt")
+    brk_ha <- function(yr) { x <- byyr$area_ha[byyr$break_year == yr]; if (length(x)) x else 0 }
+    cloud <- freq[freq$class_name == "Clouds", ]
+    data.frame(
+      group = g, item = groups[[g]], crs = meta$crs, ncell = meta$ncell,
+      valid_ha = round(sh$valid_ha, 1),
+      changed_ha = round(sh$changed_ha, 1), pct_changed_of_valid = round(100 * sh$changed_ha / sh$valid_ha, 2),
+      pct_sustained = sh$pct_sustained, pct_endpoint = sh$pct_endpoint, pct_flicker = sh$pct_flicker,
+      # how far the two-epoch layer overstates change sustained two years each side
+      overstatement_factor = round(sh$changed_ha / sh$sustained_ha, 2),
+      stable_flicker_ha = round(sh$stable_flicker_ha, 1),
+      pct_stable_flicker_of_valid = round(100 * sh$stable_flicker_ha / sh$valid_ha, 2),
+      # the flicker the two-epoch layer cannot see, relative to what it reports
+      stable_flicker_over_changed = round(sh$stable_flicker_ha / sh$changed_ha, 2),
+      break_2018_ha = round(brk_ha(2018), 1), pct_break_2018 = round(100 * brk_ha(2018) / sh$changed_ha, 1),
+      break_2023_ha = round(brk_ha(2023), 1), pct_break_2023 = round(100 * brk_ha(2023) / sh$changed_ha, 1),
+      ratio_2018_2023 = round(brk_ha(2018) / brk_ha(2023), 2),
+      cloud_cells_2017 = sum(cloud$n_cells[cloud$year == 2017]),
+      cloud_cells_other = sum(cloud$n_cells[cloud$year != 2017]),
+      ff02_km2 = pick(shp, shp$layer == "ff02", "area_km2"),
+      ff04_km2 = pick(shp, shp$layer == "ff04", "area_km2"),
+      ff06_km2 = pick(shp, shp$layer == "ff06", "area_km2"),
+      ff06_over_ff02 = round(pick(shp, shp$layer == "ff06", "area_km2") / pick(shp, shp$layer == "ff02", "area_km2"), 3),
+      ff04_width_m = pick(shp, shp$layer == "ff04", "width_m"),
+      ff04_perimeter_km = pick(shp, shp$layer == "ff04", "perimeter_km"),
+      ff04_n_polygons = pick(shp, shp$layer == "ff04", "n_polygons"),
+      n_patches = pick(pg, pg$group == "all", "n_patches"),
+      break_frac_all = pick(pg, pg$group == "all", "break_frac_area_wtd"),
+      break_frac_artifact = pick(pg, pg$group == "artifact_signature", "break_frac_area_wtd"),
+      break_frac_other = pick(pg, pg$group == "other", "break_frac_area_wtd"),
+      pct_area_artifact = round(100 * pick(pg, pg$group == "artifact_signature", "area_ha") /
+                                  pick(pg, pg$group == "all", "area_ha"), 1),
+      n_flips_sliver = pick(pg, pg$group == "sliver", "n_flips_area_wtd"),
+      n_flips_wider = pick(pg, pg$group == "wider", "n_flips_area_wtd"),
+      break_frac_sliver = pick(pg, pg$group == "sliver", "break_frac_area_wtd"),
+      break_frac_wider = pick(pg, pg$group == "wider", "break_frac_area_wtd"),
+      wall_s = pick(tim, tim$stage == "wall", "seconds"),
+      break_class_s = pick(tim, tim$stage == "break_class", "seconds"),
+      peak_rss_gib = if (file.exists(rss)) round(max(scan(rss, quiet = TRUE)) / 1024^2, 1) else NA_real_
+    )
+  })
+  out <- do.call(rbind, rows)
+  print(t(out))
+  utils::write.csv(out, file.path(log_root, "summary_groups.csv"), row.names = FALSE)
+  # the note includes these tables verbatim, so `diff` is the check that its
+  # numbers are the script's
+  md <- c("<!-- generated by data-raw/break_class_groups.R summarize; do not edit -->", "",
+          "## Q1: split of the 2017 -> 2023 changed area", "",
+          knitr::kable(out[c("group", "valid_ha", "changed_ha", "pct_changed_of_valid", "pct_sustained",
+                             "pct_endpoint", "pct_flicker", "overstatement_factor",
+                             "stable_flicker_ha", "pct_stable_flicker_of_valid",
+                             "stable_flicker_over_changed")], format = "markdown"), "",
+          "## Q2: endpoint-only breaks by year", "",
+          knitr::kable(out[c("group", "break_2018_ha", "pct_break_2018", "break_2023_ha", "pct_break_2023",
+                             "ratio_2018_2023", "cloud_cells_2017", "cloud_cells_other")], format = "markdown"), "",
+          "## Q3: floodplain shape against the flicker share", "",
+          knitr::kable(out[c("group", "ff02_km2", "ff04_km2", "ff06_km2", "ff06_over_ff02", "ff04_width_m",
+                             "ff04_perimeter_km", "ff04_n_polygons", "pct_flicker", "pct_sustained",
+                             "n_flips_sliver", "n_flips_wider")], format = "markdown"), "",
+          "## Q4: temporal evidence by geometric signature (area-weighted clean-break share)", "",
+          knitr::kable(out[c("group", "n_patches", "break_frac_all", "break_frac_artifact", "break_frac_other",
+                             "pct_area_artifact", "break_frac_sliver", "break_frac_wider")], format = "markdown"), "",
+          "## Run", "",
+          knitr::kable(out[c("group", "crs", "ncell", "wall_s", "break_class_s", "peak_rss_gib")],
+                       format = "markdown"))
+  writeLines(md, file.path(log_root, "summary_groups.md"))
+
+  # BULK on the published grid (14651 x 11552) against the #9 run on the grid
+  # dft_stac_fetch() tiled from Planetary Computer (16000 x 12000). Same script
+  # logic, same AOI mask to within a few cells; the deltas are reported, not
+  # asserted, and a delta beyond about a percentage point is a finding.
+  old <- utils::read.csv(file.path("data-raw", "logs", "benchmark_break_class", "summary_change.csv"))
+  new <- utils::read.csv(file.path(log_root, "bulk", "summary_change.csv"))
+  # unrounded per run, so the delta row is a difference of measurements rather
+  # than of their one-decimal displays; each is rounded once, for display
+  rec <- function(chg) {
+    sh <- shares(chg)
+    chg1 <- chg[chg$changed == 1, ]
+    share <- function(lbl) 100 * pick(chg1, chg1$category_label == lbl, "area_ha") / sh$changed_ha
+    data.frame(valid_cells = sum(chg$n_cells), valid_ha = sh$valid_ha, changed_ha = sh$changed_ha,
+               pct_sustained = share("break_sustained"), pct_endpoint = share("break_endpoint"),
+               pct_flicker = share("flicker"), stable_flicker_ha = sh$stable_flicker_ha)
+  }
+  r_old <- rec(old)
+  r_new <- rec(new)
+  recon <- rbind(data.frame(run = "bulk_pc_fetch_issue9", round(r_old, 2)),
+                 data.frame(run = "bulk_published_issue62", round(r_new, 2)),
+                 data.frame(run = "delta", round(r_new - r_old, 2)))
+  print(recon)
+  utils::write.csv(recon, file.path(log_root, "summary_bulk_reconcile.csv"), row.names = FALSE)
+  # the note must carry these tables byte for byte: a hand-edited number in the
+  # note is exactly what the round-8 review of #9 found
+  note <- file.path("inst", "notes", "temporal-qa-groups.md")
+  if (file.exists(note)) {
+    body <- paste(readLines(note), collapse = "\n")
+    if (!grepl(paste(md[-1], collapse = "\n"), body, fixed = TRUE)) {
+      stop("inst/notes/temporal-qa-groups.md does not contain summary_groups.md verbatim; ",
+           "rebuild the note from the generated tables")
+    }
+    message("note tables match summary_groups.md")
+  }
+  message("SUMMARIZE DONE")
+  quit(save = "no", status = 0)
+}
+
+# --- per-group stage -------------------------------------------------------
+
+g <- arg
+item <- groups[[g]]
+sp_layer <- paste(strsplit(item, "_")[[1]][2:3], collapse = "_")   # e.g. co_ff04
+sp <- strsplit(item, "_")[[1]][2]                                   # e.g. co
+out_dir <- file.path(log_root, g)
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+t0 <- Sys.time()
+timings <- list()
+tick <- function(label, start) {
+  el <- round(as.numeric(difftime(Sys.time(), start, units = "secs")), 1)
+  message(sprintf("[%7.1fs] %s: %.1f s", as.numeric(difftime(Sys.time(), t0, units = "secs")),
+                  label, el))
+  timings[[label]] <<- el
+  invisible(el)
+}
+
+# --- 1. Published assets, verified against the item's checksums ----
+t1 <- Sys.time()
+item_json <- fetch_once(paste0(api_url, "/", item), file.path(out_dir, "item.json"))
+assets <- jsonlite::fromJSON(item_json, simplifyVector = FALSE)[["assets"]]
+stopifnot(all(sprintf("classified_%d", years) %in% names(assets)), "floodplain" %in% names(assets))
+tifs <- vapply(years, function(y) {
+  key <- sprintf("classified_%d", y)
+  p <- fetch_once(assets[[key]][["href"]], file.path(out_dir, paste0(key, ".tif")))
+  verify_checksum(p, assets[[key]], item_json)
+  p
+}, character(1))
+gpkg <- fetch_once(assets[["floodplain"]][["href"]], file.path(out_dir, "floodplain.gpkg"))
+verify_checksum(gpkg, assets[["floodplain"]], item_json)
+tick("download", t1)
+
+rasters <- lapply(tifs, terra::rast)
+names(rasters) <- years
+stopifnot(identical(as.integer(names(rasters)), 2017:2023))   # Q2's year <-> n_before/n_after identity
+for (r in rasters[-1]) stopifnot(terra::compareGeom(rasters[[1]], r, stopOnError = FALSE))
+stopifnot(!any(vapply(rasters, terra::inMemory, logical(1))))  # the file-backed floor is the point
+ref <- rasters[[1]]
+epsg <- terra::crs(ref, describe = TRUE)$code
+message(item, ": ", paste(dim(ref)[1:2], collapse = " x "), " at ",
+        paste(terra::res(ref), collapse = " x "), " m, EPSG:", epsg, ", ",
+        format(terra::ncell(ref), big.mark = ","), " cells")
+
+# --- 2. Classify; per-year class frequencies ----
+t1 <- Sys.time()
+classified <- dft_rast_classify(rasters, source = "io-lulc")
+tick("classify", t1)
+
+t1 <- Sys.time()
+freq <- do.call(rbind, lapply(years, function(y) {
+  f <- terra::freq(classified[[as.character(y)]])
+  data.frame(year = y, class_name = f$value, n_cells = f$count)
+}))
+valid_by_year <- stats::aggregate(n_cells ~ year, freq, sum)
+if (length(unique(valid_by_year$n_cells)) != 1) {
+  stop("valid-cell count differs across years: ", paste(valid_by_year$n_cells, collapse = ", "))
+}
+tick("class_freq", t1)
+utils::write.csv(freq, file.path(out_dir, "summary_class_freq.csv"), row.names = FALSE)
+print(freq[freq$class_name %in% c("Clouds", "No Data"), ])
+
+# --- 3. Scan ----
+t1 <- Sys.time()
+res <- dft_rast_break_class(classified)
+tick("break_class", t1)
+utils::write.csv(res$summary, file.path(out_dir, "summary_pixels.csv"), row.names = FALSE)
+cell_ha <- prod(terra::res(res$raster)) * 1e-4
+
+# Q2: a clean break dated 2018 is exactly n_flips == 1 & n_before == 1 (2017 alone
+# differs); dated 2023 is exactly n_after == 1 (2023 alone differs)
+byyr <- res$summary[res$summary$status %in% "break", ]
+byyr <- stats::aggregate(cbind(n_cells, area) ~ break_year, byyr, sum)
+names(byyr) <- c("break_year", "n_cells", "area_ha")
+byyr$pct_of_break <- round(100 * byyr$n_cells / sum(byyr$n_cells), 2)
+utils::write.csv(byyr, file.path(out_dir, "summary_break_year.csv"), row.names = FALSE)
+print(byyr)
+
+# --- 4. Endpoint-changed pixels by temporal category (Q1) ----
+t1 <- Sys.time()
+category <- terra::app(res$breaks, fun = cat_fun, filename = tempfile(fileext = ".tif"),
+                       wopt = list(datatype = "INT1U"))
+codes <- terra::deepcopy(res$raster)
+levels(codes) <- NULL
+changed <- terra::app(codes, fun = function(v) as.integer((v %/% 1000L) != (v %% 1000L)),
+                      filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+ct <- terra::crosstab(c(changed, category), long = TRUE, useNA = TRUE)
+names(ct) <- c("changed", "category", "n_cells")
+ct <- ct[!is.na(ct$changed), ]
+ct$area_ha <- ct$n_cells * cell_ha
+ct$category_label <- cat_labels[ct$category + 1L]
+ct$pct_of_changed <- NA_real_
+chg <- ct$changed == 1
+ct$pct_of_changed[chg] <- round(100 * ct$n_cells[chg] / sum(ct$n_cells[chg]), 2)
+tick("category_crosstab", t1)
+utils::write.csv(ct, file.path(out_dir, "summary_change.csv"), row.names = FALSE)
+print(ct)
+
+# --- 5. Patches: the #44 pipeline with per-patch temporal evidence (Q4) ----
+t1 <- Sys.time()
+patches <- dft_transition_vectors(res$raster, changes_only = TRUE)
+tick("transition_vectors", t1)
+message(nrow(patches), " change patches, ", round(sum(patches$area_ha), 1), " ha")
+
+t1 <- Sys.time()
+tagged <- dft_transition_artifact(patches, res$raster)
+tick("transition_artifact", t1)
+
+t1 <- Sys.time()
+pid <- terra::rasterize(terra::vect(patches), res$raster, field = "patch_id",
+                        filename = tempfile(fileext = ".tif"))
+is_break <- terra::app(res$breaks[["n_flips"]], fun = function(v) as.integer(v == 1L),
+                       filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+z <- terra::zonal(c(is_break, res$breaks[["break_year"]], res$breaks[["n_flips"]]),
+                  pid, fun = "mean", na.rm = TRUE)
+names(z) <- c("patch_id", "break_frac", "break_year_mean", "n_flips_mean")
+tagged <- merge(sf::st_drop_geometry(tagged), z, by = "patch_id", all.x = TRUE)
+tick("patch_zonal", t1)
+utils::write.csv(tagged, file.path(out_dir, "summary_patches.csv"), row.names = FALSE)
+
+art <- tagged$flag_sliver & (tagged$flag_boundary | tagged$flag_reciprocal)
+art[is.na(art)] <- FALSE
+grp <- function(sel, label) {
+  q <- tagged[sel, ]
+  data.frame(group = label, n_patches = nrow(q), area_ha = round(sum(q$area_ha), 1),
+             break_frac_area_wtd = round(stats::weighted.mean(q$break_frac, q$area_ha, na.rm = TRUE), 3),
+             pct_no_break_cell = round(100 * mean(q$break_frac == 0, na.rm = TRUE), 1),
+             pct_all_break = round(100 * mean(q$break_frac == 1, na.rm = TRUE), 1),
+             n_flips_area_wtd = round(stats::weighted.mean(q$n_flips_mean, q$area_ha, na.rm = TRUE), 2))
+}
+pgroups <- rbind(grp(art, "artifact_signature"), grp(!art, "other"),
+                 grp(tagged$flag_sliver, "sliver"), grp(!tagged$flag_sliver, "wider"),
+                 grp(tagged$area_ha >= 0.5, "ge_0.5_ha"), grp(rep(TRUE, nrow(tagged)), "all"))
+print(pgroups)
+utils::write.csv(pgroups, file.path(out_dir, "summary_patch_groups.csv"), row.names = FALSE)
+
+# --- 6. Floodplain shape (Q3) ----
+# Confinement is not a field in the data. Two proxies from the published
+# floodplain polygons, derived here rather than read from the item properties:
+# how much the floodplain widens as the flood factor rises (ff06 / ff02 — a
+# confined valley barely does, a wide one does) and the ff04 effective width.
+# The per-stream `_by_blue_line_key` layer was rejected for this: its polygons
+# overlap 1.7-2.2x (tributary floodplains nested in the mainstem's) and kotl
+# has none (planning findings, drift#62).
+t1 <- Sys.time()
+shape <- do.call(rbind, lapply(c("ff02", "ff04", "ff06"), function(ff) {
+  lyr <- sf::st_read(gpkg, layer = paste0(sp, "_", ff), quiet = TRUE)
+  lyr <- sf::st_transform(sf::st_make_valid(sf::st_geometry(lyr)), sf::st_crs(ref))
+  shape_row(sf::st_as_sf(sf::st_union(lyr)), ff)
+}))
+tick("shape", t1)
+print(shape)
+utils::write.csv(shape, file.path(out_dir, "summary_shape.csv"), row.names = FALSE)
+
+# --- 7. Group metadata and timings ----
+meta <- data.frame(
+  group = g, item = item, layer = sp_layer, crs = paste0("EPSG:", epsg),
+  nrow = nrow(ref), ncol = ncol(ref), ncell = terra::ncell(ref), res_m = terra::res(ref)[1],
+  valid_cells = valid_by_year$n_cells[1], n_patches = nrow(tagged),
+  date = format(Sys.Date()), terra = as.character(utils::packageVersion("terra")),
+  drift = as.character(utils::packageVersion("drift")))
+utils::write.csv(meta, file.path(out_dir, "group_meta.csv"), row.names = FALSE)
+
+timings[["wall"]] <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 1)
+utils::write.csv(data.frame(stage = names(timings), seconds = unlist(timings)),
+                 file.path(out_dir, "timings.csv"), row.names = FALSE)
+message("ALL STAGES DONE")
