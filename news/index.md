@@ -1,6 +1,6 @@
 # Changelog
 
-## drift (development version)
+## drift 0.14.1
 
 - **Temporal QA across four watershed groups
   ([\#62](https://github.com/NewGraphEnvironment/drift/issues/62)).**
