@@ -1,5 +1,21 @@
 # Changelog
 
+## drift (development version)
+
+- **Temporal QA across four watershed groups
+  ([\#62](https://github.com/NewGraphEnvironment/drift/issues/62)).**
+  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  run on the published seven-year IO LULC series of `bulk_co_ff04`,
+  `necr_ch_ff04`, `lnth_ch_ff04` and `kotl_bt_ff04` straight from
+  stac-floodplains-bc: the share of 2017 -\> 2023 change that is a
+  switch sustained two years each side is 19.7-31.0%, flicker
+  39.6-48.5%, and 2017 is the odd endpoint more often than 2023 in every
+  group. Results, what they do and do not support, and the two follow-up
+  decisions are in
+  [`inst/notes/temporal-qa-groups.md`](https://newgraphenvironment.github.io/drift/news/inst/notes/temporal-qa-groups.md);
+  evidence in `data-raw/logs/break_class_groups/`, every number emitted
+  by `data-raw/break_class_groups.R`. No API change.
+
 ## drift 0.14.0
 
 - **New:
