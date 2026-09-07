@@ -85,3 +85,37 @@ and the written file carrying no RAT while `@return` promised a factor (document
 matching the parent's no-sidecar posture is deliberate).
 
 Lints in the changed R files: 0, against a baseline of 2 at `main`.
+
+### The NaN coercion trap, found by reading the committed evidence
+
+`summary_strength.csv` published `strength 0` for `stable`, `unsettled` and
+`stable_flicker` — three categories that have no strength at all. Measured on R 4.5.2:
+
+```
+as.character(NaN)              "NaN"
+as.integer("NaN")              0      <- no warning
+as.numeric("NaN")              NaN
+as.integer(NaN)                NA
+as.integer(as.numeric("NaN"))  NA
+```
+
+`terra::crosstab(useNA = TRUE)` returns **numeric** columns with `NaN` for the group that
+has no value, so the common idiom `as.integer(as.character(x))` turns "no value" into a
+legitimate-looking zero, silently. Four sites were mine; two more are pre-existing under
+`useNA = FALSE` and cannot reach it, so they are left alone.
+
+The dangerous one was not the published CSV but `break_class_groups.R`'s article-bulk
+self-check: `break_category_levels()[as.integer(as.character(ct$category)) + 1L]` maps a
+`NaN` category to index 1, which is **`stable`**. A pixel that could not be scanned would
+have been compared as a stable one. BULK carries no such pixel, so the check passed —
+this is a latent defect a fixture would not have reached either, since it needs an
+interior NA year *and* a known transition.
+
+Found by reading a committed number and asking what it meant, not by review or by a test.
+
+### `filename` with no way to overwrite
+
+terra refuses to write over an existing file and its error names `overwrite=TRUE` as the
+remedy — which the function did not accept, so the message pointed at something the caller
+could not do. Added `overwrite = FALSE`, wired through both the padded and unpadded write
+paths, and pinned.

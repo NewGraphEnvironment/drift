@@ -497,7 +497,12 @@ if (arg == "article-bulk") {
   ct <- terra::crosstab(c(changed, category), long = TRUE, useNA = TRUE)
   names(ct) <- c("changed", "category", "n_cells")
   ct <- ct[!is.na(ct$changed), ]
-  ct$category_label <- break_category_levels()[as.integer(as.character(ct$category)) + 1L]
+  # as.integer() DIRECTLY, never through as.character(): terra::crosstab()
+  # returns numeric columns with NaN for the useNA group, and
+  # as.integer("NaN") is 0 with NO warning while as.integer(NaN) is NA.
+  # Routed through a string, a group that has no value becomes a
+  # legitimate-looking zero -- here, category 0 is `stable`.
+  ct$category_label <- break_category_levels()[as.integer(ct$category) + 1L]
   ref <- read_change(file.path(out_dir, "summary_change.csv"))
   k_now <- paste(as.integer(ct$changed), ct$category_label)
   k_ref <- paste(ref$changed, ref$category_label)
@@ -844,7 +849,9 @@ changed <- terra::app(codes, fun = function(v) {
 ct <- terra::crosstab(c(changed, category), long = TRUE, useNA = TRUE)
 names(ct) <- c("changed", "category", "n_cells")
 ct <- ct[!is.na(ct$changed), ]
-ct$category <- as.integer(as.character(ct$category))
+# as.integer() directly: as.integer("NaN") is 0 with no warning, so a
+# crosstab group with no value would become category 0 (`stable`).
+ct$category <- as.integer(ct$category)
 ct$area_ha <- ct$n_cells * cell_ha
 ct$category_label <- break_category_levels()[ct$category + 1L]
 ct$pct_of_changed <- NA_real_

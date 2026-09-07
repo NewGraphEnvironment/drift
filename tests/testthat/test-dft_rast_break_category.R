@@ -47,6 +47,16 @@ test_that("widths 1, 2 and 3 all agree with the rule applied in R", {
   }
 })
 
+test_that("`filename` refuses to clobber, and `overwrite` is the remedy its error names", {
+  f <- withr::local_tempfile(fileext = ".tif")
+  a <- dft_rast_break_category(res_cases, filename = f)
+  expect_error(dft_rast_break_category(res_cases, filename = f), "exists")
+  b <- dft_rast_break_category(res_cases, filename = f, overwrite = TRUE)
+  expect_identical(terra::values(a), terra::values(b))
+  expect_error(dft_rast_break_category(res_cases, filename = f, overwrite = "yes"),
+               "must be TRUE or FALSE")
+})
+
 test_that("NA round-trips from the written file as NA, not the INT1U sentinel", {
   f <- withr::local_tempfile(fileext = ".tif")
   out <- dft_rast_break_category(res_cases, filename = f)

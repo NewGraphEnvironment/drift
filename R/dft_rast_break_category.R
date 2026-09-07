@@ -23,6 +23,9 @@
 #'   package avoids for that reason. `terra::rast(filename)` therefore returns a
 #'   plain integer raster; re-attach labels with the id order in `@return`, or
 #'   keep the object this returns.
+#' @param overwrite Logical. Replace `filename` if it already exists. terra
+#'   refuses by default and its error names this remedy, so the argument has to
+#'   exist for the message to be actionable.
 #'
 #' @return A two-layer `SpatRaster`:
 #'   - `category` — a factor with ids `0:4` labelled `stable`,
@@ -63,7 +66,8 @@
 #'
 #' # pixel grain and summary grain are the same rule, so they agree
 #' terra::freq(cat_r[["category"]])
-dft_rast_break_category <- function(x, rule = "v1", filename = NULL) {
+dft_rast_break_category <- function(x, rule = "v1", filename = NULL,
+                                    overwrite = FALSE) {
   break_rule_check(rule)
 
   if (is.data.frame(x) || !is.list(x)) {
@@ -93,6 +97,9 @@ dft_rast_break_category <- function(x, rule = "v1", filename = NULL) {
   }
   if (!is.null(filename) && (!is.character(filename) || length(filename) != 1L)) {
     stop("`filename` must be a single path or NULL.", call. = FALSE)
+  }
+  if (!isTRUE(overwrite) && !isFALSE(overwrite)) {
+    stop("`overwrite` must be TRUE or FALSE.", call. = FALSE)
   }
 
   files <- character(0)
@@ -131,11 +138,13 @@ dft_rast_break_category <- function(x, rule = "v1", filename = NULL) {
   steps <- max(1L, as.integer(ceiling(terra::ncell(stack) / 2.5e6)))
   out_file <- if (pad || is.null(filename)) tmpf() else filename
   out <- terra::app(stack, fun = break_category_scan(), filename = out_file,
+                    overwrite = isTRUE(overwrite) && identical(out_file, filename),
                     wopt = list(datatype = "INT1U", gdal = "COMPRESS=LZW",
                                 steps = steps))
   if (pad) {
     out_file <- if (is.null(filename)) tmpf() else filename
     out <- terra::crop(out, terra::ext(breaks), filename = out_file,
+                       overwrite = isTRUE(overwrite) && identical(out_file, filename),
                        wopt = list(datatype = "INT1U", gdal = "COMPRESS=LZW"))
   }
   names(out) <- c("category", "strength")

@@ -127,7 +127,8 @@ tick("break_class", t2)
 
 # --- 3. The function under test --------------------------------------------
 t3 <- Sys.time()
-cat_r <- dft_rast_break_category(res, filename = file.path(out_dir, "category.tif"))
+cat_r <- dft_rast_break_category(res, filename = file.path(out_dir, "category.tif"),
+                                 overwrite = TRUE)
 tick("break_category", t3)
 stopifnot(identical(names(cat_r), c("category", "strength")))
 
@@ -144,7 +145,7 @@ changed <- terra::app(codes, fun = function(v) {
 ct <- terra::crosstab(c(changed, cat_r[["category"]]), long = TRUE, useNA = TRUE)
 names(ct) <- c("changed", "category_label", "n_cells")
 ct <- ct[!is.na(ct$changed), ]
-ct$changed <- as.integer(as.character(ct$changed))
+ct$changed <- as.integer(ct$changed)   # never via as.character(): see below
 ct$category_label <- as.character(ct$category_label)
 tick("crosstab", t4)
 
@@ -179,7 +180,12 @@ st$category_label <- as.character(st$category_label)
 # `%in%`, not `==`: crosstab(useNA = TRUE) carries an NA category row, and
 # `df[cond, ]` with an NA in cond returns an all-NA ROW rather than dropping it,
 # so `==` silently drags one into every subset and all(c(2, 3, NA) >= 2) is NA.
-st$strength <- as.integer(as.character(st$strength))
+# as.integer() DIRECTLY. crosstab() returns numeric columns with NaN for the
+# useNA group, and as.integer("NaN") is 0 with NO warning where as.integer(NaN)
+# is NA -- so routing through a string publishes a strength of 0 for every
+# category that has none, which is a plausible number and a wrong one.
+stopifnot(is.numeric(st$strength))
+st$strength <- as.integer(st$strength)
 sus <- st[st$category_label %in% "break_sustained", ]
 end <- st[st$category_label %in% "break_endpoint", ]
 stopifnot(nrow(sus) > 0L, nrow(end) > 0L,                 # premise: both present

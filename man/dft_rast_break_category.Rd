@@ -4,7 +4,7 @@
 \alias{dft_rast_break_category}
 \title{Temporal category of every pixel in a break-class scan}
 \usage{
-dft_rast_break_category(x, rule = "v1", filename = NULL)
+dft_rast_break_category(x, rule = "v1", filename = NULL, overwrite = FALSE)
 }
 \arguments{
 \item{x}{The list returned by \code{\link[=dft_rast_break_class]{dft_rast_break_class()}}. \verb{$breaks} supplies
@@ -28,6 +28,10 @@ sidecar is produced — one whose loss is silent, and which the rest of this
 package avoids for that reason. \code{terra::rast(filename)} therefore returns a
 plain integer raster; re-attach labels with the id order in \verb{@return}, or
 keep the object this returns.}
+
+\item{overwrite}{Logical. Replace \code{filename} if it already exists. terra
+refuses by default and its error names this remedy, so the argument has to
+exist for the message to be actionable.}
 }
 \value{
 A two-layer \code{SpatRaster}:
