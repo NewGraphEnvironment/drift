@@ -1,5 +1,31 @@
 # Changelog
 
+## drift 0.14.2
+
+- **Dated disturbance compared against the temporal QA, and the two BULK
+  totals reconciled
+  ([\#67](https://github.com/NewGraphEnvironment/drift/issues/67)).**
+  The published `transition_vector.gpkg` and drift’s own change patches
+  were never in conflict: the published layer is drift’s change layer
+  after a 1 ha *class-agnostic* sieve
+  (`dft_rast_transition(patch_area_min = 10000)`) and a clip to the
+  sub-basin polygon. Re-running both functions from the current tree
+  reproduces the published layer in all four groups — 0 of 53 / 44 / 41
+  / 46 transition classes differ in count, max \|dha\| 0.00 — which
+  closes the “one fact derived twice” problem blocking
+  [\#66](https://github.com/NewGraphEnvironment/drift/issues/66).
+  Against `floodplains`’ dated fire and harvest tags, `break_year` lands
+  at lag 0 or +1 for 86.2% of discriminating fire patches that produced
+  a clean break (106 of 123; 150 tagged, 5 events) and 72.0% of harvest
+  (180 of 250; 308 tagged), with the mode at +1 — the annual-composite
+  lag pre-registered before the distribution was seen. Flicker is
+  markedly *lower* in disturbed patches than in the residual matching no
+  disturbance layer, so it does not support reading flicker as
+  succession. Write-up in
+  [`inst/notes/temporal-qa-disturbance.md`](https://newgraphenvironment.github.io/drift/news/inst/notes/temporal-qa-disturbance.md);
+  evidence in `data-raw/logs/disturbance_compare/`, every number emitted
+  by `data-raw/disturbance_compare.R`. No API change.
+
 ## drift 0.14.1
 
 - **Temporal QA across four watershed groups
