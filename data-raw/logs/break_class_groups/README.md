@@ -103,3 +103,24 @@ the measurements: `flag_sliver`, 0.2-0.6 ha, then either within 15 m of permanen
 in the transition, or beyond 200 m with no Water and `flag_boundary` — median-area candidate, ties
 to the lower `patch_id`. The 0.2-0.6 ha band is deliberate: below 0.1 ha every patch is a sliver,
 so an example from there would illustrate nothing about width.
+
+## The `article-context` stage (drift#73)
+
+`Rscript data-raw/break_class_groups.R article-context`. Everything the article needs to say where
+it is, none of which existed in the package.
+
+The four groups' **names** and boundaries come from one BCDC record (FWA Watershed Groups,
+`51f20b1a-ab75-42de-809d-bf415a0f9c62`) — Bulkley River, Nechako River, Lower North Thompson River
+and Kootenay Lake. Before this the article used the four-letter codes and said so, because no
+source for the names was in the repo.
+
+The **basemap** is one `maptiles` fetch of Esri.WorldShadedRelief at zoom 8, reprojected to the
+group's CRS and written JPEG-compressed: 40 KB against 213 KB for DEFLATE, and lossy costs nothing
+in a photographic backdrop. It is shipped rather than fetched at render time because the article
+must build with no network. A tile service returning a placeholder or a "key required" watermark is
+a 200 that renders as a flat field, so the stage refuses a tile with fewer than 25 grey levels or a
+standard deviation under 5 rather than trusting the status code.
+
+Simplification tolerances are set to well under a rendered pixel at the scale each layer is drawn
+(2 km for the province outline, 1 km for the groups, 60 m for the floodplain), and the results are
+checked for empty and GEOMETRYCOLLECTION geometries, which would draw as nothing and say nothing.

@@ -22,11 +22,15 @@ Produced by `data-raw/break_class_groups.R`, which is not part of the package bu
 | `summary_patch_area_bands.csv` | `article-slivers` | the same, split by area band instead — the control a sieve cannot give |
 | `bulk_slivers.csv` | `article-slivers` | the two example patches, their measurements and the selection rule |
 | `bulk_slivers.rds` | `article-slivers` | `terra::wrap()`ped crops for those two, plus their outlines |
+| `watershed_groups.csv` | `article-context` | the four groups' codes and **names**, with the BCDC record they came from |
+| `watershed_groups.rds` | `article-context` | BC outline, the four group polygons, and the Bulkley floodplain outline, simplified for a locator |
+| `bulk_basemap.tif` | `article-context` | shaded relief behind the floodplain overview, reprojected and JPEG-compressed to 40 KB |
 
 Regenerate with `Rscript data-raw/break_class_groups.R summarize`, then
 `Rscript data-raw/break_class_groups.R article-bulk`, then
 `Rscript data-raw/break_class_groups.R corridor`, then
-`Rscript data-raw/break_class_groups.R article-slivers`.
+`Rscript data-raw/break_class_groups.R article-slivers`, then
+`Rscript data-raw/break_class_groups.R article-context`.
 
 ## The corridor files carry three references, and which one you read is the finding
 

@@ -15,6 +15,7 @@
 #   Rscript data-raw/break_class_groups.R article-bulk  # BULK figure data for the #66 article
 #   Rscript data-raw/break_class_groups.R corridor   # distance-to-channel profile (#73)
 #   Rscript data-raw/break_class_groups.R article-slivers  # sieve table + sliver examples (#73)
+#   Rscript data-raw/break_class_groups.R article-context   # group names, BC locator, basemap (#73)
 #
 # Sample RSS from outside while a group runs (KiB every 2 s):
 #   Rscript data-raw/break_class_groups.R necr > data-raw/logs/break_class_groups/necr/run.log 2>&1 &
@@ -64,9 +65,9 @@ api_url <- "https://images.a11s.one/collections/stac-floodplains-bc/items"
 log_root <- file.path("data-raw", "logs", "break_class_groups")
 
 arg <- commandArgs(trailingOnly = TRUE)[1]
-if (is.na(arg) || !(arg %in% c(names(groups), "summarize", "article-bulk", "corridor", "article-slivers"))) {
+if (is.na(arg) || !(arg %in% c(names(groups), "summarize", "article-bulk", "corridor", "article-slivers", "article-context"))) {
   stop("usage: Rscript data-raw/break_class_groups.R <", paste(names(groups), collapse = "|"),
-       "|summarize|article-bulk|corridor|article-slivers>", call. = FALSE)
+       "|summarize|article-bulk|corridor|article-slivers|article-context>", call. = FALSE)
 }
 
 # --- helpers ---------------------------------------------------------------
@@ -1326,12 +1327,19 @@ if (arg == "article-slivers") {
   ids <- c(water = pickmed(wet), boundary = pickmed(dry))
   message("example slivers: water ", ids[["water"]], ", boundary ", ids[["boundary"]])
 
-  pad <- 25L   # cells of context either side
+  # A FIXED window centred on the patch, not its bounding box plus padding. A
+  # sliver is one cell wide and tens of cells long, so a bbox-based window is as
+  # long as the patch and the patch is then 1% of the frame -- you cannot see
+  # what class is inside it, which is the whole point of the figure. 41 cells is
+  # 410 m at 10 m, so one cell renders as a readable band. The patch runs out of
+  # the frame in the water case, and the caption says so.
+  win_cells <- 41L
   crops <- lapply(names(ids), function(nm) {
     geom <- patches[patches$patch_id == ids[[nm]], ]
-    e <- terra::ext(terra::vect(geom))
     r <- terra::res(res$raster)[1]
-    e2 <- terra::ext(e[1] - pad * r, e[2] + pad * r, e[3] - pad * r, e[4] + pad * r)
+    ctr <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(geom)))[1, ]
+    h <- (win_cells / 2) * r
+    e2 <- terra::ext(ctr[["X"]] - h, ctr[["X"]] + h, ctr[["Y"]] - h, ctr[["Y"]] + h)
     list(from = terra::crop(rasters[["2017"]], e2), to = terra::crop(rasters[["2023"]], e2),
          cat = terra::crop(category, e2), geom = geom["patch_id"])
   })
@@ -1366,6 +1374,101 @@ if (arg == "article-slivers") {
   saveRDS(art, tmp_rds, compress = "xz")
   if (file.size(tmp_rds) > 300e3) {
     stop("sliver artifact is ", round(file.size(tmp_rds) / 1024), " KB, over the 300 KB budget")
+  }
+  if (!file.copy(tmp_rds, out_rds, overwrite = TRUE)) stop("could not write ", out_rds)
+  message("wrote ", out_rds, " (", round(file.size(out_rds) / 1024), " KB)")
+
+  message("ALL STAGES DONE")
+  quit(save = "no", status = 0)
+}
+# --- article context: watershed group identity and a basemap (#73) ----------
+# Two things the article could not say for itself.
+#
+# 1. The four groups were referred to by their four-letter codes because no
+#    source for their names was in the repo. They are FWA watershed groups, so
+#    the name and the geometry come from the same BCDC record, and shipping the
+#    geometry also gives the article a "where in the province" locator.
+# 2. The floodplain overview had no basemap, so a reader with no local
+#    knowledge had nothing to place it against. maptiles fetches one; it is
+#    reprojected, cropped and shipped, because the article must render with no
+#    network.
+
+if (arg == "article-context") {
+  art_dir <- file.path("inst", "extdata", "temporal-composition")
+  dir.create(art_dir, recursive = TRUE, showWarnings = FALSE)
+  fwa_record <- "51f20b1a-ab75-42de-809d-bf415a0f9c62"   # FWA Watershed Groups
+  codes <- toupper(names(groups))
+
+  wg <- bcdata::bcdc_query_geodata(fwa_record) |>
+    bcdata::filter(WATERSHED_GROUP_CODE %in% codes) |>
+    bcdata::collect()
+  wg <- sf::st_transform(wg, 3005)
+  if (nrow(wg) != length(codes)) {
+    stop("expected ", length(codes), " watershed groups, got ", nrow(wg))
+  }
+  nm <- sf::st_drop_geometry(wg)[c("WATERSHED_GROUP_CODE", "WATERSHED_GROUP_NAME")]
+  names(nm) <- c("code", "name")
+  nm$group <- tolower(nm$code)
+  nm <- nm[match(names(groups), nm$group), ]
+  stopifnot(!anyNA(nm$name), identical(nm$group, names(groups)))
+  nm$source <- paste0("BCDC ", fwa_record, " (FWA Watershed Groups)")
+  nm$retrieved <- format(Sys.Date())
+  utils::write.csv(nm, file.path(art_dir, "watershed_groups.csv"), row.names = FALSE)
+  print(nm[c("group", "code", "name")])
+
+  # simplify hard: this is a locator at province scale, where 2 km of boundary
+  # detail is well under one rendered pixel
+  bc <- sf::st_transform(bcmaps::bc_bound(), 3005)
+  bc <- sf::st_simplify(sf::st_union(bc), dTolerance = 2000)
+  wgs <- sf::st_simplify(wg[c("WATERSHED_GROUP_CODE")], dTolerance = 1000)
+  names(wgs)[names(wgs) == "WATERSHED_GROUP_CODE"] <- "code"
+  # st_simplify can produce an invalid ring; a GEOMETRYCOLLECTION or an empty
+  # geometry here would draw as nothing and say nothing about it
+  bc <- sf::st_make_valid(bc); wgs <- sf::st_make_valid(wgs)
+  stopifnot(!any(sf::st_is_empty(bc)), !any(sf::st_is_empty(wgs)),
+            !any(grepl("GEOMETRYCOLLECTION", sf::st_geometry_type(wgs))))
+
+  # --- basemap for the floodplain overview -----------------------------------
+  fp <- sf::st_read(file.path(log_root, "bulk", "floodplain.gpkg"), layer = "co_ff04", quiet = TRUE)
+  ref <- terra::rast(file.path(log_root, "bulk", "classified_2017.tif"))
+  tile <- maptiles::get_tiles(sf::st_transform(fp, 3857), provider = "Esri.WorldShadedRelief",
+                              zoom = 8, crop = TRUE, cachedir = tempdir())
+  # A 200 returning a placeholder or a "key required" watermark is the failure
+  # mode cartography.md records for tile services, and it renders as a flat
+  # field. A real shaded relief has structure; assert it rather than trust the
+  # status code.
+  v <- terra::values(tile)
+  if (length(unique(v[, 1])) < 25 || stats::sd(v[, 1]) < 5) {
+    stop("the basemap tile is nearly flat (", length(unique(v[, 1])),
+         " grey levels) -- a placeholder or watermark, not relief")
+  }
+  tile <- terra::project(tile, terra::crs(ref), method = "bilinear")
+  bmp <- file.path(art_dir, "bulk_basemap.tif")
+  # JPEG rather than DEFLATE: this is a photographic backdrop, so lossy costs
+  # nothing readable and 37 KB against 213 KB is what makes shipping it sane
+  terra::writeRaster(tile, bmp, overwrite = TRUE, datatype = "INT1U",
+                     gdal = c("COMPRESS=JPEG", "JPEG_QUALITY=85", "PHOTOMETRIC=YCBCR"))
+  message("wrote ", bmp, " (", round(file.size(bmp) / 1024), " KB, ",
+          paste(dim(tile)[1:2], collapse = "x"), ")")
+
+  # The floodplain outline, so the overview can put the 1 km cells on a ground
+  # of their own: over shaded relief the lightest bin is indistinguishable from
+  # terrain, and without an outline a reader cannot see the mapped extent where
+  # no cell is drawn at all.
+  fpo <- sf::st_simplify(sf::st_union(sf::st_transform(fp, terra::crs(ref))), dTolerance = 60)
+  fpo <- sf::st_make_valid(fpo)
+  stopifnot(!any(sf::st_is_empty(fpo)),
+            !any(grepl("GEOMETRYCOLLECTION", sf::st_geometry_type(fpo))))
+
+  ctx <- list(bc = bc, groups = wgs, names = nm, floodplain = fpo,
+              meta = data.frame(record = fwa_record, provider = "Esri.WorldShadedRelief",
+                                zoom = 8L, crs = 3005L, date = format(Sys.Date()),
+                                terra = as.character(utils::packageVersion("terra"))))
+  out_rds <- file.path(art_dir, "watershed_groups.rds")
+  tmp_rds <- tempfile(fileext = ".rds")
+  saveRDS(ctx, tmp_rds, compress = "xz")
+  if (file.size(tmp_rds) > 400e3) {
+    stop("context artifact is ", round(file.size(tmp_rds) / 1024), " KB, over the 250 KB budget")
   }
   if (!file.copy(tmp_rds, out_rds, overwrite = TRUE)) stop("could not write ", out_rds)
   message("wrote ", out_rds, " (", round(file.size(out_rds) / 1024), " KB)")
