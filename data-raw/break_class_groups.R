@@ -92,41 +92,7 @@ verify_checksum <- function(path, asset, item_json) {
   invisible(TRUE)
 }
 
-# The four-level vocabulary the committed runs were made under, kept only to READ
-# their output -- read_change() maps it, and passes a five-level file through
-# untouched, so a group re-run after #72 and the files already on disk both work. The closure that produced
-# it is gone: drift::dft_rast_break_category() is the definition now (#72), and
-# the article-bulk stage below asserts it reproduces this run cell for cell.
-# benchmark_break_class_bulk.R is left exactly as it ran -- it is the committed
-# producer of the BULK evidence, not a script to keep current.
-cat_labels <- c("stable", "break_sustained", "break_endpoint", "flicker")
-
-# Every committed summary_change.csv records a run made under that four-level
-# vocabulary, in which `flicker` is every n_flips >= 2 and the two populations
-# are told apart only by the `changed` column. drift >= 0.16.0 names them apart
-# (dft_break_category(), #72). Map on READ rather than rewriting the evidence:
-# those files are the record of what was measured, and the map is a bijection
-# with (changed, four-level), so nothing is lost either way.
-read_change <- function(path) {
-  chg <- utils::read.csv(path, stringsAsFactors = FALSE)
-  lv <- break_category_levels()
-  if (all(chg$category_label %in% lv)) {
-    return(chg)                                   # written by a run since #72
-  }
-  if (!all(chg$category_label %in% cat_labels)) {
-    stop(path, " carries a category_label in neither vocabulary: ",
-         paste(setdiff(chg$category_label, union(lv, cat_labels)), collapse = ", "))
-  }
-  fl <- chg$category_label == "flicker"
-  chg$category_label[fl] <- ifelse(as.integer(chg$changed[fl]) == 1L,
-                                   "unsettled", "stable_flicker")
-  # the map must not collide two rows onto one key, or the comparisons that use
-  # it would compare one row twice
-  if (anyDuplicated(paste(chg$changed, chg$category_label))) {
-    stop("mapping ", path, " to the five-level vocabulary collided two rows")
-  }
-  chg
-}
+source(file.path("data-raw", "read_change.R"))   # cat_labels, read_change()
 
 # effective width of a polygon set in metres: 2 * area / perimeter (a rectangle
 # of width w and length L >> w gives ~w). st_length(st_boundary()) rather than

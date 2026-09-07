@@ -119,3 +119,35 @@ terra refuses to write over an existing file and its error names `overwrite=TRUE
 remedy — which the function did not accept, so the message pointed at something the caller
 could not do. Added `overwrite = FALSE`, wired through both the padded and unpadded write
 paths, and pinned.
+
+### Enumeration, which is what ends the review loop
+
+Rounds 1 and 2 each found a defect inside the previous round's fix, and so did the
+NaN trap. Past that point a quiet round proves nothing (`code-check/SKILL.md`), so the
+loop is closed by enumerating the candidate set rather than by another reviewer.
+
+**Every place the five-level vocabulary is written down as an ordered set:**
+
+| site | derived or duplicated |
+|---|---|
+| `R/dft_break_category.R` `break_category_levels()` | the source of truth — hardcoded, a contract this repo chose |
+| `R/dft_rast_break_category.R` factor ids | derived, `break_category_levels()` |
+| `data-raw/break_class_groups.R` self-checks and labels | derived, `break_category_levels()` |
+| `inst/cartography/drift_temporal.csv` `class_value` | duplicated **by necessity** (a CSV cannot call R) and **asserted equal** in `test-dft_break_category.R` |
+| the article's `keys` / `stopifnot` | duplicated, and asserted against the registry at render |
+| `data-raw/read_change.R` `cat_labels` | the retired FOUR-level set, deliberately frozen — it describes committed files, not the current rule |
+
+The 4->5 map itself had been written twice, in `break_class_groups.R` and in the
+benchmark script — one fact derived twice, the mechanism this whole issue is about,
+reproduced inside the fix for it. Now one `data-raw/read_change.R` sourced by both.
+After the consolidation: `summarize` reproduces all four groups and every article CSV
+byte-identical, `disturbance_compare summarize` byte-identical, and the BULK benchmark
+reproduces `summary_category.csv` and `summary_strength.csv` byte-identical with only
+the timing and RSS traces moving.
+
+**Every guard added, and what turns it red:** the `ncol == 2` pad (removing it, 2
+failures); the flicker split (pooling the levels, 9 failures across 4 tests); the
+matrix-only closure refusal (pinned directly, since both paths give identical values);
+`read_change()`'s three arms (four-level, five-level, neither — all three driven);
+`dft_break_strength()`'s five refusals (each driven); the benchmark's cell-for-cell
+reconciliation (a positive control perturbs a count and requires a mismatch).

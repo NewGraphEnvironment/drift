@@ -32,6 +32,8 @@ suppressMessages({
   pkgload::load_all(".", quiet = TRUE)
 })
 
+source(file.path("data-raw", "read_change.R"))   # the ONE 4->5 vocabulary map
+
 item <- "bulk_co_ff04"
 years <- 2017:2023
 api_url <- "https://images.a11s.one/collections/stac-floodplains-bc/items"
@@ -149,10 +151,7 @@ ct$changed <- as.integer(ct$changed)   # never via as.character(): see below
 ct$category_label <- as.character(ct$category_label)
 tick("crosstab", t4)
 
-ref <- utils::read.csv(ref_change, stringsAsFactors = FALSE)
-fl <- ref$category_label == "flicker"
-ref$category_label[fl] <- ifelse(as.integer(ref$changed[fl]) == 1L,
-                                 "unsettled", "stable_flicker")
+ref <- read_change(ref_change)
 k_now <- paste(ct$changed, ct$category_label)
 k_ref <- paste(ref$changed, ref$category_label)
 if (anyDuplicated(k_now) || anyDuplicated(k_ref)) stop("a (changed, category) key repeats")
