@@ -13,9 +13,12 @@ evidence <- function(res) {
 ev <- evidence(res_cases)
 rownames(ev) <- rownames(cases)
 
-test_that("return shape: raster, breaks, summary", {
+test_that("return shape: raster, breaks, summary, years", {
   expect_type(res_cases, "list")
-  expect_named(res_cases, c("raster", "breaks", "summary"))
+  expect_named(res_cases, c("raster", "breaks", "summary", "years"))
+  # sorted ascending whatever order the caller passed, so every downstream
+  # match() against it is right -- see the unsorted-names test below
+  expect_identical(res_cases$years, years)
   expect_s4_class(res_cases$raster, "SpatRaster")
   expect_equal(terra::nlyr(res_cases$raster), 1)
   expect_true(terra::is.factor(res_cases$raster))
@@ -204,6 +207,9 @@ test_that("unsorted names are sorted by year, not an error", {
   shuffled <- x_cases[c(3, 1, 7, 2, 6, 4, 5)]
   res <- dft_rast_break_class(shuffled, class_table = artifact_class_table())
   expect_equal(evidence(res), ev, ignore_attr = TRUE)
+  # $years must be the SORTED series, not the order passed: dft_break_strength()
+  # match()es break_year against it, so an unsorted copy would mislabel silently
+  expect_identical(res$years, years)
 })
 
 test_that("rasters on a different grid are resampled to the first", {

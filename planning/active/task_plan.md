@@ -59,32 +59,32 @@ single definition — two exports do not make two rules.
 
 ## Phase 1: measurement and row-grain label (pure R, no terra)
 
-- [ ] `R/dft_break_strength.R` — `idx <- match(break_year, years) - 1L`, return `pmin(idx, n - idx)`.
+- [x] `R/dft_break_strength.R` — `idx <- match(break_year, years) - 1L`, return `pmin(idx, n - idx)`.
       `years` sorted/unique/`length >= 2`; `NA_integer_` for `NA`; error on a `break_year` not in
       `years[-1]`. Document the unit as **observations, not years**, and `max_strength = floor(n/2)`.
-- [ ] `R/dft_break_category.R` — takes the result list or a bare `$summary` frame plus `years`.
+- [x] `R/dft_break_category.R` — takes the result list or a bare `$summary` frame plus `years`.
       Adds `category` (factor, id order), `strength` (integer), `rule` (character). Preserves input
       row order. Named errors for missing `from_class`/`to_class` and for a list with no `$years`.
-- [ ] `$years` (sorted) on `dft_rast_break_class()`; update `expect_named()` at
+- [x] `$years` (sorted) on `dft_rast_break_class()`; update `expect_named()` at
       `test-dft_rast_break_class.R:18` and `:90`.
-- [ ] Tests: strength round-trip against `pmin(n_before, n_after)` over every fixture; named
+- [x] Tests: strength round-trip against `pmin(n_before, n_after)` over every fixture; named
       fixtures assert the vocabulary; `flicker` -> `stable_flicker` and `flicker_diff` -> `unsettled`
       (the pooling bug, one pixel each); `na_year` -> `NA` not an error; gapped and `n == 2` series.
 
 ## Phase 2: raster-grain label
 
-- [ ] `R/dft_rast_break_category.R` — one `app()` pass over `c(x$breaks, codes)` emitting
+- [x] `R/dft_rast_break_category.R` — one `app()` pass over `c(x$breaks, codes)` emitting
       `(category, strength)`. Strip the factor with `deepcopy()` + `set.cats(NULL)`.
-- [ ] terra discipline: pad when `ncol == 2L` (measured: a 2-column return on a 2-column raster is
+- [x] terra discipline: pad when `ncol == 2L` (measured: a 2-column return on a 2-column raster is
       read as transposed and silently scrambled); matrix-only refusal; `filename =` on every write;
       `steps = ceiling(ncell / 2.5e6)`; `INT1U`; the parent's `files`/`on.exit` cleanup verbatim;
       factor ids pinned at `0:4` in article order; a `filename =` argument.
-- [ ] Tests: widths 1/2/3 against an arithmetic reference; `NA` round-trips from the written file as
+- [x] Tests: widths 1/2/3 against an arithmetic reference; `NA` round-trips from the written file as
       `NA` not 255; factor id/label table pinned; level set equals `class_value` in
       `inst/cartography/drift_temporal.csv`.
-- [ ] Pixel <-> summary parity on the bundled series (`test-dft_rast_break_class.R:369-396` pins
+- [x] Pixel <-> summary parity on the bundled series (`test-dft_rast_break_class.R:369-396` pins
       3,403 / 1,265 / 2,791 / 1,098 / 776 + 264).
-- [ ] Pin the pooling case from `inst/extdata/temporal-composition/summary_groups.csv`: BULK
+- [x] Pin the pooling case from `inst/extdata/temporal-composition/summary_groups.csv`: BULK
       `changed_ha == 4625.0`, `stable_flicker_ha == 3186.5`, pooled `== 7811.5`. Assert **no single
       level** carries the pooled figure.
 
