@@ -65,7 +65,7 @@ cells, 4.62 ha more changed area, and the three shares within 0.03 of a point
 - Four groups, all whole-WSG areas with a single sub-basin, all IO LULC v02 at 10 m. necr and
   kotl were cut from a gdalcubes cube upstream and bulk and lnth were not (floodplains#83). The
   pixel values read identically, but the two cube-cut groups are also the two that flicker
-  least: `pct_flicker` 39.6 / 42.3 against 44.0 / 48.5, `pct_sustained` 31.0 / 24.7 against
+  least: `pct_unsettled` 39.6 / 42.3 against 44.0 / 48.5, `pct_sustained` 31.0 / 24.7 against
   19.7 / 20.6, and they are the two with no 2017 clouds. With four groups that is one correlated
   signal, and producer path cannot be separated from landscape here — a reason to read the
   between-group spread in Q1 and Q3 as bounded rather than explained, and a comparison for
@@ -89,12 +89,12 @@ cells, 4.62 ha more changed area, and the three shares within 0.03 of a point
 
 ## Q1: split of the 2017 -> 2023 changed area
 
-|group | valid_ha| changed_ha| pct_changed_of_valid| pct_sustained| pct_endpoint| pct_flicker| overstatement_factor| stable_flicker_ha| pct_stable_flicker_of_valid| stable_flicker_over_changed|
-|:-----|--------:|----------:|--------------------:|-------------:|------------:|-----------:|--------------------:|-----------------:|---------------------------:|---------------------------:|
-|bulk  |  41089.7|     4625.0|                11.26|          19.7|         36.4|        44.0|                 5.09|            3186.5|                        7.76|                        0.69|
-|necr  |  41838.1|     5779.4|                13.81|          31.0|         29.4|        39.6|                 3.23|            3828.3|                        9.15|                        0.66|
-|lnth  |  16001.8|     1629.7|                10.18|          20.6|         31.0|        48.5|                 4.86|            1576.7|                        9.85|                        0.97|
-|kotl  |  69377.6|     3537.8|                 5.10|          24.7|         33.1|        42.3|                 4.06|            2235.5|                        3.22|                        0.63|
+|group | valid_ha| changed_ha| pct_changed_of_valid| pct_sustained| pct_endpoint| pct_unsettled| overstatement_factor| stable_flicker_ha| pct_stable_flicker_of_valid| stable_flicker_over_changed|
+|:-----|--------:|----------:|--------------------:|-------------:|------------:|-------------:|--------------------:|-----------------:|---------------------------:|---------------------------:|
+|bulk  |  41089.7|     4625.0|                11.26|          19.7|         36.4|          44.0|                 5.09|            3186.5|                        7.76|                        0.69|
+|necr  |  41838.1|     5779.4|                13.81|          31.0|         29.4|          39.6|                 3.23|            3828.3|                        9.15|                        0.66|
+|lnth  |  16001.8|     1629.7|                10.18|          20.6|         31.0|          48.5|                 4.86|            1576.7|                        9.85|                        0.97|
+|kotl  |  69377.6|     3537.8|                 5.10|          24.7|         33.1|          42.3|                 4.06|            2235.5|                        3.22|                        0.63|
 
 ## Q2: endpoint-only breaks by year
 
@@ -105,14 +105,14 @@ cells, 4.62 ha more changed area, and the three shares within 0.03 of a point
 |lnth  |         272.6|           16.7|         232.1|           14.2|            1.17|               62|                 0|
 |kotl  |         610.6|           17.3|         559.4|           15.8|            1.09|                0|                 5|
 
-## Q3: floodplain shape against the flicker share
+## Q3: floodplain shape against the unsettled share
 
-|group | ff02_km2| ff04_km2| ff06_km2| ff06_over_ff02| ff04_width_m| ff04_perimeter_km| ff04_n_polygons| pct_flicker| pct_sustained| n_flips_sliver| n_flips_wider|
-|:-----|--------:|--------:|--------:|--------------:|------------:|-----------------:|---------------:|-----------:|-------------:|--------------:|-------------:|
-|bulk  |   344.62|   386.42|   414.46|          1.203|        166.5|            4642.6|            5609|        44.0|          19.7|           2.28|          1.94|
-|necr  |   354.39|   396.26|   432.18|          1.220|        186.7|            4245.6|            1718|        39.6|          31.0|           2.20|          1.83|
-|lnth  |   136.25|   151.88|   172.24|          1.264|        196.4|            1546.5|            1761|        48.5|          20.6|           2.23|          2.10|
-|kotl  |   636.82|   675.56|   688.56|          1.081|        423.2|            3192.4|            7226|        42.3|          24.7|           2.03|          1.92|
+|group | ff02_km2| ff04_km2| ff06_km2| ff06_over_ff02| ff04_width_m| ff04_perimeter_km| ff04_n_polygons| pct_unsettled| pct_sustained| n_flips_sliver| n_flips_wider|
+|:-----|--------:|--------:|--------:|--------------:|------------:|-----------------:|---------------:|-------------:|-------------:|--------------:|-------------:|
+|bulk  |   344.62|   386.42|   414.46|          1.203|        166.5|            4642.6|            5609|          44.0|          19.7|           2.28|          1.94|
+|necr  |   354.39|   396.26|   432.18|          1.220|        186.7|            4245.6|            1718|          39.6|          31.0|           2.20|          1.83|
+|lnth  |   136.25|   151.88|   172.24|          1.264|        196.4|            1546.5|            1761|          48.5|          20.6|           2.23|          2.10|
+|kotl  |   636.82|   675.56|   688.56|          1.081|        423.2|            3192.4|            7226|          42.3|          24.7|           2.03|          1.92|
 
 ## Q4: temporal evidence by geometric signature (area-weighted clean-break share)
 

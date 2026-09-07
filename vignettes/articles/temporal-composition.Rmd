@@ -36,7 +36,7 @@ lab <- stats::setNames(tcl$labels, names(pal))
 # and gq accepts it without a warning, so assert the class set rather than
 # assuming the file parsed as intended
 stopifnot(identical(names(pal),
-                    c("stable", "break_sustained", "break_endpoint", "flicker", "stable_flicker")))
+                    c("stable", "break_sustained", "break_endpoint", "unsettled", "stable_flicker")))
 
 b <- grp[grp$group == "bulk", ]
 # published watershed-group codes. Only BULK is named in prose, because only
@@ -106,7 +106,7 @@ op <- graphics::par(mfrow = c(1, 2), mar = c(0.4, 0.4, 1.8, 0.4))
 
 sub <- grid[grid$sustained_ha + grid$endpoint_ha + grid$unsettled_ha > 0, ]
 frac <- sub$unsettled_ha / (sub$sustained_ha + sub$endpoint_ha + sub$unsettled_ha)
-ramp <- grDevices::colorRampPalette(c(pal[["stable"]], pal[["flicker"]]))(100)
+ramp <- grDevices::colorRampPalette(c(pal[["stable"]], pal[["unsettled"]]))(100)
 plot(sub$x, sub$y, pch = 15, cex = 0.28, asp = 1, axes = FALSE, ann = FALSE,
      col = ramp[pmax(1, ceiling(frac * 100))])
 graphics::title("Whole floodplain, 1 km cells", cex.main = 1.15, font.main = 1)
@@ -118,7 +118,7 @@ graphics::legend("bottomleft", title = "share of this cell's\nchange that never 
                  title.cex = 0.9, title.adj = 0)
 
 reach <- terra::unwrap(art$reach)
-keys <- c("stable", "break_sustained", "break_endpoint", "flicker", "stable_flicker")
+keys <- c("stable", "break_sustained", "break_endpoint", "unsettled", "stable_flicker")
 # value-keyed here too: fig_cat codes 0-4 in the order of `keys`
 terra::coltab(reach, layer = 1) <- data.frame(value = 0:4, col = unname(pal[keys]))
 terra::plot(reach, legend = FALSE, axes = FALSE, mar = NA,
@@ -131,7 +131,7 @@ graphics::par(op)
 ```
 
 Across the whole Bulkley floodplain, **`r b$pct_sustained`%** of the changed area is a sustained
-switch. **`r b$pct_endpoint`%** turns on a single endpoint year, and **`r b$pct_flicker`%** never
+switch. **`r b$pct_endpoint`%** turns on a single endpoint year, and **`r b$pct_unsettled`%** never
 settles. Separately, **`r format(round(b$stable_flicker_ha), big.mark = ",")` ha** —
 `r b$pct_stable_flicker_of_valid`% of the floodplain — flickers between classes while reading
 identically in 2017 and 2023.
@@ -139,11 +139,11 @@ identically in 2017 and 2023.
 ## Does Bulkley generalise?
 
 ```{r fig-groups, fig.height = 3.4, fig.cap = "Temporal composition of change in the four watershed groups that publish a complete 2017-2023 series, for all change (left) and for tree loss alone (right). Tree loss is every Trees to non-Trees transition except Trees to Clouds, with no patch-size threshold. Four groups is not a sample; the panel shows that the ordering holds and the magnitude moves."}
-keys3 <- c("break_sustained", "break_endpoint", "flicker")
+keys3 <- c("break_sustained", "break_endpoint", "unsettled")
 all_ch <- data.frame(
   group = rep(grp$group, 3),
   category = rep(keys3, each = nrow(grp)),
-  pct = c(grp$pct_sustained, grp$pct_endpoint, grp$pct_flicker),
+  pct = c(grp$pct_sustained, grp$pct_endpoint, grp$pct_unsettled),
   panel = "All change")
 tl <- tree[tree$class_set == "trees_to_non_trees_excl_clouds", ]
 tl <- data.frame(group = tl$group, category = tl$category, pct = tl$pct_of_set,
@@ -173,8 +173,8 @@ ggplot2::ggplot(dd, ggplot2::aes(x = pct, y = group, fill = category)) +
 ```
 
 The sustained share runs from `r min(grp$pct_sustained)`% to `r max(grp$pct_sustained)`% across
-the four groups, and the unsettled share from `r min(grp$pct_flicker)`% to
-`r max(grp$pct_flicker)`%. The magnitude moves, and in every group the unsettled share is the
+the four groups, and the unsettled share from `r min(grp$pct_unsettled)`% to
+`r max(grp$pct_unsettled)`%. The magnitude moves, and in every group the unsettled share is the
 largest of the three. It is not a fixed ordering below that: sustained change is the smallest
 category in three groups but not in NECR, where endpoint-only change is slightly smaller.
 
@@ -197,7 +197,7 @@ tb <- data.frame(
   Group = unname(group_name[grp$group]),
   `Floodplain (ha)` = round(grp$valid_ha), `Change 2017-2023 (ha)` = round(grp$changed_ha),
   `Sustained (%)` = grp$pct_sustained, `Endpoint-only (%)` = grp$pct_endpoint,
-  `Unsettled (%)` = grp$pct_flicker,
+  `Unsettled (%)` = grp$pct_unsettled,
   `Stable but flickering (ha)` = round(grp$stable_flicker_ha),
   check.names = FALSE)
 knitr::kable(tb, format.args = list(big.mark = ","),

@@ -90,22 +90,22 @@ single definition — two exports do not make two rules.
 
 ## Phase 3: vocabulary and the row-grain callers (one coordinated commit)
 
-- [ ] `inst/cartography/drift_temporal.csv`: `flicker` -> `unsettled`, carrying every column
+- [x] `inst/cartography/drift_temporal.csv`: `flicker` -> `unsettled`, carrying every column
       `gq_reg_custom()` reads.
-- [ ] `break_class_groups.R` summarize stage: delete `temporal_category()`, call
+- [x] `break_class_groups.R` summarize stage: delete `temporal_category()`, call
       `dft_break_category()`.
-- [ ] Equivalence gate from committed `summary_pixels.csv` (243/274/228/230 rows): new category
+- [x] Equivalence gate from committed `summary_pixels.csv` (243/274/228/230 rows): new category
       equals old except `flicker`, which maps to `unsettled` where `changed` and `stable_flicker`
       otherwise, with **cell counts identical**. Not `git diff --exit-code` — the vocabulary changes.
-- [ ] Regenerate `inst/extdata/temporal-composition/*.csv` and
+- [x] Regenerate `inst/extdata/temporal-composition/*.csv` and
       `data-raw/logs/break_class_groups/summary_groups.{csv,md}`; update the article's `keys`,
       `keys3` and `stopifnot` class set.
-- [ ] Docs: `inst/extdata/temporal-composition/README.md:23-43` and `CLAUDE.md:118-120` must name
+- [x] Docs: `inst/extdata/temporal-composition/README.md:23-43` and `CLAUDE.md:118-120` must name
       the export. Reconcile "Confidence" / "sustained" / `strength`.
 
 ## Phase 4: disturbance_compare.R
 
-- [ ] `is_sustained(by)` -> `dft_break_strength(by, years) >= 2`; re-run its summarize stage from
+- [x] `is_sustained(by)` -> `dft_break_strength(by, years) >= 2`; re-run its summarize stage from
       committed logs and require the outputs unchanged.
 
 ## Phase 5: BULK scale test, and the pixel-grain callers

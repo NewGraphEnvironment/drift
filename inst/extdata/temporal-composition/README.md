@@ -20,22 +20,36 @@ Regenerate with `Rscript data-raw/break_class_groups.R summarize`, then
 
 ## Three things worth knowing before quoting these numbers
 
-**The temporal category is composed here, not by the package.** `dft_rast_break_class()` reports
-`break_year`, `n_before`, `n_after` and `n_flips` and applies no threshold; the caller composes.
-For a consecutive series, `break_year` is the first year of the new class, so the series' second
-year leaves `n_before = 1` and its last leaves `n_after = 1` — both fail
-`pmin(n_before, n_after) >= 2` and are **endpoint-only**. Everything between is **sustained**.
-`n_flips >= 2` is **unsettled** (`flicker`). The `summarize` stage refuses to write any of these
-files unless that rollup reproduces each group's committed `summary_change.csv` on integer cell
-counts, and it proves the comparator can fail by perturbing a count and requiring a mismatch.
+**The temporal category is `drift::dft_break_category()`, not this script's own rule.**
+`dft_rast_break_class()` still reports `break_year`, `n_before`, `n_after` and `n_flips` and
+applies no threshold; the composition is a judgement and lives in one exported, versioned place
+(drift#72). `strength` is `pmin(n_before, n_after)` — [`dft_break_strength()`] recovers it from
+`break_year` — and it is thresholded at 2: a clean switch scoring 1 is **endpoint-only**, one
+scoring 2 or more is **sustained**, and `n_flips >= 2` is **unsettled** or **stable_flicker**
+depending on whether the endpoints differ. The `rule` column records which rule produced the
+label, so a CSV written today identifies itself if the rule ever moves.
+
+For a consecutive series that threshold is exactly an endpoint test — `break_year` is the first
+year of the new class, so the series' second year leaves `n_before = 1` and its last leaves
+`n_after = 1` — and the `summarize` stage asserts the two agree rather than assuming it. It then
+refuses to write any of these files unless the rollup reproduces each group's committed
+`summary_change.csv` on integer cell counts, and it proves the comparator can fail by perturbing
+a count and requiring a mismatch.
+
+The committed per-group `summary_change.csv` files predate the export and record a run made under
+a **four-level** vocabulary, in which `flicker` was every `n_flips >= 2` and the two populations
+were told apart only by the `changed` column. They are the record of what was measured and are
+not rewritten; `read_change()` maps them on read, and that map is a bijection with
+`(changed, four-level)`, so nothing is lost either way.
 
 **`class_set` is a column, not a footnote.** Excluding `Trees -> Water` moves the sustained share
 by -1.3 to +6.0 points across the four groups, so a tree-loss share is meaningless without the
 class set it was computed over. Both sets are in the file; the article's headline uses
 `trees_to_non_trees_excl_clouds`, matching the definition the published `gross_loss_ha` uses.
 
-**Five categories, not four.** `cat_fun()`'s category 3 is every pixel with `n_flips >= 2`
-*whether or not the endpoints differ*, so it pools two populations the article has to keep apart:
+**Five categories, not four.** The retired four-level vocabulary's `flicker` was every pixel with
+`n_flips >= 2` *whether or not the endpoints differ*, so it pooled two populations the article has
+to keep apart:
 2,032.9 ha that changed and never settled, and 3,186.5 ha that flickers while reading identical
 at both endpoints. The raster columns and the `.rds` crops therefore carry `unsettled` and
 `stable_flicker` separately. Summing them as one "flicker" overstates changed area by 69% on

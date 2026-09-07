@@ -107,10 +107,12 @@ patch_min_m2 <- 10000
 # break_year 2019, a sustained break), and it called 2022 full when it is partial. The
 # error was caught by the data, not by review. Derived from `years` below, never typed.
 break_years <- years[-1]
-is_sustained <- function(by) {
-  i <- match(by, years) - 1L
-  !is.na(i) & i >= 1L & pmin(i, length(years) - i) >= 2L
-}
+# drift::dft_break_strength() is pmin(n_before, n_after) recovered from the break
+# year, and dft_break_category() thresholds it at 2 to call a switch sustained --
+# so this is that one definition rather than a fourth copy of it (#72). Every
+# caller below intersects with `break_years` first, so the export's refusal of a
+# year outside years[-1] is unreachable here and is a guard, not a branch.
+is_sustained <- function(by) dft_break_strength(by, years) >= 2L
 discriminates <- function(Y) {
   Y <- as.integer(Y)
   if (is.na(Y)) return(NA_character_)
