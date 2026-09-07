@@ -57,10 +57,9 @@ floodplain (BULK) it says that **`r format(round(b$changed_ha), big.mark = ",")`
 `r round(b$pct_changed_of_valid)`% of the mapped floodplain — carried a different class in 2023
 than in 2017. That number is the input to most things anyone wants to ask.
 
-This article is about what is inside it. It is not about *why* land cover changed: attributing a
-patch to a dated fire or cutblock is a separate stage of the same production run, and its results
-are written up separately. What follows is the prior question — whether the change a two-year
-comparison reports is a change that stayed.
+This article is about what is inside that number. Not *why* land cover changed — attributing a
+patch to a dated fire or cutblock is a separate stage, written up separately — but the prior
+question: whether the change a two-year comparison reports is a change that stayed.
 
 ## Looking at every year, not just the ends
 
@@ -108,53 +107,24 @@ years, only part of it behaves that way.
 
 ## The same split across a whole floodplain
 
-```{r fig-map-overview, fig.height = 4.2, fig.cap = "Bulkley floodplain, aggregated to 1 km cells and binned by the share of that cell's changed area that never settles. The box marks the reach shown in the next figure. The floodplain is the drawn area — there is no basemap, so nothing outside the mapped extent is shown."}
+```{r fig-map-overview, fig.height = 3.6, fig.cap = "Where the Bulkley floodplain is and where the next figure looks. The floodplain is the drawn area; there is no basemap, so nothing outside the mapped extent is shown."}
 sub <- grid[grid$sustained_ha + grid$endpoint_ha + grid$unsettled_ha > 0, ]
-frac <- sub$unsettled_ha / (sub$sustained_ha + sub$endpoint_ha + sub$unsettled_ha)
-# A raster, not a point cloud: the cells are a regular 1 km grid, so plotting
-# them as points meant guessing a `cex` that left gaps at one size and overlap
-# at another. And FIVE BINS rather than a continuous ramp -- a 100-step ramp
-# between two light registry colours is unreadable at this size, and the
-# question a reader has ("is this cell mostly settled or mostly not?") is
-# ordinal anyway.
-cuts <- c(0, 0.2, 0.4, 0.6, 0.8, 1)
-bin_lab <- c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%")
-gr <- terra::rast(data.frame(x = sub$x, y = sub$y,
-                             v = as.integer(cut(frac, cuts, include.lowest = TRUE))),
-                  # bulk_window.csv stores the bare EPSG code, not a CRS string;
-                  # terra reads a bare integer as an empty SRS and errors
-                  type = "xyz", crs = paste0("EPSG:", win$crs))
-bins <- grDevices::colorRampPalette(c(pal[["stable"]], pal[["unsettled"]],
-                                      "grey15"))(length(bin_lab) + 1)[seq_along(bin_lab)]
-# The registry's temporal colours are all light -- they were chosen to sit under
-# black outlines as category fills, not to carry an ordered scale. Ramping
-# stable -> unsettled alone spans 29 points of luminance, which at this cell
-# size is unreadable; carrying the ramp on into a dark neutral spans 54 and the
-# bins separate. `grey15` is a neutral endpoint, not a fifth category colour, so
-# no registry value is overridden and no hex literal enters this file.
-terra::coltab(gr, layer = 1) <- data.frame(value = seq_along(bin_lab), col = bins)
-op <- graphics::par(mar = c(0.4, 0.4, 0.4, 0.4))
+# A LOCATOR, not a choropleth. This started as the same cells shaded by their
+# unsettled share, and it did not earn the space: 1 km blocks average over the
+# thing that turns out to drive the pattern -- distance to a class boundary,
+# tens of metres -- so the shading showed blobby variation with no readable
+# signal, and the corridor figure below answers the same question directly.
+gr <- terra::rast(data.frame(x = sub$x, y = sub$y, v = 1L), type = "xyz",
+                  crs = paste0("EPSG:", win$crs))
+# a neutral, deliberately NOT a category colour: this layer means "floodplain",
+# and painting it `unsettled` pink would imply a reading it no longer carries
+terra::coltab(gr, layer = 1) <- data.frame(value = 1L, col = "grey55")
+op <- graphics::par(mar = c(0.3, 0.3, 0.3, 0.3))
 terra::plot(gr, legend = FALSE, axes = FALSE, mar = NA)
 e <- terra::ext(gr)
 graphics::rect(win$reach_xmin, win$reach_ymin, win$reach_xmax, win$reach_ymax,
                border = "black", lwd = 2)
-graphics::text(win$reach_xmax, win$reach_ymax, "reach below", pos = 4, cex = 0.85, offset = 0.35)
-# EXPLICIT user coordinates, not a keyword position: terra::plot() leaves the
-# device in a state where a keyword-placed legend lands outside the visible
-# region and silently draws nothing -- the first version of this figure
-# published with no legend at all.
-# Position measured, not guessed: binning the occupied 1 km cells onto a 10x10
-# grid of the extent, the blocks x 0-0.6 by y 0-0.2 and x 0.6-1 by y 0.6-1 are
-# the two that are entirely empty. The top-right one is 0.4 x 0.4 and the
-# bottom-left 0.6 x 0.2; a five-entry legend with a two-line title needs about
-# 0.32 of the height, so only the top-right one fits it. Three earlier
-# placements -- the "bottomleft" keyword, the top-left corner, and bottom-left
-# by coordinate -- landed on floodplain, on floodplain, and clipped off the
-# bottom of the device respectively.
-graphics::legend(x = e[1] + 0.62 * (e[2] - e[1]), y = e[4],
-                 title = "share of this cell's change\nthat never settles",
-                 legend = bin_lab, fill = bins, bty = "n", cex = 0.85,
-                 title.cex = 0.85, title.adj = 0, xpd = NA)
+graphics::text(win$reach_xmax, win$reach_ymax, "reach below", pos = 4, cex = 0.9, offset = 0.4)
 graphics::par(op)
 ```
 
@@ -167,16 +137,19 @@ op <- graphics::par(mar = c(0.4, 0.4, 0.4, 0.4))
 terra::plot(reach, legend = FALSE, axes = FALSE, mar = NA)
 # topleft: the reach runs bottom-left to top-right, so this is the empty corner.
 # At bottom-left the legend sat on top of the floodplain.
-graphics::legend("topleft", legend = unname(lab[keys]), fill = unname(pal[keys]),
-                 bty = "n", cex = 0.95)
+# explicit user coordinates, not a keyword: terra::plot() leaves the device in a
+# state where a keyword-placed legend silently draws nothing, which is how the
+# overview above shipped with no legend at all
+er <- terra::ext(reach)
+graphics::legend(x = er[1], y = er[4], legend = unname(lab[keys]), fill = unname(pal[keys]),
+                 bty = "n", cex = 0.95, xpd = NA)
 graphics::par(op)
 ```
 
-Across the whole Bulkley floodplain, **`r b$pct_sustained`%** of the changed area is a sustained
-switch. **`r b$pct_endpoint`%** turns on a single endpoint year, and **`r b$pct_unsettled`%** never
-settles. Separately, **`r format(round(b$stable_flicker_ha), big.mark = ",")` ha** —
-`r b$pct_stable_flicker_of_valid`% of the floodplain — flickers between classes while reading
-identically in 2017 and 2023.
+Across the whole Bulkley floodplain **`r b$pct_sustained`%** of the changed area is a sustained
+switch, **`r b$pct_endpoint`%** turns on a single endpoint year, and **`r b$pct_unsettled`%** never
+settles. Separately, **`r format(round(b$stable_flicker_ha), big.mark = ",")` ha** flickers while
+reading identically in 2017 and 2023.
 
 ## Does Bulkley generalise?
 
@@ -214,17 +187,14 @@ ggplot2::ggplot(dd, ggplot2::aes(x = pct, y = group, fill = category)) +
                  panel.spacing.x = grid::unit(1.4, "lines"))
 ```
 
-The sustained share runs from `r min(grp$pct_sustained)`% to `r max(grp$pct_sustained)`% across
-the four groups, and the unsettled share from `r min(grp$pct_unsettled)`% to
-`r max(grp$pct_unsettled)`%. The magnitude moves, and in every group the unsettled share is the
-largest of the three. It is not a fixed ordering below that: sustained change is the smallest
-category in three groups but not in NECR, where endpoint-only change is slightly smaller.
+The magnitudes move across the four groups, but the unsettled share is the largest of the three
+everywhere. The ordering below that is not fixed: sustained change is smallest in three groups and
+not in NECR.
 
-For tree loss the picture is the same shape but shifted: sustained shares of
+Tree loss is the same shape, shifted: sustained shares of
 `r paste0(round(min(tl$pct[tl$category == "break_sustained"])), "-", round(max(tl$pct[tl$category == "break_sustained"])), "%")`.
-Shares are quoted rather than hectares because the two are not equally robust — excluding Trees to
-Water alone moves the sustained share by up to `r round(max(shift))` points, which is why the class
-set is stated in the caption.
+Shares rather than hectares, because excluding Trees to Water alone moves the sustained share by up
+to `r round(max(shift))` points — hence the class set stated in the caption.
 
 > **Two totals circulate for Bulkley tree loss, and they measure different populations.** The
 > published item property `gross_loss_ha` is 1,565.1 ha: patches, after a 1 ha sieve and a
@@ -267,21 +237,19 @@ as well as one-cell strips — and they carry only `r rng(sl_a)`% of the changed
 also flicker more than wider patches (`r rng(nf_s, 2)` switches against `r rng(nf_w, 2)`) and
 settle less often (`r rng(bf_s, 3)` of their area is a clean break, against `r rng(bf_w, 3)`).
 
-They are also very small. The median sliver is `r rng(med_cells, 0)` cells. That matters, because
-the usual conservative move is not to filter on shape at all but to drop small patches by area —
-the published change layer already discards everything under a hectare. **That sieve keeps
+They are also very small — the median sliver is `r rng(med_cells, 0)` cells. That matters, because
+the usual conservative move is not to filter on shape but to drop small patches by area, and the
+published change layer already discards everything under a hectare. **That sieve keeps
 `r rng(s1$pct_patches_kept, 1)`% of the patches and `r rng(s1$pct_area_kept, 1)`% of the changed
-area, and only `r rng(s1$pct_kept_sliver, 1)`% of what survives is a sliver.** So for anyone
-working from the sieved layer, this population is already gone; and the sieve is discarding a third
-to a half of the changed area to do it.
+area, and only `r rng(s1$pct_kept_sliver, 1)`% of what survives is a sliver** — so it removes this
+population wholesale, at the cost of a third to a half of the change.
 
-Holding area fixed instead of sieving is what separates the two ideas, and it undoes the result.
-Below a tenth of a hectare all but `r n_wider_small` of `r format(n_small, big.mark = ",")` patches
-are slivers, so width distinguishes nothing there. Above
-a fifth of a hectare, where narrow and compact patches of the same size both exist in numbers, the
-gap does not merely shrink — it **reverses** in `r n_rev` of the `r nrow(abv)` group-and-size cells
-where both populations are large enough to compare: narrow patches settle *more* often than compact
-ones of the same area. Width was standing in for size.
+Holding area fixed instead of sieving separates the two ideas, and it undoes the result. Below a
+tenth of a hectare all but `r n_wider_small` of `r format(n_small, big.mark = ",")` patches are
+slivers, so width distinguishes nothing. Above a fifth of a hectare it does not merely shrink but
+**reverses**, in `r n_rev` of the `r nrow(abv)` group-and-size cells with enough of both to
+compare: narrow patches settle *more* often than compact ones of the same area. Width was standing
+in for size.
 
 A second geometric signature asks whether a patch traces a pre-existing boundary between the two
 classes rather than cutting across one. It does not generalise either: tracing patches settle less
@@ -331,12 +299,10 @@ graphics::par(op)
 graphics::layout(1)
 ```
 
-One is a ribbon along a channel margin and the other an arc on the edge of a clearing thirteen
-kilometres from any water, and they are the same object to the width test: one to two cells across,
-tracing an interface that was already there. That is the point. Geometry alone does not say whether
-a thin patch is a mixed pixel at a water margin, a registration artifact, or a real narrow change —
-and the two panels on the right show the settings differ in *when* they move, which is the axis the
-shape tests cannot see.
+One is a ribbon along a channel margin, the other an arc on the edge of a clearing thirteen
+kilometres from any water — and to the width test they are the same object: one to two cells
+across, tracing an interface that was already there. Shape alone cannot say whether a thin patch is
+a mixed pixel, a registration artifact, or a real narrow change.
 
 ## Where the instability sits
 
@@ -384,54 +350,71 @@ class alone — a Trees pixel can never be part of the water reference, so the c
 measuring its own definition — flicker runs `r rng(tnear, 1)`% in the first ten metres beside
 permanent water against `r rng(tfar, 1)`% more than five hundred metres away, falling in every band.
 
-The null settles how to read that. Against a from-epoch class boundary with **no water on either
-side** the same gradient appears, and falls further: `r rng(enear, 1)`% in the first ten metres to
-`r rng(efar, 1)`% beyond five hundred. The water profile sits above it throughout and levels off near
-`r rng(wfar, 1)`% — what a cell far from the river but near some other boundary looks like. So a
-water margin is the most unstable edge, not a different kind of thing. Flicker
-concentrates at class boundaries, and the channel is simply the longest, most sinuous,
-highest-contrast boundary a floodplain has — the corridor is an edge effect in a river's shape.
+The null settles how to read that. Against a boundary with **no water on either side** the same
+gradient appears and falls further — `r rng(enear, 1)`% in the first ten metres to
+`r rng(efar, 1)`% beyond five hundred. The water profile sits above it throughout and levels off
+near `r rng(wfar, 1)`%, which is what a cell far from the river but near some other boundary looks
+like. A water margin is the most unstable edge, not a different kind of thing: flicker concentrates
+at class boundaries, and the channel is the longest and most sinuous one a floodplain has.
 
 Nor does the near-channel change look like a channel that moved. A migrating bank would date its
 switches progressively outward; instead the mean year of a sustained break beside permanent water
 is *later* than one far away, in all four groups — the opposite of a walk.
 
-## What this means for a quoted hectare
+## What this means for a hectare figure
 
 ```{r tbl-groups}
 tb <- data.frame(
   Group = unname(group_name[grp$group]),
-  `Floodplain (ha)` = round(grp$valid_ha), `Change 2017-2023 (ha)` = round(grp$changed_ha),
+  `Floodplain (ha)` = round(grp$valid_ha),
+  `Reported change (ha)` = round(grp$changed_ha),
   `Sustained (%)` = grp$pct_sustained, `Endpoint-only (%)` = grp$pct_endpoint,
   `Unsettled (%)` = grp$pct_unsettled,
-  `Stable but flickering (ha)` = round(grp$stable_flicker_ha),
+  `Unsettled, endpoints agree (ha)` = round(grp$stable_flicker_ha),
   check.names = FALSE)
 knitr::kable(tb, format.args = list(big.mark = ","),
-             caption = "Exact values behind this article. Every cell is a column of a CSV shipped with the package and written by a committed script.")
+             caption = "Exact values behind this article; every cell is a column of a CSV shipped with the package and written by a committed script. Reported change is the area the classifier labelled differently in 2023 than in 2017. The three percentages are shares of that area and add to 100. The last column is a separate population and is NOT part of that area, nor the sum of any of the others: it is land that changed class during the series but reads the same in 2017 as in 2023, so a two-year comparison never reports it. It carries the same name as its category in the maps above.")
 ```
 
-A hectare figure from a two-year comparison is not wrong, but it answers a narrower question than
-it appears to: *how much area carried a different label in the second year*. On these four
-floodplains, between a fifth and a third of that area is change that stayed put for at least two
-years on each side. Where the question is durable land-cover change, the sustained share is the
-number to reach for — and where it is disturbance extent in a particular year, the endpoint-only
-share matters, because a genuine final-year change lives there.
+## What the seven-year view shows
 
-## What this does not support
+- **Reported change is area the classifier labelled differently in 2023 than in 2017** —
+  `r format(round(b$changed_ha), big.mark = ",")` ha on BULK. That is a measurement of two labels
+  disagreeing, not of land cover having changed and stayed changed.
+- **Between a fifth and a third of it is a switch that held** — `r rng(grp$pct_sustained, 1)`%
+  across the four floodplains, one class for at least two years before and after. This is the
+  number to use for durable change.
+- **About a third is a single-year switch at one end of the series**
+  (`r rng(grp$pct_endpoint, 1)`%). Some of that is real change in the last year and some is label
+  noise, and the endpoints alone cannot separate them.
+- **Between a third and a half never settles** (`r rng(grp$pct_unsettled, 1)`%): the class moves
+  two or more times in seven years and lands somewhere different from where it started.
+- **A comparable area flickers and is never reported at all.** On BULK,
+  `r format(round(b$stable_flicker_ha), big.mark = ",")` ha changes class mid-series and reads
+  identically in 2017 and 2023. A two-year comparison is blind to it, so instability is more
+  common than the change total suggests — not less.
+- **The instability sits on class boundaries, not on the river.** It rises steeply toward the
+  channel and just as steeply toward any boundary with no water in it. The channel is the longest,
+  most sinuous edge a floodplain has, which is why the noise draws its outline.
+- **Neither shape test separates it.** Narrow patches look unsettled only because they are small;
+  at equal area the effect reverses. Boundary-tracing patches separate in three groups of four.
+  Dropping small patches — the usual conservative fix — removes most of the patches and about
+  half the changed area without addressing the cause.
 
-Four groups is not a sample, and nothing here is a statistical inference; the four are simply the
-groups that publish a complete series. Two of them were produced through a different processing
-path than the other two and return lower unsettled fractions, so processing and landscape cannot
-be separated at this size. And an endpoint-only switch is not evidence of a labelling error: a
-real change in the last year of the series produces exactly the same signature, and this method
-cannot tell the two apart.
+## What it does not show
 
-The spatial results carry their own limits. Distance is measured from permanent water rather than
-a mapped stream network, and in one group two thirds of the floodplain is a regulated lake. The stable share of a near band is biased downward by construction, because every
-permanent-water pixel sits in the reference rather than in the bands — which is why the number
-above is taken within Trees. And an edge effect is not a cause: nothing separates a boundary a
-classifier renders inconsistently from one that genuinely moved, and the break dates rule out only
-the steady outward walk.
+- **Not a sample.** Four floodplains, chosen because they are the ones publishing a complete
+  seven-year series. No statistical inference is drawn from four.
+- **Endpoint-only is not proof of error.** A genuine change in the final year leaves exactly the
+  same signature as a one-year mislabel, and nothing here tells them apart.
+- **Processing and landscape are tangled.** Two of the four came through a different upstream path
+  and return lower unsettled shares. With four groups that cannot be separated from the landscape.
+- **The channel is a proxy.** Distance is measured from water that is present in all seven years,
+  not from a mapped stream network — and in one of the four, two thirds of the floodplain is a
+  regulated lake rather than a river.
+- **An edge effect is not a cause.** Nothing here distinguishes a boundary the classifier renders
+  inconsistently from one that genuinely moved back and forth. The break dates rule out only a
+  steady outward migration.
 
 ```{r wordcount, include = FALSE}
 f <- knitr::current_input()
