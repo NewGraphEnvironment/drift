@@ -88,12 +88,12 @@ dft_break_strength <- function(break_year, years) {
     stop("`break_year` must be numeric, not ", class(break_year)[1], ".",
          call. = FALSE)
   }
-  if (any(!is.na(break_year) & (!is.finite(break_year) |
-                                break_year != trunc(break_year)))) {
+  frac <- !is.na(break_year) &
+    (!is.finite(break_year) | break_year != trunc(break_year))
+  if (any(frac)) {
     stop("`break_year` must be whole years; got ",
-         paste(utils::head(sort(unique(break_year[!is.na(break_year) &
-           (!is.finite(break_year) | break_year != trunc(break_year))])), 3),
-           collapse = ", "), ".", call. = FALSE)
+         paste(utils::head(sort(unique(break_year[frac])), 3), collapse = ", "),
+         ".", call. = FALSE)
   }
   break_year <- as.integer(break_year)
   n <- length(years)

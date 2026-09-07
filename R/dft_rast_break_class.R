@@ -273,7 +273,7 @@ dft_rast_break_class <- function(x,
     )
     files <- setdiff(files, out_file)
     return(list(raster = r_trans, breaks = out[[2:5]], summary = summary_tbl,
-         years = years))
+                years = years))
   }
 
   code <- as.integer(ct$code)
@@ -304,7 +304,7 @@ dft_rast_break_class <- function(x,
 
   files <- setdiff(files, out_file)
   list(raster = r_trans, breaks = out[[2:5]], summary = summary_tbl,
-         years = years)
+       years = years)
 }
 
 #' Build the per-chunk scan function for [dft_rast_break_class()]

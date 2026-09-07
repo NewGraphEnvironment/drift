@@ -92,22 +92,13 @@ verify_checksum <- function(path, asset, item_json) {
   invisible(TRUE)
 }
 
-# 1 = clean break sustained >= 2 years each side, 2 = clean break with one
-# endpoint the odd year out, 3 = flicker, 0 = stable (n_flips == 0). Copied
-# verbatim from data-raw/benchmark_break_class_bulk.R: that script is the
-# committed producer of the BULK evidence and is left as it ran; the summarize
-# stage's reconciliation row is what would show the two drifting apart.
-cat_fun <- function(v) {
-  # refuse a bare vector: terra::app() otherwise runs this once per CELL
-  if (!is.matrix(v)) stop("matrix chunks only")
-  nf <- v[, 4]
-  out <- rep(NA_integer_, nrow(v))
-  out[!is.na(nf) & nf == 0] <- 0L
-  out[!is.na(nf) & nf >= 2] <- 3L
-  one <- !is.na(nf) & nf == 1
-  out[one] <- ifelse(pmin(v[one, 2], v[one, 3]) >= 2, 1L, 2L)
-  out
-}
+# The four-level vocabulary the committed runs were made under, kept only to READ
+# their output -- read_change() maps it, and passes a five-level file through
+# untouched, so a group re-run after #72 and the files already on disk both work. The closure that produced
+# it is gone: drift::dft_rast_break_category() is the definition now (#72), and
+# the article-bulk stage below asserts it reproduces this run cell for cell.
+# benchmark_break_class_bulk.R is left exactly as it ran -- it is the committed
+# producer of the BULK evidence, not a script to keep current.
 cat_labels <- c("stable", "break_sustained", "break_endpoint", "flicker")
 
 # Every committed summary_change.csv records a run made under that four-level
@@ -118,9 +109,13 @@ cat_labels <- c("stable", "break_sustained", "break_endpoint", "flicker")
 # with (changed, four-level), so nothing is lost either way.
 read_change <- function(path) {
   chg <- utils::read.csv(path, stringsAsFactors = FALSE)
+  lv <- break_category_levels()
+  if (all(chg$category_label %in% lv)) {
+    return(chg)                                   # written by a run since #72
+  }
   if (!all(chg$category_label %in% cat_labels)) {
-    stop(path, " carries a category_label outside the four-level vocabulary: ",
-         paste(setdiff(chg$category_label, cat_labels), collapse = ", "))
+    stop(path, " carries a category_label in neither vocabulary: ",
+         paste(setdiff(chg$category_label, union(lv, cat_labels)), collapse = ", "))
   }
   fl <- chg$category_label == "flicker"
   chg$category_label[fl] <- ifelse(as.integer(chg$changed[fl]) == 1L,
@@ -449,10 +444,10 @@ if (arg == "summarize") {
 
 
 # --- article BULK figure data (#66) ----------------------------------------
-# Figures 1 and 2 of the pkgdown article. Runs the same scan the per-group
-# stage runs, on the same published COGs, and reuses cat_fun()/cat_labels as
-# the SAME objects rather than a copy -- a second copy of that closure is the
-# likeliest place for a silent divergence from the committed numbers.
+# Figures 1 and 2 of the pkgdown article. Runs the same scan the per-group stage
+# runs, on the same published COGs, and composes the category with
+# drift::dft_rast_break_category() -- the package's one definition, so there is
+# no second copy of the closure to diverge from the committed numbers.
 #
 # Needs ~16 GiB of RAM and the gitignored BULK COGs, so it never runs in CI.
 # Same posture as data-raw/vignette_data_break.R.
@@ -473,50 +468,55 @@ if (arg == "article-bulk") {
   res <- dft_rast_break_class(classified)
   cell_ha <- prod(terra::res(res$raster)) * 1e-4
 
-  category <- terra::app(res$breaks, fun = cat_fun, filename = tempfile(fileext = ".tif"),
-                         wopt = list(datatype = "INT1U"))
+  # Five levels, ids 0:4 -- the split the four-level run could not express is
+  # already in here, so the old two-pass cat_fun() + fig_fun() composition is
+  # one call. crosstab() and segregate() below want the integer codes, and
+  # crosstab() reports LABELS the moment a layer is a factor, so keep a
+  # levels-free copy for them. deepcopy() then set.cats() in place is one copy.
+  cat5 <- dft_rast_break_category(res, filename = tempfile(fileext = ".tif"))
+  category <- terra::deepcopy(cat5[["category"]])
+  terra::set.cats(category, layer = 1, value = NULL)
+
   codes <- terra::deepcopy(res$raster)
-  levels(codes) <- NULL
-  changed <- terra::app(codes, fun = function(v) as.integer((v %/% 1000L) != (v %% 1000L)),
-                        filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+  terra::set.cats(codes, layer = 1, value = NULL)
+  # refuse a bare vector: app() tries apply(chunk, 1, fun) FIRST and only falls
+  # back to fun(chunk) when that errors, so a closure that tolerates a scalar
+  # runs once per cell -- 169M R calls here, with identical values and nothing
+  # in the output to say which path ran.
+  changed <- terra::app(codes, fun = function(v) {
+    if (!is.matrix(v)) stop("matrix chunks only")
+    as.integer((v[, 1] %/% 1000L) != (v[, 1] %% 1000L))
+  }, filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
 
   # --- self-check BEFORE deriving anything -----------------------------------
   # If this run does not reproduce the committed BULK numbers cell for cell,
   # every figure below is drawn from a different raster than the article's
-  # tables describe, and nothing downstream would say so.
+  # tables describe, and nothing downstream would say so. `changed` is derived
+  # from the transition layer rather than read off the category, so this is not
+  # the category compared against itself.
   ct <- terra::crosstab(c(changed, category), long = TRUE, useNA = TRUE)
   names(ct) <- c("changed", "category", "n_cells")
   ct <- ct[!is.na(ct$changed), ]
-  ct$category_label <- cat_labels[ct$category + 1L]
-  ref <- utils::read.csv(file.path(out_dir, "summary_change.csv"), stringsAsFactors = FALSE)
+  ct$category_label <- break_category_levels()[as.integer(as.character(ct$category)) + 1L]
+  ref <- read_change(file.path(out_dir, "summary_change.csv"))
   k_now <- paste(as.integer(ct$changed), ct$category_label)
   k_ref <- paste(ref$changed, ref$category_label)
   if (anyDuplicated(k_now) || anyDuplicated(k_ref) || !setequal(k_now, k_ref)) {
     stop("category sets differ from the committed BULK run: (",
-         paste(setdiff(k_ref, k_now), collapse = ", "), ") missing")
+         paste(setdiff(k_ref, k_now), collapse = ", "), ") missing, (",
+         paste(setdiff(k_now, k_ref), collapse = ", "), ") unexpected")
   }
   if (!identical(as.integer(ct$n_cells), as.integer(ref$n_cells[match(k_now, k_ref)]))) {
     stop("this run does not reproduce ", out_dir, "/summary_change.csv cell for cell")
   }
   message("reproduces the committed BULK summary_change.csv cell for cell")
 
-  # cat_fun's category 3 is EVERY pixel with n_flips >= 2, whether or not the
-  # endpoints differ, so it pools two populations the article must keep apart:
-  # 2032.93 ha of changed-but-unsettled and 3186.53 ha that flickers while
-  # reading identical at both endpoints. Summing it as "flicker" overstated
-  # changed area by 69% and the conservation check below is what caught it.
-  fig_fun <- function(v) {
-    if (!is.matrix(v)) stop("matrix chunks only")   # or app() runs once per cell
-    ch <- v[, 1]
-    ca <- v[, 2]
-    out <- rep(NA_integer_, nrow(v))
-    ok <- !is.na(ch) & !is.na(ca)
-    out[ok] <- ifelse(ch[ok] == 1L, ca[ok], ifelse(ca[ok] == 3L, 4L, 0L))
-    out
-  }
-  fig_cat <- terra::app(c(changed, category), fun = fig_fun,
-                        filename = tempfile(fileext = ".tif"),
-                        wopt = list(datatype = "INT1U"))
+  # The two populations the four-level vocabulary pooled: 2032.93 ha of
+  # changed-but-unsettled and 3186.53 ha that flickers while reading identical
+  # at both endpoints. Summing them as one "flicker" overstated changed area by
+  # 69%, and the conservation check below is what caught it. The figure raster
+  # IS the five-level category now -- there is no second composition step.
+  fig_cat <- category
 
   # --- per-patch temporal composition ----------------------------------------
   patches <- dft_transition_vectors(res$raster, changes_only = TRUE)
@@ -536,11 +536,18 @@ if (arg == "article-bulk") {
     wide[[cn]][is.na(wide[[cn]])] <- 0L
   }
   wide$n_tot <- wide$n_cells.1 + wide$n_cells.2 + wide$n_cells.3
-  # a change patch has from != to at the endpoints, so n_flips >= 1 and category
-  # 0 (stable) is structurally impossible inside one. Assert it rather than
-  # assume it -- if it ever appears, the shares below have a missing denominator.
-  if ("n_cells.0" %in% names(wide) && sum(wide$n_cells.0, na.rm = TRUE) > 0) {
-    stop("stable cells inside a change patch; the composition denominator is wrong")
+  # Every pixel of a change patch has from != to at the endpoints, so n_flips >= 1
+  # and BOTH the categories defined by equal endpoints -- 0 (stable) and 4
+  # (stable_flicker) -- are structurally impossible inside one. Assert it rather
+  # than assume it: if either appears, the shares below have a missing
+  # denominator. The five-level vocabulary adds the second arm; under four
+  # levels those pixels were pooled into 3 and this check could not see them.
+  for (k in c(0L, 4L)) {
+    cn <- paste0("n_cells.", k)
+    if (cn %in% names(wide) && sum(wide[[cn]], na.rm = TRUE) > 0) {
+      stop(break_category_levels()[k + 1L], " cells inside a change patch; ",
+           "the composition denominator is wrong")
+    }
   }
 
   cand <- merge(sf::st_drop_geometry(patches)[c("patch_id", "transition", "area_ha")],
@@ -669,7 +676,10 @@ if (arg == "article-bulk") {
   }
   # the population that the pooled category 3 was hiding, asserted separately
   sf_ha <- sum(grid$stable_flicker_ha)
-  ref_sf <- sum(ref$n_cells[ref$changed == 0 & ref$category_label == "flicker"]) * cell_ha
+  # `stable_flicker` after read_change(); the four-level files spelled it
+  # `flicker` and told it apart from the changed half by the `changed` column
+  # alone, which is the pooling this vocabulary exists to prevent
+  ref_sf <- sum(ref$n_cells[ref$category_label == "stable_flicker"]) * cell_ha
   if (abs(sf_ha - ref_sf) > cell_ha / 2) {
     stop("stable-flicker hectares in the 1 km grid (", round(sf_ha, 1), ") do not match the ",
          "committed total (", round(ref_sf, 1), ")")
@@ -815,17 +825,28 @@ print(byyr)
 
 # --- 4. Endpoint-changed pixels by temporal category (Q1) ----
 t1 <- Sys.time()
-category <- terra::app(res$breaks, fun = cat_fun, filename = tempfile(fileext = ".tif"),
-                       wopt = list(datatype = "INT1U"))
+# drift::dft_rast_break_category(), the package's one definition (#72). Five
+# levels: what this stage used to write as `flicker` is now `unsettled` where
+# the endpoints differ and `stable_flicker` where they agree. `changed` stays,
+# because it is a fact about the row and because read_change() needs it to map
+# the four-level files already committed.
+cat5 <- dft_rast_break_category(res, filename = tempfile(fileext = ".tif"))
+category <- terra::deepcopy(cat5[["category"]])
+terra::set.cats(category, layer = 1, value = NULL)   # crosstab reports LABELS on a factor
 codes <- terra::deepcopy(res$raster)
-levels(codes) <- NULL
-changed <- terra::app(codes, fun = function(v) as.integer((v %/% 1000L) != (v %% 1000L)),
-                      filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+terra::set.cats(codes, layer = 1, value = NULL)
+# refuse a bare vector, or app() runs this once per CELL -- 169M R calls on a
+# floodplain grid, with identical values and nothing in the output to say so
+changed <- terra::app(codes, fun = function(v) {
+  if (!is.matrix(v)) stop("matrix chunks only")
+  as.integer((v[, 1] %/% 1000L) != (v[, 1] %% 1000L))
+}, filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
 ct <- terra::crosstab(c(changed, category), long = TRUE, useNA = TRUE)
 names(ct) <- c("changed", "category", "n_cells")
 ct <- ct[!is.na(ct$changed), ]
+ct$category <- as.integer(as.character(ct$category))
 ct$area_ha <- ct$n_cells * cell_ha
-ct$category_label <- cat_labels[ct$category + 1L]
+ct$category_label <- break_category_levels()[ct$category + 1L]
 ct$pct_of_changed <- NA_real_
 chg <- ct$changed == 1
 ct$pct_of_changed[chg] <- round(100 * ct$n_cells[chg] / sum(ct$n_cells[chg]), 2)

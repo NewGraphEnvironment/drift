@@ -5,14 +5,24 @@
 #' mapped, patched, or crossed against anything else on the grid.
 #'
 #' @param x The list returned by [dft_rast_break_class()]. `$breaks` supplies
-#'   the measurements, `$raster` whether the endpoints differ, and `$years` the
-#'   series the endpoint threshold is relative to.
+#'   the measurements and `$raster` whether the endpoints differ. `$years` is
+#'   **not** needed here and not required: `n_before` and `n_after` are measured
+#'   per pixel, so the strength is read off them rather than recovered from
+#'   `break_year` the way [dft_break_category()] must do at row grain. A result
+#'   saved before drift 0.16.0 therefore works unchanged.
 #' @param rule Character. The labelling rule; only `"v1"` exists. Recorded on
 #'   the result as the `drift_break_rule` metadata tag, and implied by the
 #'   category level labels themselves.
 #' @param filename Character or `NULL`. Where to write the result. A
 #'   floodplain-scale grid is worth putting somewhere you chose; `NULL` writes
 #'   a temporary file that R removes at the end of the session.
+#'
+#'   The **file** carries the integer codes `0:4`, not the labels: the levels
+#'   are set on the returned object after the write, so no `.tif.aux.xml` RAT
+#'   sidecar is produced — one whose loss is silent, and which the rest of this
+#'   package avoids for that reason. `terra::rast(filename)` therefore returns a
+#'   plain integer raster; re-attach labels with the id order in `@return`, or
+#'   keep the object this returns.
 #'
 #' @return A two-layer `SpatRaster`:
 #'   - `category` — a factor with ids `0:4` labelled `stable`,
@@ -60,12 +70,12 @@ dft_rast_break_category <- function(x, rule = "v1", filename = NULL) {
     stop("`x` must be a `dft_rast_break_class()` result. For a summary data ",
          "frame use `dft_break_category()`.", call. = FALSE)
   }
-  for (el in c("raster", "breaks", "years")) {
+  # `years` is deliberately NOT required: nothing here reads it, so demanding it
+  # would refuse a result saved before 0.16.0 for no reason.
+  for (el in c("raster", "breaks")) {
     if (is.null(x[[el]])) {
-      stop("`x` carries no `", el, "`",
-           if (el == "years") paste0("; results saved by drift < 0.16.0 predate ",
-                                     "that element") else "",
-           ". Expected a `dft_rast_break_class()` result.", call. = FALSE)
+      stop("`x` carries no `", el, "`. Expected a `dft_rast_break_class()` result.",
+           call. = FALSE)
     }
   }
   breaks <- x[["breaks"]]

@@ -136,11 +136,19 @@ test_that("the rule travels with the raster and an unsupported one is refused by
                'unsupported `rule`: v2\\. Supported: "v1"')
 })
 
+test_that("a result saved before $years existed still works, because nothing here reads it", {
+  # strength is measured per pixel as pmin(n_before, n_after); only the row-grain
+  # function has to recover it from break_year and therefore needs the series.
+  # Requiring $years here would refuse a pre-0.16.0 result for no reason.
+  old <- res_cases[c("raster", "breaks", "summary")]
+  expect_null(old$years)                                   # premise
+  expect_identical(as.integer(terra::values(dft_rast_break_category(old)[["category"]])),
+                   as.integer(terra::values(dft_rast_break_category(res_cases)[["category"]])))
+})
+
 test_that("inputs it cannot scan are named errors", {
   expect_error(dft_rast_break_category(res_cases$summary), "use `dft_break_category\\(\\)`")
-  expect_error(dft_rast_break_category(res_cases[c("raster", "breaks")]),
-               "carries no `years`.*drift < 0\\.16\\.0")
-  expect_error(dft_rast_break_category(res_cases[c("raster", "years")]), "carries no `breaks`")
+  expect_error(dft_rast_break_category(res_cases["raster"]), "carries no `breaks`")
   bad <- res_cases
   bad$breaks <- bad$breaks[[1:3]]
   expect_error(dft_rast_break_category(bad), "must have layers break_year")

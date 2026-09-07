@@ -149,6 +149,18 @@ dft_break_category <- function(x, years = NULL, rule = "v1") {
          "; only a clean switch has one.", call. = FALSE)
   }
 
+  # An NA class name (a code missing from the class table the scan was given)
+  # would make `changed` NA and hand back an NA category on a row whose status
+  # is perfectly good -- indistinguishable from the NA that means "could not be
+  # scanned", which is the only NA this function documents.
+  unnamed <- !is.na(n_flips) & (is.na(s$from_class) | is.na(s$to_class))
+  if (any(unnamed)) {
+    stop(sum(unnamed), " row", if (sum(unnamed) > 1) "s" else "",
+         if (sum(unnamed) > 1) " carry" else " carries",
+         " an NA class name, so whether the endpoints differ is unknown. ",
+         "That is a class code missing from the class table the scan was given, ",
+         "not a pixel that could not be scanned.", call. = FALSE)
+  }
   code <- break_category_code(n_flips, strength, s$from_class != s$to_class)
 
   s$category <- factor(break_category_levels()[code + 1L],

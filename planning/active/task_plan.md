@@ -110,31 +110,31 @@ single definition — two exports do not make two rules.
 
 ## Phase 5: BULK scale test, and the pixel-grain callers
 
-- [ ] Fetch `bulk_co_ff04` 2017-2023; run `dft_rast_break_category()` with an RSS sampler
+- [x] Fetch `bulk_co_ff04` 2017-2023; run `dft_rast_break_category()` with an RSS sampler
       (start the long command alone on its own line, or `$!` is the subshell). Record wall-clock
       and peak RSS for the PR body.
-- [ ] Migrate `cat_fun`/`fig_fun` in the `article-bulk` stage under its existing cell-for-cell
+- [x] Migrate `cat_fun`/`fig_fun` in the `article-bulk` stage under its existing cell-for-cell
       self-check; regenerate `bulk_grid_1km.csv` and `bulk_window.rds` with `varnames()` pinned.
-- [ ] Leave `data-raw/benchmark_break_class_bulk.R` alone; pointer comment only.
+- [x] Leave `data-raw/benchmark_break_class_bulk.R` alone; pointer comment only.
 
 ## Phase 6: release
 
-- [ ] `devtools::document()`, `pkgdown::check_pkgdown()`, `lintr::lint_package()` against the `HEAD`
+- [x] `devtools::document()`, `pkgdown::check_pkgdown()`, `lintr::lint_package()` against the `HEAD`
       baseline, full `devtools::test()`.
-- [ ] `NEWS.md` + `DESCRIPTION` 0.15.0 -> **0.16.0**, as the final commit.
+- [x] `NEWS.md` + `DESCRIPTION` 0.15.0 -> **0.16.0**, as the final commit.
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] Restore-the-bug proof: put the 4-level vocabulary back, confirm the parity and
+- [x] Tests pass
+- [x] `/code-check` clean on each commit
+- [x] Restore-the-bug proof: put the 4-level vocabulary back, confirm the parity and
       absent-pooled-number tests go red, via `NOT_CRAN=true testthat::test_file()`
-- [ ] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion
+- [x] PWF checkboxes match landed work
+- [x] `/planning-archive` on completion
 
 ## Acceptance (from the issue)
 
-- [ ] One definition of the split in the package; the three re-derivations call it.
-- [ ] `pmin(n_before, n_after)` reachable without recomputing it from `$breaks`.
-- [ ] Existing `$summary` readers unaffected.
-- [ ] Pooled and unpooled totals both reproducible, difference asserted — 4,625.0 vs 7,811.5 ha.
+- [x] One definition of the split in the package; the three re-derivations call it.
+- [x] `pmin(n_before, n_after)` reachable without recomputing it from `$breaks`.
+- [x] Existing `$summary` readers unaffected.
+- [x] Pooled and unpooled totals both reproducible, difference asserted — 4,625.0 vs 7,811.5 ha.

@@ -43,3 +43,45 @@
 | `expect_false(NA)` errors rather than fails, and `tapply()` returns `NA` for an empty factor level | Assert the property (endpoint equality) rather than an arithmetic identity over `tapply()` output |
 | `inst/notes/temporal-qa-groups.md does not contain summary_groups.md verbatim` | Expected — the note embeds the generated tables byte for byte, so a renamed column means the note is rebuilt from the new `summary_groups.md`, not hand-edited |
 | Two review agents given the same findings path; the first ran ~35 min and wrote after the second was spawned | One file per round is not enough when a round is re-spawned — rescued as `review-code-round1.md` before the collision |
+
+### Phase 5-6 landed
+
+**BULK scale test** (`data-raw/benchmark_break_category_bulk.R`, evidence in
+`data-raw/logs/benchmark_break_category/`). 14651 x 11552 = 169,248,352 cells at 10 m,
+97.7% NA outside the floodplain threads:
+
+| stage | seconds |
+|---|---|
+| download (7 COGs, checksum-verified) | 5.4 |
+| `dft_rast_break_class()` | 60.0 |
+| `dft_rast_break_category()` | **26.6** |
+| reconciliation crosstab | 16.4 |
+
+Peak RSS **8.88 GiB** over 52 samples, sampler watching the R process's own pid.
+`dft_rast_break_category()` reproduces the committed four-level `summary_change.csv`
+cell for cell once mapped to five levels, with a positive control on the comparator;
+90,935 sustained cells carry `strength >= 2` against 168,269 endpoint-only at exactly 1,
+matching the committed counts.
+
+**`article-bulk`** re-run through the export: reproduces `summary_change.csv` cell for
+cell, same 21,701 patches, same selected patch 18141 at the same 0.299 min share, and the
+1 km grid conserves 41,089.7 / 4,625.0 / 3,186.5 ha. `bulk_grid_1km.csv` regenerates
+byte-identical; `bulk_window.rds` differs only in `meta` (run date and drift version) with
+every raster's values, extent and varnames identical.
+
+Two things the run caught that no fixture could:
+
+- `on.exit()` at a script's top level never fires, so the first run's peak RSS was
+  swallowed when a `stopifnot` aborted. `withr::defer(envir = globalenv())` fixed it, and
+  it prints `Ran 1/1 deferred expressions` as the confirmation.
+- `df[cond, ]` where `cond` holds an `NA` returns an all-`NA` ROW rather than dropping it,
+  so `all(c(2, 3, NA) >= 2)` was `NA` and `stopifnot` failed on correct data. `%in%`
+  instead of `==`, plus an explicit `!anyNA()`.
+
+**Review round 2** found 4; 1 was already fixed mid-flight (`read_change()` refusing the
+five-level vocabulary), 3 fixed and pinned: `$years` required but never read by the pixel
+path (a pre-0.16.0 result is now accepted), an NA class name giving a silent NA category,
+and the written file carrying no RAT while `@return` promised a factor (documented, since
+matching the parent's no-sidecar posture is deliberate).
+
+Lints in the changed R files: 0, against a baseline of 2 at `main`.

@@ -8,8 +8,11 @@ dft_rast_break_category(x, rule = "v1", filename = NULL)
 }
 \arguments{
 \item{x}{The list returned by \code{\link[=dft_rast_break_class]{dft_rast_break_class()}}. \verb{$breaks} supplies
-the measurements, \verb{$raster} whether the endpoints differ, and \verb{$years} the
-series the endpoint threshold is relative to.}
+the measurements and \verb{$raster} whether the endpoints differ. \verb{$years} is
+\strong{not} needed here and not required: \code{n_before} and \code{n_after} are measured
+per pixel, so the strength is read off them rather than recovered from
+\code{break_year} the way \code{\link[=dft_break_category]{dft_break_category()}} must do at row grain. A result
+saved before drift 0.16.0 therefore works unchanged.}
 
 \item{rule}{Character. The labelling rule; only \code{"v1"} exists. Recorded on
 the result as the \code{drift_break_rule} metadata tag, and implied by the
@@ -17,7 +20,14 @@ category level labels themselves.}
 
 \item{filename}{Character or \code{NULL}. Where to write the result. A
 floodplain-scale grid is worth putting somewhere you chose; \code{NULL} writes
-a temporary file that R removes at the end of the session.}
+a temporary file that R removes at the end of the session.
+
+The \strong{file} carries the integer codes \code{0:4}, not the labels: the levels
+are set on the returned object after the write, so no \code{.tif.aux.xml} RAT
+sidecar is produced — one whose loss is silent, and which the rest of this
+package avoids for that reason. \code{terra::rast(filename)} therefore returns a
+plain integer raster; re-attach labels with the id order in \verb{@return}, or
+keep the object this returns.}
 }
 \value{
 A two-layer \code{SpatRaster}:

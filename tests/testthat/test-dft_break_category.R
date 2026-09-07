@@ -101,6 +101,12 @@ test_that("the inputs it cannot label are named errors, not NA", {
                "carries no `years`.*drift < 0\\.16\\.0")
   expect_error(dft_break_category(list(years = years)), "has no `summary`")
   expect_error(dft_break_category(1:3), "not integer")
+  # a class code missing from the class table gives an NA class NAME, which would
+  # make `changed` NA and hand back an NA category on a row whose status is fine
+  # -- indistinguishable from the NA that means "could not be scanned"
+  partial <- s
+  partial$from_class[which(partial$status %in% "flicker")[1]] <- NA_character_
+  expect_error(dft_break_category(partial, years = years), "carries an NA class name")
 })
 
 test_that("`rule` is validated by name and recorded in the output", {
