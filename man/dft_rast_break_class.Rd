@@ -23,7 +23,7 @@ When \code{NULL}, loaded via \code{\link[=dft_class_table]{dft_class_table()}} u
 (default), \code{"km2"}, or \code{"m2"}.}
 }
 \value{
-A list with three elements:
+A list with four elements:
 \itemize{
 \item \code{raster}: a single-layer factor \code{SpatRaster} named \code{transition},
 encoding the \strong{first-year to last-year} class pair of every pixel as
@@ -35,9 +35,12 @@ unchanged.
 \itemize{
 \item \code{break_year} — the first year of the new class for a clean switch;
 \code{NA} for stable and flicker pixels
-\item \code{n_before}, \code{n_after} — years in the old and new class either side of
-the switch; \code{NA} unless \code{n_flips == 1}. Confidence is \code{min(n_before, n_after)}: a pixel whose last year alone differs is a clean switch
-with \code{n_after == 1}, and one whose first year alone differs has
+\item \code{n_before}, \code{n_after} — \strong{observations} in the old and new class either
+side of the switch; \code{NA} unless \code{n_flips == 1}. Their \code{pmin()} is the
+switch's \strong{strength} — see \code{\link[=dft_break_strength]{dft_break_strength()}}, which is the one
+name this quantity goes by — and a switch is only as sure as its
+shorter side: a pixel whose last observation alone differs is a clean
+switch with \code{n_after == 1}, and one whose first alone differs has
 \code{n_before == 1}.
 \item \code{n_flips} — number of year-to-year class changes: \code{0} stable, \code{1} a
 clean switch, \code{2} or more flicker
@@ -47,6 +50,9 @@ clean switch, \code{2} or more flicker
 pixels. \code{status} is \code{"stable"} (\code{n_flips == 0}), \code{"break"} (\code{1}) or
 \code{"flicker"} (\verb{>= 2}), or \code{NA} where an interior year is \code{NA};
 \code{break_year} is \code{NA} except for \code{"break"} rows.
+\item \code{years}: the observation years, sorted ascending — the series the
+other three elements were measured over, so \code{\link[=dft_break_category]{dft_break_category()}} can
+apply the endpoint threshold without being told it again.
 }
 }
 \description{
@@ -71,7 +77,10 @@ reads as stable on the endpoints and is flicker here.
 
 No threshold is applied — every measurement is reported and the caller
 composes, e.g. \code{n_flips == 1 & pmin(n_before, n_after) >= 2} for a switch
-sustained at least two years on each side. Compare \code{\link[=dft_rast_consensus]{dft_rast_consensus()}},
+sustained at least two observations on each side. \code{\link[=dft_break_category]{dft_break_category()}}
+is that composition, versioned and in one place; use it rather than
+re-deriving the split, and \code{\link[=dft_break_strength]{dft_break_strength()}} for the number it
+thresholds. Compare \code{\link[=dft_rast_consensus]{dft_rast_consensus()}},
 which votes a real mid-window switch back to its old class because the
 pre-change years outnumber the post-change ones; here that pixel is a dated
 break.

@@ -21,7 +21,7 @@
 #' @param unit Character. Area unit for the summary. One of `"ha"`
 #'   (default), `"km2"`, or `"m2"`.
 #'
-#' @return A list with three elements:
+#' @return A list with four elements:
 #'   - `raster`: a single-layer factor `SpatRaster` named `transition`,
 #'     encoding the **first-year to last-year** class pair of every pixel as
 #'     `from * 1000 + to` with levels labelled `"from_class -> to_class"` —
@@ -31,10 +31,12 @@
 #'   - `breaks`: a four-layer integer `SpatRaster` of per-pixel evidence:
 #'     - `break_year` — the first year of the new class for a clean switch;
 #'       `NA` for stable and flicker pixels
-#'     - `n_before`, `n_after` — years in the old and new class either side of
-#'       the switch; `NA` unless `n_flips == 1`. Confidence is `min(n_before,
-#'       n_after)`: a pixel whose last year alone differs is a clean switch
-#'       with `n_after == 1`, and one whose first year alone differs has
+#'     - `n_before`, `n_after` — **observations** in the old and new class either
+#'       side of the switch; `NA` unless `n_flips == 1`. Their `pmin()` is the
+#'       switch's **strength** — see [dft_break_strength()], which is the one
+#'       name this quantity goes by — and a switch is only as sure as its
+#'       shorter side: a pixel whose last observation alone differs is a clean
+#'       switch with `n_after == 1`, and one whose first alone differs has
 #'       `n_before == 1`.
 #'     - `n_flips` — number of year-to-year class changes: `0` stable, `1` a
 #'       clean switch, `2` or more flicker
@@ -43,6 +45,9 @@
 #'     pixels. `status` is `"stable"` (`n_flips == 0`), `"break"` (`1`) or
 #'     `"flicker"` (`>= 2`), or `NA` where an interior year is `NA`;
 #'     `break_year` is `NA` except for `"break"` rows.
+#'   - `years`: the observation years, sorted ascending — the series the
+#'     other three elements were measured over, so [dft_break_category()] can
+#'     apply the endpoint threshold without being told it again.
 #'
 #' @details
 #' A two-epoch comparison such as 2017 -> 2023 reports every pixel whose label
@@ -56,7 +61,10 @@
 #'
 #' No threshold is applied — every measurement is reported and the caller
 #' composes, e.g. `n_flips == 1 & pmin(n_before, n_after) >= 2` for a switch
-#' sustained at least two years on each side. Compare [dft_rast_consensus()],
+#' sustained at least two observations on each side. [dft_break_category()]
+#' is that composition, versioned and in one place; use it rather than
+#' re-deriving the split, and [dft_break_strength()] for the number it
+#' thresholds. Compare [dft_rast_consensus()],
 #' which votes a real mid-window switch back to its old class because the
 #' pre-change years outnumber the post-change ones; here that pixel is a dated
 #' break.
@@ -264,7 +272,8 @@ dft_rast_break_class <- function(x,
       n_cells = integer(0), area = numeric(0), pct = numeric(0)
     )
     files <- setdiff(files, out_file)
-    return(list(raster = r_trans, breaks = out[[2:5]], summary = summary_tbl))
+    return(list(raster = r_trans, breaks = out[[2:5]], summary = summary_tbl,
+                years = years))
   }
 
   code <- as.integer(ct$code)
@@ -294,7 +303,8 @@ dft_rast_break_class <- function(x,
                   value = data.frame(id = codes_present, transition = labels))
 
   files <- setdiff(files, out_file)
-  list(raster = r_trans, breaks = out[[2:5]], summary = summary_tbl)
+  list(raster = r_trans, breaks = out[[2:5]], summary = summary_tbl,
+       years = years)
 }
 
 #' Build the per-chunk scan function for [dft_rast_break_class()]

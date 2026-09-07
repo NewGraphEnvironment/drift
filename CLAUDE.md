@@ -50,8 +50,19 @@ Temporal evidence across the annual series (v0.14.0; the third QA leg beside `pa
 
 ```r
 bc <- dft_rast_break_class(classified)   # names(classified) are years; $raster is the first->last transition,
-                                         # $breaks has break_year / n_before / n_after / n_flips, $summary by status
+                                         # $breaks has break_year / n_before / n_after / n_flips, $summary by status,
+                                         # $years the series (v0.16.0)
 patches <- dft_transition_vectors(bc$raster, changes_only = TRUE)   # unchanged downstream
+```
+
+Compose the split with the package, not by hand (v0.16.0, #72). `stable` / `break_sustained` /
+`break_endpoint` / `unsettled` / `stable_flicker`, where the last two are the flicker that a
+two-epoch comparison reports as change and the flicker it cannot see — **never sum them**:
+
+```r
+dft_break_category(bc)                   # $summary + category, strength, rule
+dft_rast_break_category(bc)              # the same rule per pixel: category, strength
+dft_break_strength(break_year, years)    # pmin(n_before, n_after), the number behind the threshold
 ```
 
 Continuous index-trajectory change (v0.3.0; see the `trajectory-break-detection` vignette):
@@ -115,9 +126,10 @@ Tag PR bodies with `Relates to NewGraphEnvironment/sred-2025-2026#16` (the issue
 
 - [What a Land-Cover Change Figure Is Made Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.html)
   (`vignettes/articles/temporal-composition.Rmd`, #66) — the #62 result stated for a reader outside
-  the package. **Read before quoting a temporal share:** `cat_fun()`'s category 3 pools
+  the package. **Read before quoting a temporal share:** the retired four-level vocabulary pooled
   changed-but-unsettled with the flicker whose endpoints agree (2,032.9 vs 3,186.5 ha on BULK), and
-  summing them as one "flicker" overstates changed area by 69%.
+  summing them as one "flicker" overstates changed area by 69%. `dft_break_category()` (#72) names
+  them apart as `unsettled` and `stable_flicker`; compose with it rather than re-deriving the split.
 - [`inst/notes/temporal-qa-groups.md`](inst/notes/temporal-qa-groups.md) — `dft_rast_break_class()` across the four published seven-year groups (#62): sustained-break share 20-31% of 2017-2023 change, flicker 40-49%, 2017 the odd endpoint everywhere; the shape proxies and why the per-stream segment layer was rejected. Read before quoting a `transition_2017_2023` hectare as change.
 - [`inst/notes/temporal-qa-disturbance.md`](inst/notes/temporal-qa-disturbance.md) — does dated fire/harvest corroborate the temporal QA (#67): the published `transition_vector.gpkg` is drift's own change layer after a 1 ha class-agnostic sieve and a sub-basin clip, reproduced exactly in all four groups (0 of 53/44/41/46 classes differ), which closes the two-totals problem; `break_year` lands at lag 0 or +1 for 86% of discriminating fire patches that broke and 72% of harvest (70.7% / 58.4% of all tagged), mode +1; flicker is LOWER in disturbed patches, so it does not read as succession. Read before treating drift's patch count and the published one as the same population.
 - [`inst/notes/gdalcubes-pc-gotchas.md`](inst/notes/gdalcubes-pc-gotchas.md) — non-obvious gdalcubes 0.7.3 + Planetary Computer Sentinel-2 gotchas (filter_geom segfault, reduce_time worker closures, terra↔gdalcubes NetCDF round-trip, the S2 +1000 DN offset boundary at 2022-01-25, PC pagination). Read before touching the continuous pipeline.
