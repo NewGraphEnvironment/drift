@@ -13,11 +13,17 @@ Detecting Riparian and Inland Floodplain Transitions — track land cover change
 - `dft_` prefix for all exported functions
 - Two pipelines: **categorical** (classified land cover → transitions) and **continuous** (Sentinel-2 spectral-index trajectories → abrupt breaks + gradual trends). The continuous path complements the categorical one — it can QA which mapped transitions carry a real spectral change, and catch gradual degradation/recovery the annual labels miss.
 - Generic STAC pipeline — works with any classified raster (IO LULC, ESA WorldCover, custom COGs)
-- `R/` — package functions, `tests/testthat/` — testthat 3e tests, `vignettes/` — worked examples
+- `R/` — package functions, `tests/testthat/` — testthat 3e tests, `vignettes/` — worked examples;
+  `vignettes/articles/` — pkgdown-only articles, excluded from the tarball by `.Rbuildignore`
 - `inst/lulc_classes/` — shipped CSV class tables (code, class_name, color, description)
 - `inst/indices/` — spectral-index registry CSV (ndvi, kndvi, ndmi) read by `dft_index_table()`
 - `inst/extdata/` — small test rasters (Neexdzii Kwa reach; IO LULC for every year 2017–2023 on one grid, 237KB total)
 - `inst/notes/` — durable technical reference (see Reference docs below)
+- `inst/cartography/` — `gq_reg_custom()` layer CSVs, so figures carry no hardcoded colour. Note
+  `gq_reg_custom()` reads a fixed column set through `$`, so an **absent column is a length-zero
+  `if`**, not a default — carry every column it references, empty where unused.
+- `inst/extdata/temporal-composition/` — data for the `temporal-composition` article, written by
+  the `summarize` and `article-bulk` stages of `data-raw/break_class_groups.R` (its own README)
 - `data-raw/` — scripts to regenerate test data (flooded + gdalcubes) and vignette artifacts
 
 ## Core Pipeline
@@ -107,6 +113,11 @@ Tag PR bodies with `Relates to NewGraphEnvironment/sred-2025-2026#16` (the issue
 
 ## Reference docs
 
+- [What a Land-Cover Change Figure Is Made Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.html)
+  (`vignettes/articles/temporal-composition.Rmd`, #66) — the #62 result stated for a reader outside
+  the package. **Read before quoting a temporal share:** `cat_fun()`'s category 3 pools
+  changed-but-unsettled with the flicker whose endpoints agree (2,032.9 vs 3,186.5 ha on BULK), and
+  summing them as one "flicker" overstates changed area by 69%.
 - [`inst/notes/temporal-qa-groups.md`](inst/notes/temporal-qa-groups.md) — `dft_rast_break_class()` across the four published seven-year groups (#62): sustained-break share 20-31% of 2017-2023 change, flicker 40-49%, 2017 the odd endpoint everywhere; the shape proxies and why the per-stream segment layer was rejected. Read before quoting a `transition_2017_2023` hectare as change.
 - [`inst/notes/temporal-qa-disturbance.md`](inst/notes/temporal-qa-disturbance.md) — does dated fire/harvest corroborate the temporal QA (#67): the published `transition_vector.gpkg` is drift's own change layer after a 1 ha class-agnostic sieve and a sub-basin clip, reproduced exactly in all four groups (0 of 53/44/41/46 classes differ), which closes the two-totals problem; `break_year` lands at lag 0 or +1 for 86% of discriminating fire patches that broke and 72% of harvest (70.7% / 58.4% of all tagged), mode +1; flicker is LOWER in disturbed patches, so it does not read as succession. Read before treating drift's patch count and the published one as the same population.
 - [`inst/notes/gdalcubes-pc-gotchas.md`](inst/notes/gdalcubes-pc-gotchas.md) — non-obvious gdalcubes 0.7.3 + Planetary Computer Sentinel-2 gotchas (filter_geom segfault, reduce_time worker closures, terra↔gdalcubes NetCDF round-trip, the S2 +1000 DN offset boundary at 2022-01-25, PC pagination). Read before touching the continuous pipeline.
