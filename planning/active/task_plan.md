@@ -16,28 +16,36 @@ measured anywhere in this repo).
 ## What exploration established (2026-09-07, 64 GB machine, terra 1.9.34)
 
 - Phase 1 needs no computation: `summary_patch_groups.csv` is committed for all four groups.
+  `flag_sliver` is an effective-width proxy (`2A/P < 1.5` px), not literally "one pixel wide".
 - `terra::distance()` on the full 169M-cell BULK grid is **8.3 s**; the whole band x category
-  analysis ran in **108 s**. The issue body has the cost inverted.
+  analysis ran in **108 s**. (An earlier draft said the issue had the cost inverted; the issue
+  never mentions compute — that correction was withdrawn.)
 - The corridor signal is large and monotone, from a stable-water-core reference whose 591,901
   cells reconcile exactly to `summary_pixels.csv`'s `Water,Water,stable`: unsettled 22.2% in the
   first 10 m ring against 4.6% beyond 500 m (4.8x); combined flicker 4.5x; `break_sustained` 4.0x.
-- The issue's sketch step 3 needs no new machinery — `dft_rast_break_category()` already
-  separates the directional walk (`break_sustained`) from the oscillation.
+- **Withdrawn after review:** `break_sustained` does not establish a walk — a classifier that
+  changed its mind permanently produces the same label. The walk signature is `break_year`
+  against distance, and it is now measured.
 - The remaining confound is class composition, controlled with a three-way crosstab.
 - The acceptance criterion cites a sentence that does not exist in the article.
 
 ## Phase 1: `corridor` stage
 
-- [ ] Extend the arg dispatch to accept `corridor`
-- [ ] Per group: read cached COGs, `dft_rast_break_class()`, `dft_rast_break_category()`
-- [ ] Stable water core (Water in all seven years); assert its count against the committed
+- [x] Extend the arg dispatch to accept `corridor`
+- [x] Per group: read cached COGs, `dft_rast_break_class()`, `dft_rast_break_category()`
+- [x] Stable water core (Water in all seven years); assert its count against the committed
       `summary_pixels.csv` `Water,Water,stable` row
-- [ ] `terra::distance()` -> `classify()` into 8 bands (0 / 10 / 30 / 50 / 100 / 200 / 500 / >500 m)
-- [ ] Three-way `crosstab(band, from_class, category)`; coerce numeric columns directly
-- [ ] 2017-Water sensitivity arm
-- [ ] Conservation guard against committed `summary_change.csv`, with a positive control
-- [ ] Write per-group `summary_corridor.csv` + root rollup; print `ALL STAGES DONE`
-- [ ] Run via `break_class_groups-run.sh corridor`; record timings and peak RSS
+- [x] `terra::distance()` -> `classify()` into 8 bands (0 / 10 / 30 / 50 / 100 / 200 / 500 / >500 m)
+- [x] Three-way `crosstab(band, from_class, category)`; coerce numeric columns directly
+- [x] 2017-Water sensitivity arm
+- [x] Conservation guard against committed `summary_change.csv`, with **two** positive controls
+      (one per comparator arm) and a band-degeneracy check
+- [x] Write per-group `summary_corridor.csv` + root rollup; print `ALL STAGES DONE`
+- [x] Run via `break_class_groups-run.sh corridor`; record timings and peak RSS
+- [x] **Added after review:** the null — a from-epoch class boundary with no water on either
+      side, as a third reference arm
+- [x] **Added after review:** `break_year` by band, the walk-versus-oscillation test the
+      category alone cannot make
 
 ## Phase 2: shipped article data
 
@@ -59,7 +67,8 @@ measured anywhere in this repo).
 - [ ] `inst/notes/temporal-qa-groups.md` corridor section
 - [ ] `data-raw/logs/break_class_groups/README.md` stage documentation
 - [ ] `NEWS.md` 0.17.0 and the version bump as the final commit
-- [ ] Edit the #73 body: the non-existent sentence, and the inverted cost premise
+- [ ] Edit the #73 body: the non-existent sentence, the wrong boundary-signature numbers, and
+      the 1000-word cap this PR overrides. **Not** the cost premise — the issue never made it.
 
 ## Validation
 

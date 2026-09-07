@@ -1,0 +1,255 @@
+"group","band","band_label","from_class","category_label","n_cells","area_ha","pct_of_band_class"
+"bulk",1,"core","Water","stable",591901,5919.01,100
+"bulk",2,"0-10","Bare Ground","break_endpoint",2252,22.52,59.34
+"bulk",2,"0-10","Bare Ground","break_sustained",30,0.3,0.79
+"bulk",2,"0-10","Bare Ground","stable_flicker",19,0.19,0.5
+"bulk",2,"0-10","Bare Ground","unsettled",1494,14.94,39.37
+"bulk",2,"0-10","Built Area","break_endpoint",22,0.22,10.14
+"bulk",2,"0-10","Built Area","break_sustained",33,0.33,15.21
+"bulk",2,"0-10","Built Area","stable",13,0.13,5.99
+"bulk",2,"0-10","Built Area","stable_flicker",84,0.84,38.71
+"bulk",2,"0-10","Built Area","unsettled",65,0.65,29.95
+"bulk",2,"0-10","Clouds","break_endpoint",32,0.32,32.65
+"bulk",2,"0-10","Clouds","unsettled",66,0.66,67.35
+"bulk",2,"0-10","Crops","break_endpoint",21,0.21,7.87
+"bulk",2,"0-10","Crops","break_sustained",15,0.15,5.62
+"bulk",2,"0-10","Crops","stable_flicker",25,0.25,9.36
+"bulk",2,"0-10","Crops","unsettled",206,2.06,77.15
+"bulk",2,"0-10","Flooded Vegetation","break_endpoint",23,0.23,53.49
+"bulk",2,"0-10","Flooded Vegetation","unsettled",20,0.2,46.51
+"bulk",2,"0-10","Rangeland","break_endpoint",1669,16.69,46.45
+"bulk",2,"0-10","Rangeland","break_sustained",140,1.4,3.9
+"bulk",2,"0-10","Rangeland","stable",37,0.37,1.03
+"bulk",2,"0-10","Rangeland","stable_flicker",326,3.26,9.07
+"bulk",2,"0-10","Rangeland","unsettled",1421,14.21,39.55
+"bulk",2,"0-10","Snow/Ice","break_endpoint",102,1.02,21.21
+"bulk",2,"0-10","Snow/Ice","unsettled",379,3.79,78.79
+"bulk",2,"0-10","Trees","break_endpoint",3603,36.03,24.74
+"bulk",2,"0-10","Trees","break_sustained",1802,18.02,12.37
+"bulk",2,"0-10","Trees","stable",1225,12.25,8.41
+"bulk",2,"0-10","Trees","stable_flicker",3636,36.36,24.97
+"bulk",2,"0-10","Trees","unsettled",4297,42.97,29.51
+"bulk",2,"0-10","Water","break_endpoint",7398,73.98,33.05
+"bulk",2,"0-10","Water","break_sustained",1939,19.39,8.66
+"bulk",2,"0-10","Water","stable_flicker",10890,108.9,48.65
+"bulk",2,"0-10","Water","unsettled",2156,21.56,9.63
+"bulk",3,"10-30","Bare Ground","break_endpoint",2190,21.9,45.59
+"bulk",3,"10-30","Bare Ground","break_sustained",56,0.56,1.17
+"bulk",3,"10-30","Bare Ground","stable",47,0.47,0.98
+"bulk",3,"10-30","Bare Ground","stable_flicker",190,1.9,3.96
+"bulk",3,"10-30","Bare Ground","unsettled",2321,23.21,48.31
+"bulk",3,"10-30","Built Area","break_endpoint",116,1.16,8.03
+"bulk",3,"10-30","Built Area","break_sustained",14,0.14,0.97
+"bulk",3,"10-30","Built Area","stable",681,6.81,47.16
+"bulk",3,"10-30","Built Area","stable_flicker",467,4.67,32.34
+"bulk",3,"10-30","Built Area","unsettled",166,1.66,11.5
+"bulk",3,"10-30","Clouds","break_endpoint",4,0.04,10.26
+"bulk",3,"10-30","Clouds","unsettled",35,0.35,89.74
+"bulk",3,"10-30","Crops","break_endpoint",164,1.64,10.07
+"bulk",3,"10-30","Crops","break_sustained",414,4.14,25.43
+"bulk",3,"10-30","Crops","stable",93,0.93,5.71
+"bulk",3,"10-30","Crops","stable_flicker",335,3.35,20.58
+"bulk",3,"10-30","Crops","unsettled",622,6.22,38.21
+"bulk",3,"10-30","Flooded Vegetation","break_endpoint",12,0.12,9.09
+"bulk",3,"10-30","Flooded Vegetation","stable",5,0.05,3.79
+"bulk",3,"10-30","Flooded Vegetation","stable_flicker",16,0.16,12.12
+"bulk",3,"10-30","Flooded Vegetation","unsettled",99,0.99,75
+"bulk",3,"10-30","Rangeland","break_endpoint",1869,18.69,19
+"bulk",3,"10-30","Rangeland","break_sustained",365,3.65,3.71
+"bulk",3,"10-30","Rangeland","stable",2631,26.31,26.75
+"bulk",3,"10-30","Rangeland","stable_flicker",2347,23.47,23.86
+"bulk",3,"10-30","Rangeland","unsettled",2625,26.25,26.68
+"bulk",3,"10-30","Snow/Ice","break_endpoint",91,0.91,9.75
+"bulk",3,"10-30","Snow/Ice","unsettled",842,8.42,90.25
+"bulk",3,"10-30","Trees","break_endpoint",5965,59.65,11.11
+"bulk",3,"10-30","Trees","break_sustained",1627,16.27,3.03
+"bulk",3,"10-30","Trees","stable",33073,330.73,61.59
+"bulk",3,"10-30","Trees","stable_flicker",8012,80.12,14.92
+"bulk",3,"10-30","Trees","unsettled",5019,50.19,9.35
+"bulk",3,"10-30","Water","break_endpoint",1819,18.19,21.17
+"bulk",3,"10-30","Water","break_sustained",1290,12.9,15.01
+"bulk",3,"10-30","Water","stable_flicker",2469,24.69,28.74
+"bulk",3,"10-30","Water","unsettled",3014,30.14,35.08
+"bulk",4,"30-50","Bare Ground","break_endpoint",1258,12.58,53.49
+"bulk",4,"30-50","Bare Ground","break_sustained",42,0.42,1.79
+"bulk",4,"30-50","Bare Ground","stable",84,0.84,3.57
+"bulk",4,"30-50","Bare Ground","stable_flicker",112,1.12,4.76
+"bulk",4,"30-50","Bare Ground","unsettled",856,8.56,36.39
+"bulk",4,"30-50","Built Area","break_endpoint",16,0.16,1.1
+"bulk",4,"30-50","Built Area","break_sustained",9,0.09,0.62
+"bulk",4,"30-50","Built Area","stable",1043,10.43,71.68
+"bulk",4,"30-50","Built Area","stable_flicker",281,2.81,19.31
+"bulk",4,"30-50","Built Area","unsettled",106,1.06,7.29
+"bulk",4,"30-50","Clouds","unsettled",7,0.07,100
+"bulk",4,"30-50","Crops","break_endpoint",132,1.32,6.8
+"bulk",4,"30-50","Crops","break_sustained",622,6.22,32.06
+"bulk",4,"30-50","Crops","stable",329,3.29,16.96
+"bulk",4,"30-50","Crops","stable_flicker",492,4.92,25.36
+"bulk",4,"30-50","Crops","unsettled",365,3.65,18.81
+"bulk",4,"30-50","Flooded Vegetation","break_endpoint",21,0.21,17.8
+"bulk",4,"30-50","Flooded Vegetation","break_sustained",6,0.06,5.08
+"bulk",4,"30-50","Flooded Vegetation","stable",5,0.05,4.24
+"bulk",4,"30-50","Flooded Vegetation","stable_flicker",23,0.23,19.49
+"bulk",4,"30-50","Flooded Vegetation","unsettled",63,0.63,53.39
+"bulk",4,"30-50","Rangeland","break_endpoint",1318,13.18,11.85
+"bulk",4,"30-50","Rangeland","break_sustained",285,2.85,2.56
+"bulk",4,"30-50","Rangeland","stable",5064,50.64,45.52
+"bulk",4,"30-50","Rangeland","stable_flicker",2670,26.7,24
+"bulk",4,"30-50","Rangeland","unsettled",1789,17.89,16.08
+"bulk",4,"30-50","Snow/Ice","break_endpoint",48,0.48,9.16
+"bulk",4,"30-50","Snow/Ice","unsettled",476,4.76,90.84
+"bulk",4,"30-50","Trees","break_endpoint",1921,19.21,3.61
+"bulk",4,"30-50","Trees","break_sustained",827,8.27,1.55
+"bulk",4,"30-50","Trees","stable",43757,437.57,82.16
+"bulk",4,"30-50","Trees","stable_flicker",3735,37.35,7.01
+"bulk",4,"30-50","Trees","unsettled",3021,30.21,5.67
+"bulk",4,"30-50","Water","break_endpoint",209,2.09,11.55
+"bulk",4,"30-50","Water","break_sustained",138,1.38,7.62
+"bulk",4,"30-50","Water","stable_flicker",742,7.42,40.99
+"bulk",4,"30-50","Water","unsettled",721,7.21,39.83
+"bulk",5,"50-100","Bare Ground","break_endpoint",2014,20.14,59.48
+"bulk",5,"50-100","Bare Ground","break_sustained",54,0.54,1.59
+"bulk",5,"50-100","Bare Ground","stable",31,0.31,0.92
+"bulk",5,"50-100","Bare Ground","stable_flicker",70,0.7,2.07
+"bulk",5,"50-100","Bare Ground","unsettled",1217,12.17,35.94
+"bulk",5,"50-100","Built Area","break_endpoint",21,0.21,0.85
+"bulk",5,"50-100","Built Area","break_sustained",24,0.24,0.97
+"bulk",5,"50-100","Built Area","stable",1839,18.39,74.39
+"bulk",5,"50-100","Built Area","stable_flicker",464,4.64,18.77
+"bulk",5,"50-100","Built Area","unsettled",124,1.24,5.02
+"bulk",5,"50-100","Clouds","unsettled",5,0.05,100
+"bulk",5,"50-100","Crops","break_endpoint",318,3.18,6.79
+"bulk",5,"50-100","Crops","break_sustained",1676,16.76,35.77
+"bulk",5,"50-100","Crops","stable",907,9.07,19.36
+"bulk",5,"50-100","Crops","stable_flicker",1070,10.7,22.83
+"bulk",5,"50-100","Crops","unsettled",715,7.15,15.26
+"bulk",5,"50-100","Flooded Vegetation","break_endpoint",29,0.29,12.95
+"bulk",5,"50-100","Flooded Vegetation","break_sustained",4,0.04,1.79
+"bulk",5,"50-100","Flooded Vegetation","stable_flicker",60,0.6,26.79
+"bulk",5,"50-100","Flooded Vegetation","unsettled",131,1.31,58.48
+"bulk",5,"50-100","Rangeland","break_endpoint",2672,26.72,9.92
+"bulk",5,"50-100","Rangeland","break_sustained",611,6.11,2.27
+"bulk",5,"50-100","Rangeland","stable",14124,141.24,52.42
+"bulk",5,"50-100","Rangeland","stable_flicker",6054,60.54,22.47
+"bulk",5,"50-100","Rangeland","unsettled",3484,34.84,12.93
+"bulk",5,"50-100","Snow/Ice","break_endpoint",43,0.43,6.92
+"bulk",5,"50-100","Snow/Ice","unsettled",578,5.78,93.08
+"bulk",5,"50-100","Trees","break_endpoint",3130,31.3,2.95
+"bulk",5,"50-100","Trees","break_sustained",1257,12.57,1.18
+"bulk",5,"50-100","Trees","stable",90213,902.13,84.89
+"bulk",5,"50-100","Trees","stable_flicker",6935,69.35,6.53
+"bulk",5,"50-100","Trees","unsettled",4733,47.33,4.45
+"bulk",5,"50-100","Water","break_endpoint",260,2.6,14.53
+"bulk",5,"50-100","Water","break_sustained",87,0.87,4.86
+"bulk",5,"50-100","Water","stable_flicker",689,6.89,38.51
+"bulk",5,"50-100","Water","unsettled",753,7.53,42.09
+"bulk",6,"100-200","Bare Ground","break_endpoint",2577,25.77,64.46
+"bulk",6,"100-200","Bare Ground","break_sustained",10,0.1,0.25
+"bulk",6,"100-200","Bare Ground","stable_flicker",6,0.06,0.15
+"bulk",6,"100-200","Bare Ground","unsettled",1405,14.05,35.14
+"bulk",6,"100-200","Built Area","break_endpoint",87,0.87,1.36
+"bulk",6,"100-200","Built Area","break_sustained",51,0.51,0.8
+"bulk",6,"100-200","Built Area","stable",4060,40.6,63.45
+"bulk",6,"100-200","Built Area","stable_flicker",1724,17.24,26.94
+"bulk",6,"100-200","Built Area","unsettled",477,4.77,7.45
+"bulk",6,"100-200","Clouds","unsettled",2,0.02,100
+"bulk",6,"100-200","Crops","break_endpoint",839,8.39,9.66
+"bulk",6,"100-200","Crops","break_sustained",2920,29.2,33.61
+"bulk",6,"100-200","Crops","stable",1461,14.61,16.82
+"bulk",6,"100-200","Crops","stable_flicker",1964,19.64,22.61
+"bulk",6,"100-200","Crops","unsettled",1503,15.03,17.3
+"bulk",6,"100-200","Flooded Vegetation","break_endpoint",41,0.41,5.67
+"bulk",6,"100-200","Flooded Vegetation","stable",5,0.05,0.69
+"bulk",6,"100-200","Flooded Vegetation","stable_flicker",266,2.66,36.79
+"bulk",6,"100-200","Flooded Vegetation","unsettled",411,4.11,56.85
+"bulk",6,"100-200","Rangeland","break_endpoint",4022,40.22,8.32
+"bulk",6,"100-200","Rangeland","break_sustained",1249,12.49,2.58
+"bulk",6,"100-200","Rangeland","stable",28477,284.77,58.89
+"bulk",6,"100-200","Rangeland","stable_flicker",10148,101.48,20.98
+"bulk",6,"100-200","Rangeland","unsettled",4464,44.64,9.23
+"bulk",6,"100-200","Snow/Ice","break_endpoint",20,0.2,3.17
+"bulk",6,"100-200","Snow/Ice","unsettled",610,6.1,96.83
+"bulk",6,"100-200","Trees","break_endpoint",4117,41.17,2.58
+"bulk",6,"100-200","Trees","break_sustained",1803,18.03,1.13
+"bulk",6,"100-200","Trees","stable",137758,1377.58,86.21
+"bulk",6,"100-200","Trees","stable_flicker",9991,99.91,6.25
+"bulk",6,"100-200","Trees","unsettled",6119,61.19,3.83
+"bulk",6,"100-200","Water","break_endpoint",149,1.49,15.04
+"bulk",6,"100-200","Water","break_sustained",43,0.43,4.34
+"bulk",6,"100-200","Water","stable_flicker",343,3.43,34.61
+"bulk",6,"100-200","Water","unsettled",456,4.56,46.01
+"bulk",7,"200-500","Bare Ground","break_endpoint",2779,27.79,58.25
+"bulk",7,"200-500","Bare Ground","break_sustained",29,0.29,0.61
+"bulk",7,"200-500","Bare Ground","stable_flicker",1,0.01,0.02
+"bulk",7,"200-500","Bare Ground","unsettled",1962,19.62,41.12
+"bulk",7,"200-500","Built Area","break_endpoint",256,2.56,1.49
+"bulk",7,"200-500","Built Area","break_sustained",63,0.63,0.37
+"bulk",7,"200-500","Built Area","stable",13458,134.58,78.38
+"bulk",7,"200-500","Built Area","stable_flicker",2109,21.09,12.28
+"bulk",7,"200-500","Built Area","unsettled",1285,12.85,7.48
+"bulk",7,"200-500","Clouds","unsettled",4,0.04,100
+"bulk",7,"200-500","Crops","break_endpoint",2370,23.7,11.6
+"bulk",7,"200-500","Crops","break_sustained",8250,82.5,40.39
+"bulk",7,"200-500","Crops","stable",2199,21.99,10.77
+"bulk",7,"200-500","Crops","stable_flicker",3890,38.9,19.05
+"bulk",7,"200-500","Crops","unsettled",3715,37.15,18.19
+"bulk",7,"200-500","Flooded Vegetation","break_endpoint",138,1.38,7.82
+"bulk",7,"200-500","Flooded Vegetation","break_sustained",3,0.03,0.17
+"bulk",7,"200-500","Flooded Vegetation","stable",288,2.88,16.32
+"bulk",7,"200-500","Flooded Vegetation","stable_flicker",740,7.4,41.93
+"bulk",7,"200-500","Flooded Vegetation","unsettled",596,5.96,33.77
+"bulk",7,"200-500","Rangeland","break_endpoint",8078,80.78,7.95
+"bulk",7,"200-500","Rangeland","break_sustained",3032,30.32,2.98
+"bulk",7,"200-500","Rangeland","stable",58076,580.76,57.13
+"bulk",7,"200-500","Rangeland","stable_flicker",22701,227.01,22.33
+"bulk",7,"200-500","Rangeland","unsettled",9771,97.71,9.61
+"bulk",7,"200-500","Snow/Ice","break_endpoint",76,0.76,12.88
+"bulk",7,"200-500","Snow/Ice","unsettled",514,5.14,87.12
+"bulk",7,"200-500","Trees","break_endpoint",8199,81.99,2.74
+"bulk",7,"200-500","Trees","break_sustained",3774,37.74,1.26
+"bulk",7,"200-500","Trees","stable",258781,2587.81,86.57
+"bulk",7,"200-500","Trees","stable_flicker",16938,169.38,5.67
+"bulk",7,"200-500","Trees","unsettled",11219,112.19,3.75
+"bulk",7,"200-500","Water","break_endpoint",88,0.88,10.8
+"bulk",7,"200-500","Water","break_sustained",186,1.86,22.82
+"bulk",7,"200-500","Water","stable_flicker",202,2.02,24.79
+"bulk",7,"200-500","Water","unsettled",339,3.39,41.6
+"bulk",8,">500","Bare Ground","break_endpoint",5753,57.53,45.92
+"bulk",8,">500","Bare Ground","break_sustained",2,0.02,0.02
+"bulk",8,">500","Bare Ground","stable",3,0.03,0.02
+"bulk",8,">500","Bare Ground","stable_flicker",178,1.78,1.42
+"bulk",8,">500","Bare Ground","unsettled",6592,65.92,52.62
+"bulk",8,">500","Built Area","break_endpoint",629,6.29,1.96
+"bulk",8,">500","Built Area","break_sustained",256,2.56,0.8
+"bulk",8,">500","Built Area","stable",26625,266.25,83.12
+"bulk",8,">500","Built Area","stable_flicker",2858,28.58,8.92
+"bulk",8,">500","Built Area","unsettled",1664,16.64,5.19
+"bulk",8,">500","Clouds","break_endpoint",64,0.64,51.2
+"bulk",8,">500","Clouds","unsettled",61,0.61,48.8
+"bulk",8,">500","Crops","break_endpoint",5924,59.24,17.83
+"bulk",8,">500","Crops","break_sustained",8447,84.47,25.42
+"bulk",8,">500","Crops","stable",5173,51.73,15.57
+"bulk",8,">500","Crops","stable_flicker",7307,73.07,21.99
+"bulk",8,">500","Crops","unsettled",6383,63.83,19.21
+"bulk",8,">500","Flooded Vegetation","break_endpoint",230,2.3,1.26
+"bulk",8,">500","Flooded Vegetation","break_sustained",78,0.78,0.43
+"bulk",8,">500","Flooded Vegetation","stable",12284,122.84,67.38
+"bulk",8,">500","Flooded Vegetation","stable_flicker",3314,33.14,18.18
+"bulk",8,">500","Flooded Vegetation","unsettled",2324,23.24,12.75
+"bulk",8,">500","Rangeland","break_endpoint",30914,309.14,6.25
+"bulk",8,">500","Rangeland","break_sustained",16799,167.99,3.4
+"bulk",8,">500","Rangeland","stable",315703,3157.03,63.82
+"bulk",8,">500","Rangeland","stable_flicker",88616,886.16,17.91
+"bulk",8,">500","Rangeland","unsettled",42681,426.81,8.63
+"bulk",8,">500","Snow/Ice","break_endpoint",326,3.26,12.73
+"bulk",8,">500","Snow/Ice","stable_flicker",4,0.04,0.16
+"bulk",8,">500","Snow/Ice","unsettled",2231,22.31,87.11
+"bulk",8,">500","Trees","break_endpoint",49755,497.55,2.62
+"bulk",8,">500","Trees","break_sustained",30487,304.87,1.6
+"bulk",8,">500","Trees","stable",1676369,16763.69,88.14
+"bulk",8,">500","Trees","stable_flicker",93016,930.16,4.89
+"bulk",8,">500","Trees","unsettled",52362,523.62,2.75
+"bulk",8,">500","Water","break_endpoint",76,0.76,17.35
+"bulk",8,">500","Water","break_sustained",86,0.86,19.63
+"bulk",8,">500","Water","stable_flicker",124,1.24,28.31
+"bulk",8,">500","Water","unsettled",152,1.52,34.7

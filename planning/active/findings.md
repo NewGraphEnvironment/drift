@@ -15,8 +15,16 @@ Machine: 64 GB, macOS. terra 1.9.34, drift 0.16.0. BULK floodplain (`bulk_co_ff0
 | `dft_rast_break_category()` | 26.9 |
 | whole band x category probe, end to end | 107.7 |
 
-The issue body assumes Phase 2 is the expensive half. It is not: the distance transform is
-the cheapest step in the pipeline, an order of magnitude under the scan that already runs.
+The distance transform is the cheapest step in the pipeline, an order of magnitude under the scan
+that already runs.
+
+**Corrected after review:** an earlier draft claimed the issue body "has the cost inverted" and
+scheduled an edit to the issue saying so. The issue never mentions compute cost. It says *"the
+confound is the work"* and that Phase 1 can ship alone "if phase 2 **runs long**", which plainly
+means the design question, not the wall clock. Measuring 8.3 s refutes nothing the issue claimed,
+and the finding below on `break_year` shows the design question was in fact still open. That
+issue-body edit is dropped; correcting a premise the author never held would have put a wrong
+correction on the record.
 
 ### Corridor profile, stable-water-core reference
 
@@ -36,8 +44,15 @@ construction, so the reference cannot manufacture the instability being measured
 | 200-500 m | 446,109 | 74.6% | 3.4% | 4.9% | 6.6% | 10.4% |
 | >500 m | 2,495,850 | 81.6% | 2.2% | 3.8% | 4.6% | 7.8% |
 
-Monotone in every column. Unsettled 4.8x, combined flicker (unsettled + stable_flicker)
-4.5x, `break_sustained` 4.0x. **97.2% of the first 10 m ring is not stable.**
+Unsettled 4.8x, combined flicker (unsettled + stable_flicker) 4.5x, `break_sustained` 4.0x.
+
+**Corrected after review:** an earlier draft of this file said "monotone in every column". It is
+not. `stable` dips 74.8 -> 74.6 between the 100-200 and 200-500 m bands, `stable_flicker` is flat
+across 50-200 m, and `break_sustained` has a **local maximum at 200-500 m** rather than falling.
+Only `unsettled` and `break_endpoint` are monotone once the core row is dropped. The
+`break_sustained` shape matters on its own: settled, real change peaks *away* from the water, which
+argues against reading the corridor result as "change concentrates on the channel". It is a
+**flicker** result.
 
 ### Sensitivity: 2017-Water reference
 
@@ -89,6 +104,120 @@ concession has to be **added** before it can be filled, and the issue body needs
 - The five temporal categories are unchanged, so `inst/cartography/drift_temporal.csv` and
   the article's `stopifnot()` on the class set are untouched.
 
+## Plan review round 1 — findings acted on
+
+A `Plan` subagent reviewed the task plan against the issue and the code while Phase 1 was being
+written, so it read the implementation rather than the plan text. Nine findings were verified
+against the committed artifacts and acted on; the two most consequential changed what the article
+will claim.
+
+### The stable-water core excises the stable class from the near bands (verified, reframes the result)
+
+The core is every pixel with `n_flips == 0` and class Water. So **every permanent-water pixel is
+removed from the band population and put in the core**, and the 0-10 m ring is by construction the
+set of cells beside permanent water that are *not* permanent water — the one place the dominant
+stable class has been excised a priori. The far bands keep all of theirs.
+
+Measured, `from_class = Water` on bulk, share within band and class:
+
+| band | stable |
+|---|---|
+| core | 100% |
+| 0-10 m | **0%** |
+| 10-30 m | **0%** |
+| ... | **0%** |
+| >500 m | **0%** |
+
+Zero in every band outside the core, exactly as predicted: a 2017-Water cell that is not in the
+core either changed or flickered, so `stable` is structurally unreachable. **Any all-class band
+share is contaminated by this, and the Water column of the within-class table is a tautology.**
+
+The fix is not a different reference — it is to lead with a class that cannot be in the core.
+`from_class = Trees` is immune, and it is clean and monotone (bulk, share within band and class):
+
+| band | stable | flicker |
+|---|---|---|
+| 0-10 m | 8.4% | 54.5% |
+| 10-30 m | 61.6% | 24.3% |
+| 30-50 m | 82.2% | 12.7% |
+| 100-200 m | 86.2% | 10.1% |
+| >500 m | 88.1% | 7.6% |
+
+Across all four groups, within-Trees flicker runs 46.3-59.7% in the first ring against 3.3-11.1%
+beyond 500 m. **That is the number the article should quote**, not the all-class band share.
+
+### `break_sustained` does not establish a walk (verified, added to the stage)
+
+An earlier draft of this file claimed the issue's step 3 "needs no new machinery" because
+`dft_rast_break_category()` already separates the channel walk from mixed-pixel oscillation. It
+does not: a classifier that changed its mind once and permanently produces `break_sustained` too.
+A walk is a spatial-temporal signature — `break_year` rising with distance across a band of pixels
+— and that layer was not in the plan. It is in `res$breaks` already, so it cost one crosstab.
+`summary_corridor_breakyear.csv` is the result.
+
+### A control is not a null (verified, added to the stage)
+
+The acceptance criterion asks for a corridor claim "with its null stated". A three-way crosstab on
+`from_class` is a **control** for composition — it says the gradient is not an artifact of which
+classes sit near water. It says nothing about whether *water* is special. The null that answers
+that is a from-epoch class boundary with no water on either side: same machinery, same bands, same
+denominator. If flicker rises at any edge the same way, the corridor framing is not supported and
+the honest reading is a generic edge effect. Added as a third reference arm.
+
+### The issue's own boundary-signature numbers are wrong, and the effect reverses in one group
+
+The issue body quotes `break_frac` "0.464-0.544 against 0.515-0.629" for artifact-signature
+patches against the rest. Read straight off the four committed `summary_patch_groups.csv` files:
+
+| group | artifact_signature | other | sliver | wider |
+|---|---|---|---|---|
+| bulk | 0.494 | 0.575 | 0.464 | 0.590 |
+| necr | 0.490 | 0.621 | 0.478 | 0.629 |
+| lnth | **0.518** | **0.515** | 0.478 | 0.532 |
+| kotl | 0.550 | 0.583 | 0.544 | 0.588 |
+
+The quoted range conflates two rows: 0.464-0.544 is the **sliver** range and 0.629 is necr's
+**wider** value. The artifact range is 0.490-0.550 against 0.515-0.621. And in **lnth the
+direction reverses** — artifact-signature patches settle slightly *more* than the rest. So the
+article must not assert a boundary-signature effect as universal; it holds in three groups of
+four. The width effect, by contrast, is solid: sliver `n_flips` exceeds wider in all four and
+sliver `break_frac` is below wider in all four.
+
+### "One pixel wide" is not what `flag_sliver` measures
+
+`R/dft_transition_artifact.R:141,238` — `flag_sliver` is `(2 * area / perimeter) / cell_size <
+1.5`, an effective-width proxy. At 10 m an isolated cell scores 0.5 px, a 2x2 block 1.0, a 2x3 1.2,
+a 3x3 exactly 1.5 (not flagged); rasterized diagonals have inflated perimeter and are
+systematically flagged. So the population is "effective width under 1.5 pixels — small compact
+blobs as well as one-cell strips", not "one pixel wide". The value traces to a committed CSV, which
+is what the acceptance criterion asks; the sentence did not describe the measurand.
+
+### kotl's reference is a lake, not a channel
+
+Core share of valid cells: bulk 14.4%, necr 25.3%, lnth 33.7%, **kotl 67.0%**. Kootenay Lake is
+two thirds of that floodplain, so "distance to the channel" reads as "distance to a regulated lake
+shore" there. Band occupancy is not the problem — every band holds 37k-2.5M cells in every group —
+the framing is. Reported in the article rather than corrected.
+
+### Guards added
+
+- Both comparator arms now have a positive control; one perturbed count drives only the value arm.
+- Band-degeneracy check: every conservation arm is satisfied by an all-zero distance raster, which
+  is what a 1/0 mask produces, since `terra::distance()` measures *from* NA cells *to* non-NA ones.
+- Realised band set asserted against the eight declared codes — `classify()` leaves an unmatched
+  value at its original value rather than setting NA, so an out-of-range distance would survive as
+  a phantom band carrying a raw metric.
+- Unmapped from-epoch class codes refused rather than becoming an NA class name.
+- `wopt = list(steps = 64)` on the seven-layer `app()`; `terra::tmpFiles(remove = TRUE)` per group.
+
+### Findings checked and already satisfied by the implementation
+
+`terra::distance()` polarity (the mask is built 1/NA), the `7L` magic literal (`ncol(v)` is used),
+the water code (read from `dft_class_table()`), the four-level vocabulary in `summary_change.csv`
+(joined on `category_label` through `read_change()`, never on the integer id), factor layers
+reaching `crosstab()` (`deepcopy` + `set.cats(NULL)`), and the reclass lower bound of -1 reaching a
+published column (fixed before the first commit).
+
 ## Errors Encountered
 
 | Error | Resolution |
@@ -96,6 +225,9 @@ concession has to be **added** before it can be filled, and the issue body needs
 | A background probe launched with `&` inside a Bash call returned "completed" while the R process was still running; the log held only a progress bar | Gate on the in-band `PROBE DONE` marker and wait on the PID with `kill -0`, never on the wrapper exit |
 
 ## Issue context
+
+Pasted verbatim and **not verified** — the boundary-signature numbers in it
+are wrong, see the review section above. Kept as the record of what was asked.
 
 **If we do it:** a reader of the temporal-composition article learns that nine tenths of the
 change patches are one pixel wide and that the unsettled share is concentrated where classes

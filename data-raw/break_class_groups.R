@@ -13,6 +13,7 @@
 #   Rscript data-raw/break_class_groups.R necr        # or lnth, bulk, kotl
 #   Rscript data-raw/break_class_groups.R summarize   # assemble summary_groups.*
 #   Rscript data-raw/break_class_groups.R article-bulk  # BULK figure data for the #66 article
+#   Rscript data-raw/break_class_groups.R corridor   # distance-to-channel profile (#73)
 #
 # Sample RSS from outside while a group runs (KiB every 2 s):
 #   Rscript data-raw/break_class_groups.R necr > data-raw/logs/break_class_groups/necr/run.log 2>&1 &
@@ -30,6 +31,10 @@
 #   summary_patch_groups.csv - per-patch temporal evidence by #44 geometric signature (Q4)
 #   summary_shape.csv        - floodplain ff02/ff04/ff06 areas, ff06/ff02, 2A/P width (Q3)
 #   timings.csv              - stage timings and wall clock
+# and from the corridor stage, in the same per-group directory (#73):
+#   summary_corridor.csv       - temporal category by distance band, three references
+#   summary_corridor_class.csv - the same, kept split by from-epoch class
+#   summary_corridor_breakyear.csv - break_year by distance band (walk vs noise)
 # and from the summarize stage, in data-raw/logs/break_class_groups/:
 #   summary_groups.csv / .md - one row per group, every number the note quotes
 #   summary_bulk_reconcile.csv - the published-grid BULK run against the #9 run
@@ -37,6 +42,10 @@
 #   summary_groups.csv            - a column subset of the object above
 #   summary_class_temporal.csv    - temporal category per transition class
 #   summary_treeloss_temporal.csv - Trees -> non-Trees, under two named class sets
+#   summary_patch_widths.csv      - change patches by width and artifact signature
+#   summary_corridor.csv          - temporal category by distance to the channel
+#   summary_corridor_class.csv    - the same, within from-epoch class
+#   summary_corridor_breakyear.csv - break_year by distance band (walk vs noise)
 # and from the article-bulk stage, in the same directory:
 #   bulk_grid_1km.csv / bulk_window.csv / bulk_window.rds - the article's BULK figures
 
@@ -54,9 +63,9 @@ api_url <- "https://images.a11s.one/collections/stac-floodplains-bc/items"
 log_root <- file.path("data-raw", "logs", "break_class_groups")
 
 arg <- commandArgs(trailingOnly = TRUE)[1]
-if (is.na(arg) || !(arg %in% c(names(groups), "summarize", "article-bulk"))) {
+if (is.na(arg) || !(arg %in% c(names(groups), "summarize", "article-bulk", "corridor"))) {
   stop("usage: Rscript data-raw/break_class_groups.R <", paste(names(groups), collapse = "|"),
-       "|summarize|article-bulk>", call. = FALSE)
+       "|summarize|article-bulk|corridor>", call. = FALSE)
 }
 
 # --- helpers ---------------------------------------------------------------
@@ -720,6 +729,373 @@ if (arg == "article-bulk") {
   quit(save = "no", status = 0)
 }
 
+# --- corridor stage (#73) --------------------------------------------------
+# Where in the floodplain does the temporal instability sit? The article (#66)
+# reports how much of a two-epoch comparison is unstable and never raises the
+# spatial axis; this measures the one spatial axis nothing in the repo has:
+# distance to the channel.
+#
+# The reference is a STABLE WATER CORE -- pixels classed Water in all seven
+# years -- not the from-epoch Water class. That matters and is not a detail: a
+# margin pixel that oscillates Water/non-Water is both "near 2017 water" and
+# "unsettled", so a single-epoch reference is partly measuring itself. Every
+# core cell is stable by construction, so the reference cannot manufacture the
+# instability. The single-epoch arm is kept as a sensitivity check, not as the
+# published number.
+#
+# `dft_rast_break_category()` already separates the two things a margin can be
+# doing -- a channel that WALKED is a clean switch (break_sustained), a boundary
+# that never moved and oscillates is unsettled/stable_flicker -- so the
+# separation the issue sketched as new work is a column that already exists.
+#
+# Distance and class composition are confounded: the near bands hold most of the
+# Water and Bare pixels, which are the intrinsically confusable classes. The
+# three-way crosstab keeps from_class so a within-class share can be quoted
+# rather than a raw band share.
+#
+# All four groups run in ONE process, so the rss.txt beside this stage is a
+# whole-run peak and not the per-group trace the other stages record; results
+# are freed and terra's temp files removed between groups. Needs the gitignored
+# COGs and ~16 GiB, so it never runs in CI.
+#
+# kotl's reference is NOT a channel: 67% of its floodplain is permanent water
+# (Kootenay Lake) against 14-34% in the other three, so "distance to the
+# channel" reads as "distance to the lake shore" there. Reported, not corrected.
+
+if (arg == "corridor") {
+  art_dir <- file.path("inst", "extdata", "temporal-composition")
+  dir.create(art_dir, recursive = TRUE, showWarnings = FALSE)
+  cor_dir <- file.path(log_root, "corridor")
+  dir.create(cor_dir, recursive = TRUE, showWarnings = FALSE)
+
+  t0 <- Sys.time()
+  timings <- list()
+  tick <- function(label, start) {
+    timings[[label]] <<- round(as.numeric(difftime(Sys.time(), start, units = "secs")), 1)
+  }
+
+  lulc <- dft_class_table("io-lulc")
+  water_code <- lulc$code[lulc$class_name == "Water"]
+  stopifnot(length(water_code) == 1L, !is.na(water_code))
+
+  # Bands in metres. `classify()` is right-closed, so the first row (-1, 0]
+  # captures exactly the reference cells themselves, which is the internal
+  # control: that band must come back 100% stable under the core reference.
+  band_label <- c("core", "0-10", "10-30", "30-50", "50-100", "100-200", "200-500", ">500")
+  # The reclass lower bound of the first band is -1 so that a right-closed
+  # (-1, 0] interval captures distance exactly 0 -- the reference cells. That
+  # -1 is a reclass mechanic and must not reach a published column, where it
+  # would read as a negative distance; `band_from` is what gets written.
+  rcl_from   <- c(-1, 0, 10, 30, 50, 100, 200, 500)
+  band_from  <- c(0, 0, 10, 30, 50, 100, 200, 500)
+  band_to    <- c(0, 10, 30, 50, 100, 200, 500, Inf)
+  rcl <- cbind(rcl_from, band_to, seq_along(band_label))
+
+  # A levels-free integer copy. crosstab() reports LABELS the moment a layer is
+  # a factor, and terra writes a .tif.aux.xml RAT sidecar beside any factor it
+  # writes; deepcopy() then set.cats() in place is one copy either way.
+  bare_int <- function(x) {
+    y <- terra::deepcopy(x)
+    terra::set.cats(y, layer = 1, value = NULL)
+    terra::coltab(y) <- NULL
+    y
+  }
+
+  # One reference -> the three-way band x from_class x category table.
+  corridor_table <- function(ref_mask, from_class, category, cell_ha) {
+    d <- terra::distance(ref_mask, filename = tempfile(fileext = ".tif"))
+    band <- terra::classify(d, rcl, include.lowest = TRUE,
+                            filename = tempfile(fileext = ".tif"),
+                            wopt = list(datatype = "INT1U"))
+    names(band) <- "band"
+    ct <- terra::crosstab(c(band, from_class, category), long = TRUE, useNA = TRUE)
+    if (ncol(ct) != 4L) stop("crosstab returned ", ncol(ct), " columns, expected 4")
+    names(ct) <- c("band", "from_code", "category", "n_cells")
+    # as.integer() DIRECTLY, never via as.character(): crosstab() returns
+    # numeric columns carrying NaN for the useNA group, and as.integer("NaN")
+    # is 0 with no warning while as.integer(NaN) is NA. Routed through a
+    # string, a pixel that could not be scanned would be published as
+    # category 0 -- `stable` -- which is the one answer that must not appear.
+    ct$band       <- as.integer(ct$band)
+    ct$from_code  <- as.integer(ct$from_code)
+    ct$category   <- as.integer(ct$category)
+    ct$n_cells    <- as.integer(ct$n_cells)
+    stopifnot(is.numeric(ct$n_cells), !anyNA(ct$n_cells))
+    ct$band_label     <- ifelse(is.na(ct$band), NA_character_, band_label[ct$band])
+    # every realised band must be one of the eight declared codes: classify()
+    # leaves an unmatched value at its ORIGINAL value rather than setting NA, so
+    # a distance outside the reclass table would survive as a phantom band
+    # carrying a raw metric value
+    if (!all(stats::na.omit(ct$band) %in% seq_along(band_label))) {
+      stop("bands outside the declared set: ",
+           paste(setdiff(unique(stats::na.omit(ct$band)), seq_along(band_label)), collapse = ", "))
+    }
+    ct$from_class     <- lulc$class_name[match(ct$from_code, lulc$code)]
+    # an unmapped class code would silently become an NA class name and be
+    # dropped by every downstream filter
+    if (any(is.na(ct$from_class) & !is.na(ct$from_code))) {
+      stop("from-epoch class codes absent from dft_class_table(\"io-lulc\"): ",
+           paste(unique(ct$from_code[is.na(ct$from_class) & !is.na(ct$from_code)]), collapse = ", "))
+    }
+    ct$category_label <- ifelse(is.na(ct$category), NA_character_,
+                                break_category_levels()[ct$category + 1L])
+    ct$area_ha <- round(ct$n_cells * cell_ha, 2)
+    ct
+  }
+
+  # Roll a three-way table up to (band, category), dropping unscannable pixels.
+  # `pct_of_band` is a share of the SCANNED cells in that band, which is the
+  # denominator the article quotes; it is not a share of the band's cells.
+  roll_band <- function(ct) {
+    s <- ct[!is.na(ct$category) & !is.na(ct$band), ]
+    a <- stats::aggregate(cbind(n_cells, area_ha) ~ band + band_label + category_label,
+                          s, sum, na.action = stats::na.pass)
+    tot <- stats::aggregate(n_cells ~ band, a, sum)
+    a$pct_of_band <- round(100 * a$n_cells / tot$n_cells[match(a$band, tot$band)], 2)
+    a[order(a$band, a$category_label), ]
+  }
+
+  per_group <- list()
+  for (g in names(groups)) {
+    tg <- Sys.time()
+    out_dir <- file.path(log_root, g)
+    message("--- ", g, " (", groups[[g]], ")")
+
+    rasters <- lapply(stats::setNames(years, as.character(years)), function(yr) {
+      dest <- file.path(out_dir, sprintf("classified_%d.tif", yr))
+      if (!file.exists(dest)) stop("missing ", dest, " -- run the ", g, " stage first")
+      terra::rast(dest)
+    })
+    classified <- dft_rast_classify(rasters, source = "io-lulc")
+    res <- dft_rast_break_class(classified)
+    cell_ha <- prod(terra::res(res$raster)) * 1e-4
+    cat5 <- dft_rast_break_category(res, filename = tempfile(fileext = ".tif"))
+    category <- bare_int(cat5[["category"]])
+    from_class <- bare_int(rasters[[1]])
+    names(from_class) <- "from_code"
+
+    # --- the stable water core ------------------------------------------------
+    # Water in ALL seven years. na.rm = TRUE is safe only because the test is
+    # `== nlyr`: a pixel NA in any year contributes 0 and cannot reach it, so an
+    # unscannable pixel is excluded rather than admitted.
+    stk <- terra::rast(unname(rasters))
+    core01 <- terra::app(stk, fun = function(v) {
+      # refuse a bare vector: app() tries apply(chunk, 1, fun) FIRST and falls
+      # back to fun(chunk) only when that errors, so a closure that tolerates a
+      # scalar runs once per cell
+      if (!is.matrix(v)) stop("matrix chunks only")
+      as.integer(rowSums(v == water_code, na.rm = TRUE) == ncol(v))
+    }, filename = tempfile(fileext = ".tif"),
+       # bound the R-side matrices: a 7-layer pass over 204M cells (kotl) left
+       # to terra's memory heuristic builds them in one or two chunks
+       wopt = list(datatype = "INT1U", steps = 64))
+    n_core <- as.integer(terra::global(core01, "sum", na.rm = TRUE)[[1]])
+
+    # PREMISE, not decoration. {Water in all 7 years} and {status stable AND
+    # class Water} are the same set by definition, so this identity holds for
+    # every group or the scan and the core disagree about what "never changed"
+    # means. It is also the only thing that would catch app() reading the
+    # seven-column chunk transposed, which terra does silently at some widths.
+    px <- utils::read.csv(file.path(out_dir, "summary_pixels.csv"), stringsAsFactors = FALSE)
+    w <- px[px$from_class %in% "Water" & px$to_class %in% "Water" &
+              px$status %in% "stable", ]
+    if (nrow(w) != 1L) {
+      stop(g, ": expected exactly one Water,Water,stable row in summary_pixels.csv, got ", nrow(w))
+    }
+    if (!identical(n_core, as.integer(w$n_cells))) {
+      stop(g, ": stable water core is ", n_core, " cells but summary_pixels.csv reports ",
+           w$n_cells, " Water,Water,stable -- the two definitions of 'never changed' disagree")
+    }
+    message("  stable water core ", format(n_core, big.mark = ","),
+            " cells, identical to the committed Water,Water,stable row")
+
+    core_mask <- terra::ifel(core01 == 1L, 1L, NA, filename = tempfile(fileext = ".tif"))
+    ct_core <- corridor_table(core_mask, from_class, category, cell_ha)
+
+    # sensitivity arm: the single-epoch reference, which is partly circular
+    w17 <- terra::ifel(from_class == water_code, 1L, NA, filename = tempfile(fileext = ".tif"))
+    ct_2017 <- corridor_table(w17, from_class, category, cell_ha)
+
+    # THE NULL. A control for class composition is not a null: it says the
+    # gradient is not an artifact of which classes sit near water, and says
+    # nothing about whether water is special. The question a null has to answer
+    # is whether flicker concentrates at the CHANNEL or simply at any EDGE. So
+    # the third reference is the from-epoch class boundary with no water on
+    # either side: same machinery, same bands, same denominator, water removed.
+    # If the profile against it has the same shape, the corridor framing is not
+    # supported and the honest reading is a generic edge effect.
+    fmax <- terra::focal(from_class, w = 3, fun = "max", na.rm = TRUE,
+                         filename = tempfile(fileext = ".tif"))
+    fmin <- terra::focal(from_class, w = 3, fun = "min", na.rm = TRUE,
+                         filename = tempfile(fileext = ".tif"))
+    is_w <- terra::ifel(from_class == water_code, 1L, 0L, filename = tempfile(fileext = ".tif"))
+    wnear <- terra::focal(is_w, w = 3, fun = "max", na.rm = TRUE,
+                          filename = tempfile(fileext = ".tif"))
+    # na.rm = TRUE means a cell on the floodplain's outer edge is not flagged
+    # merely for having NA neighbours -- the AOI boundary is not a class
+    # boundary, and counting it as one would put the whole perimeter in band 2
+    edge_nw <- terra::ifel(fmax != fmin & wnear == 0L, 1L, NA,
+                           filename = tempfile(fileext = ".tif"))
+    n_edge <- as.integer(terra::global(terra::ifel(is.na(edge_nw), 0L, 1L), "sum",
+                                       na.rm = TRUE)[[1]])
+    ct_edge <- corridor_table(edge_nw, from_class, category, cell_ha)
+    message("  non-water class-boundary reference: ", format(n_edge, big.mark = ","), " cells")
+
+    # WALK vs OSCILLATION (the issue's step 3). break_sustained does NOT
+    # establish a channel that moved: a classifier that changed its mind once
+    # and for all produces the same label. A walk is a spatial-temporal
+    # signature -- break_year rising with distance from the old channel across
+    # a band of pixels -- so it needs the break_year layer, which the category
+    # alone does not carry.
+    byr <- bare_int(res$breaks[["break_year"]])
+    names(byr) <- "break_year"
+    d_core <- terra::distance(core_mask, filename = tempfile(fileext = ".tif"))
+    band_core_r <- terra::classify(d_core, rcl, include.lowest = TRUE,
+                                   filename = tempfile(fileext = ".tif"),
+                                   wopt = list(datatype = "INT1U"))
+    names(band_core_r) <- "band"
+    ct_walk <- terra::crosstab(c(band_core_r, byr, category), long = TRUE, useNA = TRUE)
+    names(ct_walk) <- c("band", "break_year", "category", "n_cells")
+    for (nm in names(ct_walk)) ct_walk[[nm]] <- as.integer(ct_walk[[nm]])
+    ct_walk <- ct_walk[!is.na(ct_walk$band) & !is.na(ct_walk$break_year) &
+                         !is.na(ct_walk$category), ]
+    ct_walk$category_label <- break_category_levels()[ct_walk$category + 1L]
+    ct_walk <- ct_walk[ct_walk$category_label %in% c("break_sustained", "break_endpoint"), ]
+    ct_walk$band_label <- band_label[ct_walk$band]
+    ct_walk$group <- g
+    ct_walk <- ct_walk[c("group", "band", "band_label", "break_year",
+                         "category_label", "n_cells")]
+    utils::write.csv(ct_walk, file.path(out_dir, "summary_corridor_breakyear.csv"),
+                     row.names = FALSE)
+
+    # --- conservation, against the committed artifact -------------------------
+    # The comparison is against summary_change.csv, which this stage does not
+    # write and did not derive: same population (scannable pixels), two
+    # independent derivations. Per category, not just the total, so two errors
+    # cannot cancel.
+    ref_chg <- read_change(file.path(out_dir, "summary_change.csv"))
+    ref_by <- stats::aggregate(n_cells ~ category_label, ref_chg, sum)
+    check_conservation <- function(ct, arm) {
+      got <- stats::aggregate(n_cells ~ category_label,
+                              ct[!is.na(ct$category), ], sum)
+      if (!setequal(got$category_label, ref_by$category_label)) {
+        stop(g, " (", arm, "): category sets differ from summary_change.csv: (",
+             paste(setdiff(ref_by$category_label, got$category_label), collapse = ", "),
+             ") missing, (",
+             paste(setdiff(got$category_label, ref_by$category_label), collapse = ", "),
+             ") unexpected")
+      }
+      m <- match(got$category_label, ref_by$category_label)
+      if (!identical(as.integer(got$n_cells), as.integer(ref_by$n_cells[m]))) {
+        stop(g, " (", arm, "): banding does not conserve the committed cell counts; ",
+             paste(sprintf("%s %d vs %d", got$category_label, got$n_cells,
+                           ref_by$n_cells[m]), collapse = "; "))
+      }
+      invisible(TRUE)
+    }
+    check_conservation(ct_core, "core")
+    check_conservation(ct_2017, "water2017")
+    check_conservation(ct_edge, "edge_nonwater")
+
+    # POSITIVE CONTROLS: the comparator has two arms and one control drives only
+    # one of them. Perturbing a count leaves the key sets identical, so it
+    # exercises the value arm and says nothing about the structural arm; a
+    # dropped category is the other. Both, or half the comparator is unproven.
+    fires <- function(tbl, why) {
+      if (!inherits(try(check_conservation(tbl, "control"), silent = TRUE), "try-error")) {
+        stop(g, ": the conservation comparator passed a table it should have refused (", why, ")")
+      }
+    }
+    i <- which(!is.na(ct_core$category))[1]
+    bad_value <- ct_core; bad_value$n_cells[i] <- bad_value$n_cells[i] + 1L
+    fires(bad_value, "one count off by one")
+    drop_lab <- ct_core$category_label[i]
+    fires(ct_core[is.na(ct_core$category) | ct_core$category_label != drop_lab, ],
+          paste("category", drop_lab, "removed"))
+    message("  conserves the committed summary_change.csv per category; both controls fire")
+
+    # BAND DEGENERACY. Every conservation arm above is satisfied by an all-zero
+    # distance raster -- which is what an inverted mask produces, since
+    # terra::distance() measures FROM the NA cells TO the non-NA ones. A mask
+    # built 1/0 rather than 1/NA bands every valid cell as `core` and still
+    # conserves every count exactly.
+    occ <- table(ct_core$band[!is.na(ct_core$category) & !is.na(ct_core$band)])
+    if (length(occ) < 3L) {
+      stop(g, ": only ", length(occ), " distance bands are occupied -- the distance ",
+           "transform is degenerate (an inverted 1/0 mask does exactly this)")
+    }
+
+    # --- write ---------------------------------------------------------------
+    band_core <- roll_band(ct_core); band_core$reference <- "water_core"
+    band_2017 <- roll_band(ct_2017); band_2017$reference <- "water_2017"
+    band_edge <- roll_band(ct_edge); band_edge$reference <- "edge_nonwater"
+    bands <- rbind(band_core, band_2017, band_edge)
+    bands$group <- g
+    bands$dist_min_m <- band_from[bands$band]
+    bands$dist_max_m <- band_to[bands$band]
+    bands <- bands[c("group", "reference", "band", "band_label", "dist_min_m", "dist_max_m",
+                     "category_label", "n_cells", "area_ha", "pct_of_band")]
+    utils::write.csv(bands, file.path(out_dir, "summary_corridor.csv"), row.names = FALSE)
+
+    # the within-class control, core reference only
+    cls <- ct_core[!is.na(ct_core$category) & !is.na(ct_core$band) & !is.na(ct_core$from_class), ]
+    cls <- stats::aggregate(cbind(n_cells, area_ha) ~ band + band_label + from_class +
+                              category_label, cls, sum, na.action = stats::na.pass)
+    tot <- stats::aggregate(n_cells ~ band + from_class, cls, sum)
+    k <- paste(cls$band, cls$from_class)
+    cls$pct_of_band_class <- round(100 * cls$n_cells /
+                                     tot$n_cells[match(k, paste(tot$band, tot$from_class))], 2)
+    cls$group <- g
+    cls <- cls[order(cls$band, cls$from_class, cls$category_label),
+               c("group", "band", "band_label", "from_class", "category_label",
+                 "n_cells", "area_ha", "pct_of_band_class")]
+    utils::write.csv(cls, file.path(out_dir, "summary_corridor_class.csv"), row.names = FALSE)
+
+    per_group[[g]] <- list(bands = bands, class = cls, walk = ct_walk, n_core = n_core)
+    print(band_core[band_core$category_label %in% c("unsettled", "stable_flicker"),
+                    c("band_label", "n_cells", "pct_of_band")])
+    tick(g, tg)
+
+    rm(rasters, classified, res, cat5, category, from_class, stk, core01, core_mask,
+       w17, ct_core, ct_2017, ct_edge, ct_walk, cls, bands, band_core, band_2017,
+       band_edge, fmax, fmin, is_w, wnear, edge_nw, byr, d_core, band_core_r)
+    terra::tmpFiles(remove = TRUE)
+    gc(verbose = FALSE)
+  }
+
+  # --- rollup ---------------------------------------------------------------
+  if (!setequal(names(per_group), names(groups))) {
+    stop("corridor: only ", paste(names(per_group), collapse = ", "), " completed")
+  }
+  all_bands <- do.call(rbind, lapply(per_group, `[[`, "bands"))
+  all_class <- do.call(rbind, lapply(per_group, `[[`, "class"))
+  all_walk  <- do.call(rbind, lapply(per_group, `[[`, "walk"))
+  rownames(all_bands) <- NULL
+  rownames(all_class) <- NULL
+  rownames(all_walk)  <- NULL
+  utils::write.csv(all_bands, file.path(log_root, "summary_corridor.csv"), row.names = FALSE)
+  utils::write.csv(all_bands, file.path(art_dir, "summary_corridor.csv"), row.names = FALSE)
+  utils::write.csv(all_class, file.path(art_dir, "summary_corridor_class.csv"), row.names = FALSE)
+  utils::write.csv(all_walk, file.path(art_dir, "summary_corridor_breakyear.csv"),
+                   row.names = FALSE)
+
+  # The internal control, asserted rather than eyeballed: under the core
+  # reference the reference band is stable by construction, so anything else
+  # there means the core and the scan disagree.
+  ctl <- all_bands[all_bands$reference == "water_core" & all_bands$band_label == "core", ]
+  bad <- ctl[ctl$category_label != "stable" & ctl$n_cells > 0, ]
+  if (nrow(bad) > 0) {
+    stop("the stable water core is not 100% stable in ",
+         paste(unique(bad$group), collapse = ", "), " -- the reference is not what it claims")
+  }
+  message("core band is 100% stable in all four groups")
+
+  timings[["wall"]] <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 1)
+  utils::write.csv(data.frame(stage = names(timings), seconds = unlist(timings)),
+                   file.path(cor_dir, "timings.csv"), row.names = FALSE)
+  message("ALL STAGES DONE")
+  quit(save = "no", status = 0)
+}
 # --- per-group stage -------------------------------------------------------
 
 g <- arg
