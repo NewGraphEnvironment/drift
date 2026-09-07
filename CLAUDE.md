@@ -1331,6 +1331,50 @@ appears at the consumer, far from the producer that legitimately emitted nothing
 `x$col <- rep(value, nrow(x))` is 0-row-safe.
 
 
+### `deparse(body(f))` excludes formal defaults, so a body scan cannot see a default
+
+A guard that scans function bodies for a forbidden literal is blind to that literal in a
+**signature**. Measured on R 4.5:
+
+```r
+f <- function(image = "qgis/qgis:latest") { x <- 1; x }
+grepl("qgis/qgis:latest", paste(deparse(body(f)), collapse = ""))   # FALSE
+grepl("qgis/qgis:latest", paste(deparse(f),       collapse = ""))   # TRUE
+```
+
+That matters because **a formal default is how a package-wide constant is usually
+expressed** — `image =`, `path =`, a URL, a schema name. So the shape most likely to
+carry the thing you are forbidding is the one shape the scan cannot reach, and the guard
+reports clean against the exact regression it names.
+
+Caught 2026-09-06 in rfp#282: a test asserting no rolling docker tag remained in `R/`
+reported **FAIL 0** with the pre-fix default restored on both entry points. `deparse(o)`
+instead of `deparse(body(o))` — one word, 0 hits as shipped and 2 with the bug restored.
+
+Two things worth knowing before switching:
+
+- **`deparse()` walks the AST, not the srcref**, so a comment mentioning the literal does
+  **not** false-positive. Verified against two legitimate mentions in the same package.
+- **Choose per guard, not globally.** A scan for something that can only appear in a body
+  — a re-inlined argument vector, a direct `system2()` call — is correctly `body()`, and
+  widening it to `deparse(o)` only adds surface. The question is whether the thing being
+  forbidden could be written as a default.
+
+The entry above, "Under `R CMD check`, tests run from a temp dir against the INSTALLED
+package", prescribes `deparse(body(get(nm, envir = asNamespace("pkg"))))`. That snippet is
+right about the half it is teaching — read the installed bodies, never `../../R/*.R` — and
+carries this blind spot for any guard whose literal could sit in a signature. Reconciling
+the two is soul#208.
+
+**Anti-vacuity, since this guard's premise is easy to get wrong:** asserting the namespace
+has objects proves the scan *ran*, not that the predicate can *fire*. Plant the shape:
+
+```r
+planted <- function(image = "forbidden") NULL
+expect_true(grepl("forbidden", paste(deparse(planted), collapse = "\n"), fixed = TRUE))
+expect_false(grepl("forbidden", paste(deparse(body(planted)), collapse = "\n"), fixed = TRUE))
+```
+
 
 # Code Check — Shell
 
@@ -1767,6 +1811,42 @@ all_pids="$all_pids $!"
 ...
 for pid in $all_pids; do wait "$pid" 2>/dev/null || true; done
 ```
+
+### A `pgrep -f` waiter matches its own command line, so it never exits
+
+`until ! pgrep -f "job" >/dev/null; do sleep 30; done` is the obvious way to wait for a
+background job, and it cannot terminate: the loop's **own** command line contains the
+string `job`, so `pgrep -f` finds the waiter itself and the condition stays true after
+the real process is long gone.
+
+It fails quietly and expensively. Nothing errors, the job finishes normally, and the
+waiter spins until something kills it — so a session that launched three of them for
+three stages sits waiting on a stage that ended, with the log on disk saying `Done`.
+Measured 2026-09-06 in rtj: two waiters were still looping after their refresh had
+written its completion block, and `pgrep -fl` showed each matching only *the other
+waiter and itself*.
+
+Wait on the **PID**, which cannot self-match:
+
+```bash
+nohup Rscript long_job.R > run.log 2>&1 &
+PID=$!
+while kill -0 "$PID" 2>/dev/null; do sleep 30; done
+```
+
+`kill -0` tests for existence without signalling. Note the `&`-binding trap above —
+assign `PID` on its own line, and start the long command alone, or `$!` is the
+subshell's.
+
+Where only a pattern is available, exclude the waiter explicitly (`pgrep -f "job" |
+grep -v $$`), or match on something the loop's own text does not contain — but the PID
+is the form that has no failure mode.
+
+**Diagnose it with `pgrep -fl`, not `pgrep -f`.** The count alone says "still running";
+the listing shows *what* matched, and a waiter matching itself is obvious the moment
+you can read the command lines. This is the refinement of `always-away.md`'s "check
+`pgrep` before declaring a run dead": checking is right, and looping on the check is
+where it goes wrong.
 
 ### `timeout` is GNU coreutils — a portable deadline
 
@@ -2825,6 +2905,107 @@ Caught 2026-09-06 in drift#67, by a reviewer disassembling the method rather tha
 both paths return the same numbers on a fixture small enough to run.
 
 
+### sf: close a rotated ring by copying the first vertex, never by recomputing it
+
+Rotating a polygon by multiplying its whole vertex matrix — `xy %*% rot` — looks exact,
+and for a ring built closed it is not. `%*%` computes rows **independently**, and an
+optimised BLAS may block or vectorise them differently, so the fifth row (a duplicate of
+the first, by construction) can come back a few ulps away from where the first landed:
+
+```r
+xy  <- matrix(c(-1000,-1000, 1000,-1000, 1000,1000, -1000,1000, -1000,-1000),
+              ncol = 2, byrow = TRUE)             # closed: row 5 == row 1
+rad <- 230 * pi / 180
+r   <- xy %*% matrix(c(cos(rad), sin(rad), -sin(rad), cos(rad)), nrow = 2)
+identical(r[1, ], r[5, ])                          # FALSE
+r[1, ] - r[5, ]                                    # 0  -2.842171e-14
+```
+
+`sf::st_polygon()` requires **exact** closure and raises *"polygons not (all) closed"* —
+an **error**, not a warning — so one unlucky feature aborts the whole batch rather than
+losing itself. Rotate four vertices and append the first again:
+
+```r
+xy <- matrix(c(-hc,-ha, hc,-ha, hc,ha, -hc,ha), ncol = 2, byrow = TRUE)  # four
+if (is.finite(b)) xy <- xy %*% rot
+xy <- rbind(xy, xy[1, , drop = FALSE])             # close by COPY
+```
+
+**Whether it fires depends on the angle and the dimensions**, so a fixture that happens
+not to hit it proves nothing: measured 2026-09-02 in fly#26, this had been latent on
+`main` for every rotated non-square footprint since fly#32 and 1338 passing tests never
+saw it. Sweep the angle — `seq(0, 359.5, by = 0.5)` — rather than sampling a handful,
+and assert that the *recomputed* form still fails somewhere in that sweep, or the test
+silently becomes decoration once the fix makes the property true by construction.
+
+Generalises past rotation to any affine map applied to a closed ring, and past sf to any
+library that validates closure by exact equality. The rule is the same: a closing vertex
+is a **copy**, never a computation.
+
+
+### terra: `plot(type = "classes", levels =, col =)` maps colours by POSITION, per layer
+
+A `levels`/`col` pair is not a value-to-colour mapping. `terra::plot()` matches the vectors
+against **that layer's own sorted unique values**, so a layer missing a class shifts every class
+after it — and each panel of a multi-panel figure is mapped independently.
+
+Measured 2026-09-06 in drift#66 on a 7-layer IO LULC stack carrying codes 1, 2, 5, 9, 11. Five of
+the seven years contain no code 9 (Snow/Ice), so their four values took the first four colours and
+**Rangeland drew in Snow/Ice's blue** — 705 cells, in the panel the figure existed to show,
+contradicting the legend printed beneath it from the same vectors:
+
+```r
+present <- sort(unique(values(stack)))          # 1 2 5 9 11 across the STACK
+ct <- ct[match(present, ct$code), ]
+terra::plot(stack[[i]], type = "classes", levels = ct$class_name, col = ct$color)
+#> layer i has 1 2 5 11 -> code 11 draws ct$color[4], not ct$color[5]
+```
+
+Computing the class set over the whole stack is exactly the instinct that produces it: it is the
+right way to build a **legend**, and the wrong way to build a per-layer `col`.
+
+Use a colour table, which is keyed by cell value and cannot desynchronise:
+
+```r
+for (i in seq_len(terra::nlyr(x))) terra::coltab(x, layer = i) <- data.frame(value = , col = )
+terra::plot(x[[i]], legend = FALSE)
+```
+
+- **A single-layer fixture cannot reach this**, and neither can a stack whose layers happen to
+  carry every class. The trigger is a *missing* class in *some* layer.
+- **Reading the code will not find it** — the vectors are correct and the legend built from them
+  is correct. Read the rendered image and check one cell of a known class against the legend.
+- Same shape for any renderer taking parallel `breaks`/`labels`/`col` vectors and re-deriving the
+  domain per facet.
+
+### terra: `wrap()` carries the tempfile basename in `varnames`, so a committed artifact churns
+
+`sources()` on a derived raster (above) is the well-known half. `varnames` is the quiet one:
+terra keeps the **basename of whatever `filename =` produced**, and `wrap()` serialises it, so an
+`app()`/`focal()` written to `tempfile()` puts a per-process random string into the saved object.
+
+```r
+r <- terra::app(x, fun = f, filename = tempfile(fileext = ".tif"))
+terra::varnames(r)                       #> "file178092823716a"
+saveRDS(terra::wrap(r), "committed.rds") #> different bytes on every run
+```
+
+Measured 2026-09-06 in drift#66. Values, extent and CRS all round-trip **identically** — the
+diff is entirely `@attributes$varnames` — so every content check agrees while the file changes on
+each regeneration and a real change becomes invisible in the noise. Pin it, with `longnames`,
+before wrapping or writing:
+
+```r
+terra::varnames(y) <- rep("<a stable name>", terra::nlyr(y))
+terra::longnames(y) <- rep("", terra::nlyr(y))
+```
+
+The check is a byte comparison of two consecutive regenerations, not an inspection of the object:
+`cmp` on the two `.rds` files is what found it, after `identical(values(a), values(b))` had said
+they matched. Note this pins only the **per-process** variation — a `date` field in the same
+artifact still churns daily, which is a deliberate provenance choice rather than a defect, so say
+which one the artifact is making.
+
 
 # Code Check Conventions
 
@@ -2915,6 +3096,7 @@ favourable** member of the population, computed, not the vivid one you remember.
 |---|---|---|
 | 2026-08 | link#227 / fresh#214 | **A fixture set that cannot reach the failure mode is not validation** — 8 hydrology fixtures all compared groups with *differing* stream codes; the bug fires only between groups sharing one; the next case tried dropped the group the whole Fraser drains through |
 | 2026-08 | rfp#139 | **A negative-case fixture rots when the positive set grows** — a refusal test picked EPSG:4326 because nothing supplied it; shipping an `<srs>` for a tracking layer made it resolvable and the test failed blaming the code; assert the premise beside the property |
+| 2026-09-02 | fly#26 | **An assertion invariant under the transformation you are adding stays green while its premise dies** — a film-footprint regression net pinned shape two ways, area and bbox aspect. Rotation preserves area exactly, and a rotated square's bbox is still a square (`w = h = s(|cos b| + |sin b|)`), so both survived the change that falsified their stated premise ("Square, so unrotated") and the test kept passing while measuring nothing. The fixture was fine — it is the **assertions** that could not see it. Before adding a transformation, ask of every existing assertion whether it is invariant under that transformation; what discriminated here was ring vertex 1's azimuth from the centroid, `bearing + 225`, which pins angle, sign and vertex order together |
 | 2026-08-27 | flooded#40 | **A comparison test proves nothing if the fixture makes both sides identical** — grouping by `gnis_name` vs `blue_line_key` was a bijection in the test data, so the two runs were the same run with different labels |
 | — | water-temp-bc#23 | **Test fixtures must mirror production column TYPES, not just shapes** — fixtures had `Grade` as string, production has double; a `coalesce(Grade, '')` sentinel passed 27 tests and broke on first contact |
 | 2026-09-01 | stac_floodplains_bc#23 | **A cross-item consistency check cannot see a defect that hits every item** — a uniform-key validator measures variance; keying a new asset by a stem that was already a key would have overwritten a raster in every item and every check would pass; pair with one absolute assertion |
@@ -3187,6 +3369,7 @@ every widening broke and every narrowing held.
 | 2026-09-01 | flooded#52 | **A claim flagged as under-evidenced gets repaired by widening, and widening is what breaks** — six review rounds, 36 findings; every fix added a quantifier over a ragged dataset×resolution×lineage grid; terminated by reproducing the old behaviour to the digit and measuring every row |
 | 2026-09-03 | rtj#243 | **A defect rate is a claim about the population filter first, and the subject second** — a photo-reference audit reported 142 of 290 references (49%) dangling on the server, which flipped a design conclusion and was one command from being written into another repo's issue as fact. The filter for the *reference* side was right; the filter for the *server* side required the path to contain a `photos/` directory, so every image stored elsewhere was invisible and counted as missing. Re-run on all image extensions, case-insensitive: **6 of 290, 2%** — and those six reconciled exactly to an already-filed issue about bare filenames. A 49% failure rate in a shipped project was the tell, and the reconciliation that catches it is cheap: **count both sides of a ratio with independently-justified filters, and re-run the denominator's filter one notch looser before believing a rate**. Sibling of the positive control above — here the control is a *second, more lenient* population, not a known-good item |
 | 2026-09-05 | rfp#275 | **A differential baseline stops being one the moment the parent moves** — a branch suite was compared against a baseline measured earlier the same session, at a commit that had since stopped being the branch point: another session shipped a release into `main` in between. The comparison still *ran*, still produced two numbers, and would have attributed six failures on a parent that no longer existed. Re-run at the real branch point the counts moved 4409 → 4711 on the baseline side alone. **A baseline is only valid against `git merge-base HEAD origin/main`**, so in a shared checkout re-derive it at push time rather than reusing the one taken at branch time — and note the failure direction: the stale baseline was *lower*, which flatters the branch. Sibling of "a measurement carries the time it was taken", where what expired is the reference rather than the reading |
+| 2026-09-06 | rfp#282 | **An instrument that is not stable within one version cannot speak to the difference between two — and it reads as a regression or as equivalence with equal confidence.** Smoke-testing two container versions before pinning one, the written style differed on a colour and read as a version regression; the same image run twice differed identically, because the renderer mints a symbol with a random colour. Then the *other* script's PNG came out byte-identical across the two versions and that was written into the findings file as the gate's evidence — also luck, since two runs at one image are not byte-identical either. **Both directions in one session**, on one gate. Re-measured on painted-pixel count, which is stable within a version: 7779 across three runs at each. The discriminating test is one command and precedes every A/B: **run the same image twice before comparing two of them.** Distinct from the stale-baseline row above — there the reference expired, here the *ruler* is noisy — and from a proxy, which is stable but measures the wrong thing. The tell is a difference you cannot explain mechanically, or an agreement too clean for something with a random component in it |
 | 2026-09-04 | rtj#282/#283/#284 | **And the filter can be right while the *predicate* is wrong** — the refinement of the row above, met three times in one session on one number. A photo manifest reported 142 of 290 present; the count then moved to 35, to 11, to **0 genuinely lost**, and no step was an arithmetic error. First the resolver named three directories photos were known to live in and the project also had a fourth. Then the denominator included **form-template placeholders** — six dummy filenames on a worked-example record, which is why three different projects reported *exactly six* missing, a tell sitting in my own summary table unexamined. Then the predicate itself: `exists in the project directory` was standing in for *is this photo safe*, while photos are **deliberately moved off** to control project size — so the check penalised the housekeeping it should encourage, on the gate that precedes destroying a generation. **Ask what the predicate is a proxy for before trusting the rate**, and when several independent subjects report an identical count, that equality is the finding. Each correction came from workflow knowledge no amount of re-measuring would have supplied — so when a rate survives one correction, ask who else knows what the number means |
 | 2026-09-05 | rfp#268/#271 | **When you cannot list, read the PRODUCER — "unlistable" is not "unknowable"** — a bucket answered `403 AccessDenied` to a list (correct for a `s3:GetObject`-only policy), so the artifact was reported as unconfirmable and a shipped feature was documented as blocked on it, with a follow-up issue filed saying so. The job that writes the object recorded the exact key in its own source; one `HEAD` on it returned **200, 66,635,819 bytes, staged the previous day**. The reasoning was "guessing a key is the construct-the-sibling-path antipattern" — true of a key *derived from a pattern*, and the opposite of true for one *read from the code that writes it*, which is that rule's own remedy. **Before concluding an artifact's presence is unknowable, grep the producer for the path it writes**; and treat a self-filed "blocked on X" as a claim to check rather than a conclusion, since nothing downstream will ever re-test it |
 | 2026-09-04 | rfp | **An error naming its own remedy, mapped onto a remembered failure instead of read** — a memory note said `op read` "times out on authorization"; the actual error was `couldn't connect to the 1Password desktop app… update to the latest version and restart the app`, and the app was running with `--just-updated --should-restart`. Not a timeout, not an authorization problem, and the fix was in the text. Cost: the *preferred* documented route was abandoned for the last-rank fallback, the user was escalated to, and then the credential's **name** was doubted — it had been right all along. Two tells, both cheap: the error prescribed an action nobody took, and the remembered failure mode had a different **shape** (a hang) than the one observed (an immediate error). **Read the error's own words before matching it to a prior**, and when a convention ranks routes, confirm the preferred route's prerequisite is genuinely absent rather than merely erroring once |
@@ -4707,6 +4890,33 @@ nothing.
 `gh-pages` history is not a problem the way normal git history is: on a private
 repo the branch is not publicly browsable, and only the currently-served content
 is public. Deleting the file genuinely ends the exposure — no history rewriting.
+
+## pkgdown drops a footnote's body and keeps its marker
+
+A pandoc footnote — `text[^k]` with a `[^k]: …` block — renders in an article as a
+**superscript marker with no footnote section under it**. The marker is emitted
+(`class="footnote-ref"`), the content is not, and nothing warns.
+
+So the failure is silent and lands on exactly the material a footnote is for: the caveat, the
+definition, the reconciliation. Measured 2026-09-06 in drift#66, where a footnote carrying the
+reconciliation of two circulating hectare totals — the sentence that stops a reader treating them
+as a disagreement — was absent from the published page while `rmarkdown::render()` of the same
+source showed it fine.
+
+- **Do not write footnotes in a pkgdown article.** Promote the content to a block quote, a
+  parenthetical, or its own short paragraph. If it is worth a footnote it is usually worth being
+  visible.
+- **Check the rendered HTML, not the source.** The tell is a marker with nothing to jump to:
+
+  ```bash
+  grep -c 'footnote-ref' docs/articles/<name>.html     # markers emitted
+  grep -c 'class="footnotes' docs/articles/<name>.html # section emitted — expect these to agree
+  ```
+
+Same family as the cross-reference gotcha already noted for vignettes (`\@ref(fig:…)` compiling
+to a literal): bookdown output formats do not carry all of bookdown's machinery through pkgdown,
+and each missing piece fails quietly in its own way. Verify anything structural — footnotes,
+cross-references, numbered captions — against the built page the first time you use it.
 
 
 # Planning Conventions
