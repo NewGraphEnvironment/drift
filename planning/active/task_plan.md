@@ -49,10 +49,10 @@ measured anywhere in this repo).
 
 ## Phase 2: shipped article data
 
-- [ ] `summarize` gains `summary_patch_widths.csv`, read from the committed patch-group CSVs
-- [ ] `corridor` emits `summary_corridor.csv` into `inst/extdata/temporal-composition/`
-- [ ] Update `inst/extdata/temporal-composition/README.md`
-- [ ] Assert every pre-existing committed CSV is untouched
+- [x] `summarize` gains `summary_patch_widths.csv`, read from the committed patch-group CSVs
+- [x] `corridor` emits `summary_corridor.csv` into `inst/extdata/temporal-composition/`
+- [x] Update `inst/extdata/temporal-composition/README.md`
+- [x] Assert every pre-existing committed CSV is untouched
 
 ## Phase 3: the article
 

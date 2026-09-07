@@ -135,12 +135,16 @@ if (arg == "summarize") {
          sustained_ha = pick(chg1, chg1$category_label == "break_sustained", "area_ha"),
          stable_flicker_ha = pick(chg, chg$category_label == "stable_flicker", "area_ha"))
   }
+  pg_all <- list()
   rows <- lapply(have, function(g) {
     d <- file.path(log_root, g)
     meta <- utils::read.csv(file.path(d, "group_meta.csv"))
     sh <- shares(read_change(file.path(d, "summary_change.csv")))
     byyr <- utils::read.csv(file.path(d, "summary_break_year.csv"))
     pg <- utils::read.csv(file.path(d, "summary_patch_groups.csv"))
+    pg_all[[g]] <<- pg          # the same read the width table below uses; a
+                                # second read of one file in one stage is two
+                                # derivations of one fact waiting to disagree
     shp <- utils::read.csv(file.path(d, "summary_shape.csv"))
     freq <- utils::read.csv(file.path(d, "summary_class_freq.csv"))
     tim <- utils::read.csv(file.path(d, "timings.csv"))
@@ -403,6 +407,41 @@ if (arg == "summarize") {
   stopifnot(nrow(treeloss) == 2L * length(groups) * length(chg_cats))
   utils::write.csv(treeloss, file.path(art_dir, "summary_treeloss_temporal.csv"),
                    row.names = FALSE)
+
+  # Patch width and artifact signature (#73). No recomputation: these are the
+  # committed per-group summary_patch_groups.csv files, which is what makes this
+  # half of #73 free -- and they come from the same in-memory read that fed
+  # summary_groups.csv above, not a second one.
+  #
+  # `flag_sliver` is an effective-width proxy, 2A/P < 1.5 px, so this population
+  # is "narrow" and not literally "one pixel wide": at 10 m an isolated cell
+  # scores 0.5 px, a 2x2 block 1.0, a 3x3 exactly 1.5 and is NOT flagged. The
+  # column names say group, not width, for that reason.
+  widths <- do.call(rbind, lapply(names(pg_all), function(g) {
+    x <- pg_all[[g]]; x$group_name <- g
+    x[c("group_name", "group", "n_patches", "area_ha", "break_frac_area_wtd",
+        "pct_no_break_cell", "pct_all_break", "n_flips_area_wtd")]
+  }))
+  names(widths)[names(widths) == "group"] <- "patch_group"
+  names(widths)[names(widths) == "group_name"] <- "group"
+  # PARTITION. grp() subsets with a raw logical, so an NA in flag_sliver would
+  # add a phantom all-NA row to BOTH the sliver and the wider group rather than
+  # dropping it, and every share would still look plausible. Only a partition
+  # check sees that.
+  for (g in names(pg_all)) {
+    w <- widths[widths$group == g, ]
+    tot <- w$n_patches[w$patch_group == "all"]
+    for (pair in list(c("sliver", "wider"), c("artifact_signature", "other"))) {
+      got <- sum(w$n_patches[w$patch_group %in% pair])
+      if (!identical(as.integer(got), as.integer(tot))) {
+        stop(g, ": ", paste(pair, collapse = " + "), " is ", got, " patches but `all` is ",
+             tot, " -- the two groups are not a partition of the patch set")
+      }
+    }
+  }
+  message("patch width and signature groups partition the patch set in all ",
+          length(pg_all), " groups")
+  utils::write.csv(widths, file.path(art_dir, "summary_patch_widths.csv"), row.names = FALSE)
 
   # the article's group table is a COLUMN SUBSET of the object that produced
   # summary_groups.csv above -- one derivation, so the two cannot disagree
