@@ -24,6 +24,9 @@ tree <- utils::read.csv(d("summary_treeloss_temporal.csv"), stringsAsFactors = F
 grid <- utils::read.csv(d("bulk_grid_1km.csv"), stringsAsFactors = FALSE)
 win <- utils::read.csv(d("bulk_window.csv"), stringsAsFactors = FALSE)
 art <- readRDS(d("bulk_window.rds"))
+wid <- utils::read.csv(d("summary_patch_widths.csv"), stringsAsFactors = FALSE)
+cor <- utils::read.csv(d("summary_corridor.csv"), stringsAsFactors = FALSE)
+corc <- utils::read.csv(d("summary_corridor_class.csv"), stringsAsFactors = FALSE)
 
 # colours come from the gq registry, so no hex literal appears in this article
 reg <- gq::gq_reg_merge(gq::gq_reg_main(),
@@ -190,6 +193,92 @@ set is stated in the caption.
 > `r format(round(tree_bulk, 1), big.mark = ",", nsmall = 1)` ha, with no sieve and no clip. The
 > ratio between them is the sieve, not a disagreement — it was reconciled separately.
 
+## The shape of a change patch
+
+```{r shape-prep, include = FALSE}
+wpick <- function(g, pg, col) wid[wid$group == g & wid$patch_group == pg, col]
+sl_n <- sapply(grp$group, function(g) 100 * wpick(g, "sliver", "n_patches") / wpick(g, "all", "n_patches"))
+sl_a <- sapply(grp$group, function(g) 100 * wpick(g, "sliver", "area_ha") / wpick(g, "all", "area_ha"))
+nf_s <- sapply(grp$group, wpick, pg = "sliver", col = "n_flips_area_wtd")
+nf_w <- sapply(grp$group, wpick, pg = "wider", col = "n_flips_area_wtd")
+bf_s <- sapply(grp$group, wpick, pg = "sliver", col = "break_frac_area_wtd")
+bf_w <- sapply(grp$group, wpick, pg = "wider", col = "break_frac_area_wtd")
+bf_a <- sapply(grp$group, wpick, pg = "artifact_signature", col = "break_frac_area_wtd")
+bf_o <- sapply(grp$group, wpick, pg = "other", col = "break_frac_area_wtd")
+rng <- function(x, dp = 0) paste(formatC(range(x), format = "f", digits = dp), collapse = "-")
+stopifnot(all(nf_s > nf_w), all(bf_s < bf_w))          # the claims below, asserted
+n_rev <- sum(bf_a >= bf_o)                              # groups where the signature reverses
+```
+
+Change patches are overwhelmingly narrow. Between `r rng(sl_n)`% of them have an effective width
+below one and a half pixels — small compact blobs as well as one-cell strips, since the measure is
+`2 x area / perimeter` — and they carry only `r rng(sl_a)`% of the changed area. In every one of the four groups they also flicker more than wider patches
+(`r rng(nf_s, 2)` switches against `r rng(nf_w, 2)`) and settle less often
+(`r rng(bf_s, 3)` of their area is a clean break, against `r rng(bf_w, 3)`).
+
+A second geometric signature asks whether a patch *traces* a pre-existing boundary between the two
+classes rather than cutting across one. It does not generalise: tracing patches settle less often
+than the rest in three groups and very slightly *more* often in the fourth. Width is the leg that
+holds everywhere.
+
+## Where the instability sits
+
+```{r fig-corridor, fig.height = 3.6, fig.cap = "Flicker as a function of distance, in each of the four groups. The purple line measures distance from permanent water — pixels classed Water in all seven years. The blue line is the null: distance from a from-epoch class boundary with no water on either side. Both use the same bands and the same denominator, the scanned cells in that band. The reference band itself is omitted from both, being a definition rather than a measurement."}
+lv <- c("0-10", "10-30", "30-50", "50-100", "100-200", "200-500", ">500")
+fl <- cor[cor$category_label %in% c("unsettled", "stable_flicker") &
+            cor$reference %in% c("water_core", "edge_nonwater") & cor$band_label %in% lv, ]
+fl <- stats::aggregate(pct_of_band ~ group + reference + band_label, fl, sum)
+fl$band_label <- factor(fl$band_label, levels = lv)
+fl$panel <- factor(unname(group_name[fl$group]), levels = unname(group_name[grp$group]))
+fl$ref <- factor(ifelse(fl$reference == "water_core", "from permanent water",
+                        "from a non-water class boundary"),
+                 levels = c("from permanent water", "from a non-water class boundary"))
+# two registry colours used as LINE identities; no hex literal enters this file
+ln <- stats::setNames(unname(pal[c("unsettled", "break_sustained")]), levels(fl$ref))
+ggplot2::ggplot(fl, ggplot2::aes(band_label, pct_of_band, colour = ref, group = ref)) +
+  ggplot2::geom_line(linewidth = 0.7) + ggplot2::geom_point(size = 1.1) +
+  ggplot2::facet_wrap(~panel, nrow = 1) +
+  ggplot2::scale_colour_manual(values = ln, name = NULL) +
+  ggplot2::labs(x = "distance (m)", y = "flicker (% of scanned cells in band)") +
+  ggplot2::theme_minimal(base_size = 11) +
+  ggplot2::theme(legend.position = "bottom",
+                 axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 8),
+                 panel.spacing = grid::unit(0.9, "lines"))
+```
+
+```{r corridor-prep, include = FALSE}
+tr <- corc[corc$from_class == "Trees" & corc$category_label %in% c("unsettled", "stable_flicker"), ]
+tr <- stats::aggregate(pct_of_band_class ~ group + band_label, tr, sum)
+tnear <- tr$pct_of_band_class[tr$band_label == "0-10"]
+tfar <- tr$pct_of_band_class[tr$band_label == ">500"]
+enear <- sapply(grp$group, function(g) sum(fl$pct_of_band[fl$group == g & fl$band_label == "0-10" & fl$reference == "edge_nonwater"]))
+efar <- sapply(grp$group, function(g) sum(fl$pct_of_band[fl$group == g & fl$band_label == ">500" & fl$reference == "edge_nonwater"]))
+wfar <- sapply(grp$group, function(g) sum(fl$pct_of_band[fl$group == g & fl$band_label == ">500" & fl$reference == "water_core"]))
+# the claims in the prose below, asserted rather than read off a figure
+stopifnot(length(tnear) == nrow(grp), all(tnear > tfar), all(enear > efar),
+          all(wfar > efar),                       # water sits above the null throughout
+          all((enear / efar) > (rng_w <- sapply(grp$group, function(g)
+            sum(fl$pct_of_band[fl$group == g & fl$band_label == "0-10" & fl$reference == "water_core"]))
+            / wfar)))                              # and the null falls further
+```
+
+The reach map above hints that the unstable cells trace the channel, and they do. Within the Trees
+class alone — a Trees pixel can never be part of the water reference, so the comparison is not
+measuring its own definition — flicker runs `r rng(tnear, 1)`% in the first ten metres beside
+permanent water against `r rng(tfar, 1)`% more than five hundred metres away, falling in every band.
+
+The null settles how to read that. Against a from-epoch class boundary with **no water on either
+side** the same gradient appears, and falls further: `r rng(enear, 1)`% in the first ten metres to
+`r rng(efar, 1)`% beyond five hundred. The water profile sits above it throughout and levels off near
+`r rng(wfar, 1)`% — what a cell far from the river but near some other boundary looks like. So a
+water margin is the most unstable edge, not a different kind of thing. Flicker
+concentrates at class boundaries, and the channel is simply the longest, most sinuous,
+highest-contrast boundary a floodplain has — the corridor is an edge effect in a river's shape.
+
+Nor does the near-channel change look like a channel that moved. A migrating bank would date its
+switches progressively outward; instead the mean year of a sustained break beside permanent water
+is *later* than one far away, in all four groups — the opposite of a walk.
+
 ## What this means for a quoted hectare
 
 ```{r tbl-groups}
@@ -220,6 +309,13 @@ be separated at this size. And an endpoint-only switch is not evidence of a labe
 real change in the last year of the series produces exactly the same signature, and this method
 cannot tell the two apart.
 
+The spatial results carry their own limits. Distance is measured from permanent water rather than
+a mapped stream network, and in one group two thirds of the floodplain is a regulated lake. The stable share of a near band is biased downward by construction, because every
+permanent-water pixel sits in the reference rather than in the bands — which is why the number
+above is taken within Trees. And an edge effect is not a cause: nothing separates a boundary a
+classifier renders inconsistently from one that genuinely moved, and the break dates rule out only
+the steady outward walk.
+
 ```{r wordcount, include = FALSE}
 f <- knitr::current_input()
 if (!is.null(f)) {
@@ -231,6 +327,9 @@ if (!is.null(f)) {
   y <- y[!grepl("^\\[\\^|^\\s*$", y)]
   n <- sum(lengths(strsplit(trimws(y), "\\s+")))
   message("body prose: ", n, " words")
-  if (n > 1000) stop("body prose is ", n, " words; the cap is 1000")
+  # 1200 since #73, which added the shape and location sections; the literal
+  # appears twice on purpose-adjacent lines, so change both or the message lies
+  cap <- 1200
+  if (n > cap) stop("body prose is ", n, " words; the cap is ", cap)
 }
 ```

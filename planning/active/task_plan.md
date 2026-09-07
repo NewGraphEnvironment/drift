@@ -57,10 +57,12 @@ measured anywhere in this repo).
 ## Phase 3: the article
 
 - [ ] Add the concession sentence to `## What this does not support` first
-- [ ] New section: patch width and boundary signature
-- [ ] New section: where the instability sits, with the null and the confound stated
-- [ ] New figure: category share against distance band, gq palette, no hex literal
-- [ ] Raise the `wordcount` guard to 1200 with the reason in the chunk comment
+- [x] New section: patch width and boundary signature
+- [x] New section: where the instability sits, with the null and the confound stated
+- [x] New figure: **flicker share against distance, water reference against the null**, one
+      facet per group — a line profile, not a stacked bar, so the shape is legible and the
+      non-monotonicity is visible. Two gq registry colours, no hex literal.
+- [x] Raise the `wordcount` guard to 1200 with the reason in the chunk comment
 
 ## Phase 4: notes, NEWS, issue reconciliation
 
@@ -73,7 +75,8 @@ measured anywhere in this repo).
 ## Validation
 
 - [ ] Tests pass; `pkgdown::check_pkgdown()` clean
-- [ ] Article renders; word count under 1200; 12-point cartography self-review on the new figure
+- [x] Article renders; body prose 1193 words under the 1200 cap; figure read and reviewed against
+      the points that apply to a chart (8, 10, 12 — 1-7 are map-placement checks)
 - [ ] Restore-the-bug on the conservation guard
 - [ ] `/code-check` clean on each commit
 - [ ] PWF checkboxes match landed work
