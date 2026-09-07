@@ -160,3 +160,78 @@ collision across all 20 keys; `aggregate()` returns `changed` as logical, not fa
 conservation check is post- vs pre-aggregation and so not circular; `pct_of_pair` sums to exactly
 100 across all 221 pairs and `pct_of_set` across all 8 group x set combinations; both CSVs
 regenerate byte-identical.
+
+## Phase 3-5 review — round 3 (10 findings; mechanism named and enumerated)
+
+Round 3 independently found the figure-colour bug I had already caught by reading the rendered
+PNG, which is useful corroboration, plus nine more. The **mechanism** it named covers every
+finding in all three rounds: *a claim states a scope; the thing that produces or enforces it
+covers a different scope; nothing compares the two.* The remedy is always to widen the
+enforcement or narrow the claim.
+
+Fixed:
+
+1. **`drift_temporal.csv` row 6 had 26 fields against a 24-field header**, so `read.csv()` returned
+   **six** rows and a phantom layer keyed `"ColorBrewer Purples 3-class light"` entered the gq
+   registry with no warning. The article's palette survived only because gq groups by `layer_key`
+   and the phantom landed outside `temporal_category` — an accident, not a guard. File rewritten
+   through `csv.writer` with a field-count assertion, and the article now asserts the class set.
+2. **Five of seven panels in figure 1 were mis-coloured.** `terra::plot(type = "classes", levels =,
+   col =)` maps colours positionally onto *each layer's own* unique values; five years contain no
+   Snow/Ice, so Rangeland drew in Snow/Ice's blue — in the panel the figure exists to show,
+   contradicting the legend beneath it. Both maps now use a value-keyed `coltab`.
+3. **`strip()` did not strip.** `coltab(y) <- NULL` removes layer 1 only, so six of seven layers
+   kept a colour table. Now per layer, for both `set.cats` and `coltab`.
+4. **The provenance CSV recorded the requested extent, not the realised one.** `crop()` truncates
+   silently at the grid edge, and the `compareGeom()` beside it cannot fire because both sides were
+   cropped by the same extent. Now read back from the cropped objects.
+5. **Tolerance was `0.5` on a quantity exact to `cell_ha = 0.01`**, measured residual 1e-11 — 49
+   cells of floodplain could vanish undetected. Now `cell_ha / 2`.
+6. **The 500 KB guard ran after `saveRDS()`**, so a failure left three artifacts describing
+   different runs. Now sized on a temp copy before the real write.
+7. **Round 2's own fix recurred**: widening "They" to cover `article-bulk` made both trailing
+   clauses false — it is a fresh COG scan, not a rollup, and it is guarded on hectares, not integer
+   cell counts. Split into two sentences.
+8. "Two things worth knowing" had become three; and "No patch-size threshold is applied anywhere in
+   this directory" was falsified by `bulk_window.csv`, which is entirely a 1-4 ha selection. That
+   sentence is load-bearing, because it is what stops a reader comparing these totals to
+   `transition_vector.gpkg`.
+9. The byte-reproducibility claim was wider than the fix: `meta` still carries the run date.
+   Narrowed to the per-process variation the `varnames` pin actually removes.
+10. `n_candidates_all` is published and quoted in a caption but was measured after an inner
+    `merge()`. One `stopifnot` makes it the patch count.
+
+Also found by reading the rendered page rather than the source: **pkgdown drops the footnote body**
+while keeping the marker, so the two-totals reconciliation was invisible on the published page.
+Promoted to a block quote. And the article's remaining hardcoded numbers (`1.44 ha`, `2,050.4 ha`,
+"six points") are now derived from the shipped CSVs; only `1,565.1 ha` stays literal, because it is
+an external fact from the published STAC item rather than something this data can answer.
+
+### Terminating enumeration
+
+`scratchpad/claim_audit.py`, run against the tree:
+
+```
+A. every path/stage reference in shipped or changed prose  -> all resolve
+B. every numeric claim in the shipped README, against the data
+   sensitivity  -1.3 to +6.0  | measured -1.3 to +6.0   OK
+   2,032.9 changed-unsettled ha | measured 2,032.9      OK
+   3,186.5 stable-flicker ha    | measured 3,186.5      OK
+   69% overstatement            | measured 69%          OK
+```
+
+### Cartography self-review, all 12 points, at the delivered width (~700 px)
+
+1 correct area — BULK floodplain, conservation-checked against the committed totals. 2 fills the
+frame — the dendritic network leaves white space inherent to its shape. 3 keymap inside the frame —
+the detail box sits in the locator panel. 4 no overlap — the reach legend was moved from bottom-left
+to top-left, where it had been sitting on the floodplain. 5 legend over least-important ground —
+both legends are on white. 6 consistent spacing — both inset from their panel corners. 7 scale —
+no scale bar; the panel titles state the cell size and the reach width, which is the scale
+statement for a schematic. 8 every prominent feature legended — all five categories, all five LULC
+classes, and the detail box is named in the caption. 9 subject obvious — the floodplain is the only
+thing drawn, so it delineates itself. 10 hierarchy — grey Stable dominates the reach because it is
+33,278 of 41,090 ha, which is the point; the changed categories are saturated against it. 11
+basemap — none, stated in the caption, and none is needed since the drawn area is the subject. 12
+type — sized at cex 0.95 / 1.15 after the first render proved the defaults illegible once scaled to
+the published column.

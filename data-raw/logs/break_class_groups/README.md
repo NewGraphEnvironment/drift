@@ -25,9 +25,12 @@ Committed evidence (the `.tif`, `.gpkg`, `.json`, `.log` files and each group's
   run on the grid `dft_stac_fetch()` tiled from Planetary Computer (16000 x 12000)
 
 The `summarize` stage also writes the pkgdown article's tables into
-`inst/extdata/temporal-composition/` (drift#66), described in that directory's own README. They
-are a rollup of the committed `summary_pixels.csv` files, guarded against each group's
-`summary_change.csv` on integer cell counts, so they cannot drift from the numbers above.
+`inst/extdata/temporal-composition/` (drift#66). Those tables are a rollup of the committed
+`summary_pixels.csv` files, guarded against each group's `summary_change.csv` on integer cell
+counts, so they cannot drift from the numbers above. A third stage, `article-bulk`, writes that
+article's BULK figure data alongside them; it is a fresh scan of the same COGs rather than a
+rollup, and it refuses to proceed unless it reproduces `bulk/summary_change.csv` cell for cell.
+Both are described in that directory's own README.
 
 Runs, in order: bulk 312 s / 15.4 GiB peak, kotl 323 s / 16.3 GiB, lnth 100 s / 13.7 GiB, necr
 138 s / 14.2 GiB. Peak RSS sits at 14-16 GiB whatever the grid size (56M to 204M cells), so it

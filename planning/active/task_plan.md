@@ -40,31 +40,31 @@ drift — so that a quoted hectare figure is read with the right error bar.
 
 ## Phase 3: New `article-bulk` stage and the `inst/` artifact
 
-- [ ] Self-check: reproduce committed BULK `summary_change.csv` cell-for-cell before deriving
-- [ ] Deterministic patch selection with printed filter counts and a hard stop on an empty set
-- [ ] Shared `terra::ext()` crops + `compareGeom()` assertion
-- [ ] `bulk_grid_1km.csv` with the `valid == 0` drop (T4) and row-count assertion
-- [ ] `bulk_window.csv` provenance incl. the selection rule as a literal sentence
-- [ ] `bulk_window.rds` with round-trip assertion and a < 500 KB size guard
-- [ ] Re-verify baseline hashes unchanged
+- [x] Self-check: reproduce committed BULK `summary_change.csv` cell-for-cell before deriving
+- [x] Deterministic patch selection with printed filter counts and a hard stop on an empty set
+- [x] Shared `terra::ext()` crops + `compareGeom()` assertion
+- [x] `bulk_grid_1km.csv` with the `valid == 0` drop (T4) and row-count assertion
+- [x] `bulk_window.csv` provenance incl. the selection rule as a literal sentence
+- [x] `bulk_window.rds` with round-trip assertion and a < 500 KB size guard
+- [x] Re-verify baseline hashes unchanged
 
 ## Phase 4: The article
 
-- [ ] `vignettes/articles/temporal-composition.Rmd`, `bookdown::html_document2`
-- [ ] Load chunk reads only `inst/extdata/temporal-composition/` + `dft_class_table()`
-- [ ] Figure 1: 7 year panels laid 4 x 2, patch outline on each
-- [ ] Figure 2: 1 km locator with detail box + native-resolution reach
-- [ ] Figure 3: category shares by group, faceted (all change vs tree loss)
-- [ ] Exact-values table; approximate values in prose
-- [ ] All four limitations stated
-- [ ] Word-count guard chunk (message the count, stop above 1000)
+- [x] `vignettes/articles/temporal-composition.Rmd`, `bookdown::html_document2`
+- [x] Load chunk reads only `inst/extdata/temporal-composition/` + `dft_class_table()`
+- [x] Figure 1: 7 year panels laid 4 x 2, patch outline on each
+- [x] Figure 2: 1 km locator with detail box + native-resolution reach
+- [x] Figure 3: category shares by group, faceted (all change vs tree loss)
+- [x] Exact-values table; approximate values in prose
+- [x] All four limitations stated
+- [x] Word-count guard chunk (message the count, stop above 1000)
 
 ## Phase 5: Render and cartographic self-review
 
-- [ ] `pkgdown::build_article()`; no network
-- [ ] Walk all 12 cartography checklist points at the delivered width; record point by point
-- [ ] `pkgdown::check_pkgdown()`
-- [ ] `R CMD build` + `tar tzf`: no `vignettes/articles/`, `inst/` data present
+- [x] `pkgdown::build_article()`; no network
+- [x] Walk all 12 cartography checklist points at the delivered width; record point by point
+- [x] `pkgdown::check_pkgdown()`
+- [x] `R CMD build` + `tar tzf`: no `vignettes/articles/`, `inst/` data present
 
 ## Phase 6: Cross-links, bookkeeping, PR
 
@@ -76,7 +76,7 @@ drift — so that a quoted hectare figure is read with the right error bar.
 
 ## Validation
 
-- [ ] Tests pass
+- [x] Tests pass
 - [ ] `/code-check` clean on each commit
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
