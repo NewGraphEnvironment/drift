@@ -487,7 +487,7 @@ if (arg == "article-bulk") {
   # one call. crosstab() and segregate() below want the integer codes, and
   # crosstab() reports LABELS the moment a layer is a factor, so keep a
   # levels-free copy for them. deepcopy() then set.cats() in place is one copy.
-  cat5 <- dft_rast_break_category(res, filename = tempfile(fileext = ".tif"))
+  cat5 <- dft_rast_break_category(res, filename = tf())
   category <- terra::deepcopy(cat5[["category"]])
   terra::set.cats(category, layer = 1, value = NULL)
 
@@ -500,7 +500,7 @@ if (arg == "article-bulk") {
   changed <- terra::app(codes, fun = function(v) {
     if (!is.matrix(v)) stop("matrix chunks only")
     as.integer((v[, 1] %/% 1000L) != (v[, 1] %% 1000L))
-  }, filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+  }, filename = tf(), wopt = list(datatype = "INT1U"))
 
   # --- self-check BEFORE deriving anything -----------------------------------
   # If this run does not reproduce the committed BULK numbers cell for cell,
@@ -540,7 +540,7 @@ if (arg == "article-bulk") {
   # --- per-patch temporal composition ----------------------------------------
   patches <- dft_transition_vectors(res$raster, changes_only = TRUE)
   pid <- terra::rasterize(terra::vect(patches), res$raster, field = "patch_id",
-                          filename = tempfile(fileext = ".tif"))
+                          filename = tf())
   # crosstab, not zonal: zonal() outside its six-function fast path materialises
   # the whole grid in R, and this grid is 169M cells
   pc <- terra::crosstab(c(pid, category), long = TRUE, useNA = FALSE)
@@ -663,10 +663,10 @@ if (arg == "article-bulk") {
   ind <- terra::segregate(fig_cat, classes = 0:4, other = 0)
   names(ind) <- c("stable", "sustained", "endpoint", "unsettled", "stable_flicker")
   valid <- terra::app(category, fun = function(v) as.integer(!is.na(v)),
-                      filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+                      filename = tf(), wopt = list(datatype = "INT1U"))
   names(valid) <- "valid"
   agg <- terra::aggregate(c(valid, ind), fact = 100, fun = "sum", na.rm = TRUE,
-                          filename = tempfile(fileext = ".tif"))
+                          filename = tf())
   grid <- terra::as.data.frame(agg, xy = TRUE, na.rm = FALSE)
   grid <- grid[!is.na(grid$valid) & grid$valid > 0, ]
   for (cn in c("valid", "stable", "sustained", "endpoint", "unsettled", "stable_flicker")) {
@@ -794,7 +794,9 @@ if (arg == "article-bulk") {
 #
 # All four groups run in ONE process, so the rss.txt beside this stage is a
 # whole-run peak and not the per-group trace the other stages record; results
-# are freed and terra's temp files removed between groups. Needs the gitignored
+# are freed and every intermediate unlinked between groups -- by path, because
+# terra::tmpFiles() only tracks files terra named itself and never sees an
+# explicit tempfile(). Needs the gitignored
 # COGs and ~16 GiB, so it never runs in CI.
 #
 # kotl's reference is NOT a channel: 67% of its floodplain is permanent water
@@ -812,6 +814,12 @@ if (arg == "corridor") {
   tick <- function(label, start) {
     timings[[label]] <<- round(as.numeric(difftime(Sys.time(), start, units = "secs")), 1)
   }
+
+  # terra::tmpFiles(remove = TRUE) only tracks files terra named itself, so an
+  # explicit tempfile() survives it. ~17 full-grid rasters per group, several of
+  # them FLT4S over 204M cells, is tens of GB if nothing reclaims them.
+  scratch <- character()
+  tf <- function() { f <- tempfile(fileext = ".tif"); scratch <<- c(scratch, f); f }
 
   lulc <- dft_class_table("io-lulc")
   water_code <- lulc$code[lulc$class_name == "Water"]
@@ -842,9 +850,9 @@ if (arg == "corridor") {
 
   # One reference -> the three-way band x from_class x category table.
   corridor_table <- function(ref_mask, from_class, category, cell_ha) {
-    d <- terra::distance(ref_mask, filename = tempfile(fileext = ".tif"))
+    d <- terra::distance(ref_mask, filename = tf())
     band <- terra::classify(d, rcl, include.lowest = TRUE,
-                            filename = tempfile(fileext = ".tif"),
+                            filename = tf(),
                             wopt = list(datatype = "INT1U"))
     names(band) <- "band"
     ct <- terra::crosstab(c(band, from_class, category), long = TRUE, useNA = TRUE)
@@ -865,9 +873,17 @@ if (arg == "corridor") {
     # leaves an unmatched value at its ORIGINAL value rather than setting NA, so
     # a distance outside the reclass table would survive as a phantom band
     # carrying a raw metric value
-    if (!all(stats::na.omit(ct$band) %in% seq_along(band_label))) {
+    # `all(x %in% y)` over na.omit() is TRUE on an empty vector, so it passes on
+    # an all-NA band raster -- which is what distance() returns for an all-NA
+    # mask: NaN everywhere, no error and no warning, written to INT1U as NA.
+    # The vacuous case has to be refused by name.
+    if (anyNA(ct$band)) stop("the distance banding produced NA bands -- the reference mask is empty")
+    if (!all(ct$band %in% seq_along(band_label))) {
       stop("bands outside the declared set: ",
-           paste(setdiff(unique(stats::na.omit(ct$band)), seq_along(band_label)), collapse = ", "))
+           paste(setdiff(unique(ct$band), seq_along(band_label)), collapse = ", "))
+    }
+    if (length(unique(ct$band)) < 3L) {
+      stop("only ", length(unique(ct$band)), " distance bands occupied -- degenerate transform")
     }
     ct$from_class     <- lulc$class_name[match(ct$from_code, lulc$code)]
     # an unmapped class code would silently become an NA class name and be
@@ -878,19 +894,30 @@ if (arg == "corridor") {
     }
     ct$category_label <- ifelse(is.na(ct$category), NA_character_,
                                 break_category_levels()[ct$category + 1L])
+    # the one arm of the three that was unguarded: a code outside 0:4 becomes an
+    # NA label and is then dropped by every filter below without a word
+    if (any(is.na(ct$category_label) & !is.na(ct$category))) {
+      stop("category codes outside 0:4: ",
+           paste(unique(ct$category[is.na(ct$category_label) & !is.na(ct$category)]), collapse = ", "))
+    }
     ct$area_ha <- round(ct$n_cells * cell_ha, 2)
-    ct
+    list(ct = ct, band = band)
   }
 
   # Roll a three-way table up to (band, category), dropping unscannable pixels.
-  # `pct_of_band` is a share of the SCANNED cells in that band, which is the
-  # denominator the article quotes; it is not a share of the band's cells.
+
+  # The denominator is the SCANNED cells in the band, not the cells in the band.
+  # distance() fills the whole grid, so a band spans the full 169M-cell raster
+  # while only ~2.4% of it is scannable; a column called `pct_of_band` would be
+  # read as a share of the ground and be wrong by two orders of magnitude in its
+  # denominator. The name says scanned, and the total travels beside it.
   roll_band <- function(ct) {
     s <- ct[!is.na(ct$category) & !is.na(ct$band), ]
     a <- stats::aggregate(cbind(n_cells, area_ha) ~ band + band_label + category_label,
                           s, sum, na.action = stats::na.pass)
     tot <- stats::aggregate(n_cells ~ band, a, sum)
-    a$pct_of_band <- round(100 * a$n_cells / tot$n_cells[match(a$band, tot$band)], 2)
+    a$n_scanned_in_band <- tot$n_cells[match(a$band, tot$band)]
+    a$pct_of_scanned_in_band <- round(100 * a$n_cells / a$n_scanned_in_band, 2)
     a[order(a$band, a$category_label), ]
   }
 
@@ -908,7 +935,7 @@ if (arg == "corridor") {
     classified <- dft_rast_classify(rasters, source = "io-lulc")
     res <- dft_rast_break_class(classified)
     cell_ha <- prod(terra::res(res$raster)) * 1e-4
-    cat5 <- dft_rast_break_category(res, filename = tempfile(fileext = ".tif"))
+    cat5 <- dft_rast_break_category(res, filename = tf())
     category <- bare_int(cat5[["category"]])
     from_class <- bare_int(rasters[[1]])
     names(from_class) <- "from_code"
@@ -924,7 +951,7 @@ if (arg == "corridor") {
       # scalar runs once per cell
       if (!is.matrix(v)) stop("matrix chunks only")
       as.integer(rowSums(v == water_code, na.rm = TRUE) == ncol(v))
-    }, filename = tempfile(fileext = ".tif"),
+    }, filename = tf(),
        # bound the R-side matrices: a 7-layer pass over 204M cells (kotl) left
        # to terra's memory heuristic builds them in one or two chunks
        wopt = list(datatype = "INT1U", steps = 64))
@@ -948,12 +975,13 @@ if (arg == "corridor") {
     message("  stable water core ", format(n_core, big.mark = ","),
             " cells, identical to the committed Water,Water,stable row")
 
-    core_mask <- terra::ifel(core01 == 1L, 1L, NA, filename = tempfile(fileext = ".tif"))
-    ct_core <- corridor_table(core_mask, from_class, category, cell_ha)
+    core_mask <- terra::ifel(core01 == 1L, 1L, NA, filename = tf())
+    r_core <- corridor_table(core_mask, from_class, category, cell_ha)
+    ct_core <- r_core$ct
 
     # sensitivity arm: the single-epoch reference, which is partly circular
-    w17 <- terra::ifel(from_class == water_code, 1L, NA, filename = tempfile(fileext = ".tif"))
-    ct_2017 <- corridor_table(w17, from_class, category, cell_ha)
+    w17 <- terra::ifel(from_class == water_code, 1L, NA, filename = tf())
+    ct_2017 <- corridor_table(w17, from_class, category, cell_ha)$ct
 
     # THE NULL. A control for class composition is not a null: it says the
     # gradient is not an artifact of which classes sit near water, and says
@@ -963,21 +991,31 @@ if (arg == "corridor") {
     # either side: same machinery, same bands, same denominator, water removed.
     # If the profile against it has the same shape, the corridor framing is not
     # supported and the honest reading is a generic edge effect.
-    fmax <- terra::focal(from_class, w = 3, fun = "max", na.rm = TRUE,
-                         filename = tempfile(fileext = ".tif"))
-    fmin <- terra::focal(from_class, w = 3, fun = "min", na.rm = TRUE,
-                         filename = tempfile(fileext = ".tif"))
-    is_w <- terra::ifel(from_class == water_code, 1L, 0L, filename = tempfile(fileext = ".tif"))
-    wnear <- terra::focal(is_w, w = 3, fun = "max", na.rm = TRUE,
-                          filename = tempfile(fileext = ".tif"))
-    # na.rm = TRUE means a cell on the floodplain's outer edge is not flagged
-    # merely for having NA neighbours -- the AOI boundary is not a class
-    # boundary, and counting it as one would put the whole perimeter in band 2
-    edge_nw <- terra::ifel(fmax != fmin & wnear == 0L, 1L, NA,
-                           filename = tempfile(fileext = ".tif"))
+    # Clouds and No Data are not land cover. A Trees|Clouds edge flickers by
+    # construction, so leaving them in would inflate the null's near bands --
+    # and the null's near bands are what the corridor claim is tested against,
+    # so the contamination runs in the direction that would make the null look
+    # more like the channel than it is. Masked out of the boundary test.
+    non_land <- lulc$code[lulc$class_name %in% c("Clouds", "No Data")]
+    land <- terra::ifel(from_class %in% non_land, NA, from_class, filename = tf())
+    fmax <- terra::focal(land, w = 3, fun = "max", na.rm = TRUE, filename = tf())
+    fmin <- terra::focal(land, w = 3, fun = "min", na.rm = TRUE, filename = tf())
+    is_w <- terra::ifel(land == water_code, 1L, 0L, filename = tf())
+    wnear <- terra::focal(is_w, w = 3, fun = "max", na.rm = TRUE, filename = tf())
+    # na.rm = TRUE stops an INSIDE perimeter cell being flagged for having NA
+    # neighbours. It does NOT stop an OUTSIDE one: focal() computes for every
+    # cell including NA-centred ones, so a cell beyond the floodplain whose 3x3
+    # straddles two AOI classes satisfies the test and becomes a reference cell.
+    # Measured before this clause: 3.8-5.2% of the reference was outside the
+    # AOI, tracing its perimeter from one cell out -- the exact artifact the
+    # comment here used to claim was avoided. !is.na(from_class) is the half
+    # that was missing.
+    edge_nw <- terra::ifel(fmax != fmin & wnear == 0L & !is.na(from_class), 1L, NA,
+                           filename = tf())
     n_edge <- as.integer(terra::global(terra::ifel(is.na(edge_nw), 0L, 1L), "sum",
                                        na.rm = TRUE)[[1]])
-    ct_edge <- corridor_table(edge_nw, from_class, category, cell_ha)
+    if (!(n_edge > 0L)) stop(g, ": the non-water class-boundary reference is empty")
+    ct_edge <- corridor_table(edge_nw, from_class, category, cell_ha)$ct
     message("  non-water class-boundary reference: ", format(n_edge, big.mark = ","), " cells")
 
     # WALK vs OSCILLATION (the issue's step 3). break_sustained does NOT
@@ -988,12 +1026,9 @@ if (arg == "corridor") {
     # alone does not carry.
     byr <- bare_int(res$breaks[["break_year"]])
     names(byr) <- "break_year"
-    d_core <- terra::distance(core_mask, filename = tempfile(fileext = ".tif"))
-    band_core_r <- terra::classify(d_core, rcl, include.lowest = TRUE,
-                                   filename = tempfile(fileext = ".tif"),
-                                   wopt = list(datatype = "INT1U"))
-    names(band_core_r) <- "band"
-    ct_walk <- terra::crosstab(c(band_core_r, byr, category), long = TRUE, useNA = TRUE)
+    # the core band raster corridor_table() already built -- recomputing it is a
+    # second full distance() + classify() over 169-204M cells for the same answer
+    ct_walk <- terra::crosstab(c(r_core$band, byr, category), long = TRUE, useNA = TRUE)
     names(ct_walk) <- c("band", "break_year", "category", "n_cells")
     for (nm in names(ct_walk)) ct_walk[[nm]] <- as.integer(ct_walk[[nm]])
     ct_walk <- ct_walk[!is.na(ct_walk$band) & !is.na(ct_walk$break_year) &
@@ -1001,8 +1036,10 @@ if (arg == "corridor") {
     ct_walk$category_label <- break_category_levels()[ct_walk$category + 1L]
     ct_walk <- ct_walk[ct_walk$category_label %in% c("break_sustained", "break_endpoint"), ]
     ct_walk$band_label <- band_label[ct_walk$band]
+    if (nrow(ct_walk) == 0L) stop(g, ": no clean-break pixels for the walk test")
     ct_walk$group <- g
-    ct_walk <- ct_walk[c("group", "band", "band_label", "break_year",
+    ct_walk$reference <- "water_core"
+    ct_walk <- ct_walk[c("group", "reference", "band", "band_label", "break_year",
                          "category_label", "n_cells")]
     utils::write.csv(ct_walk, file.path(out_dir, "summary_corridor_breakyear.csv"),
                      row.names = FALSE)
@@ -1014,7 +1051,21 @@ if (arg == "corridor") {
     # cannot cancel.
     ref_chg <- read_change(file.path(out_dir, "summary_change.csv"))
     ref_by <- stats::aggregate(n_cells ~ category_label, ref_chg, sum)
-    check_conservation <- function(ct, arm) {
+    # `ct` here still carries any NA-band rows, while roll_band() drops them --
+    # so a cell lost to the banding conserves HERE and vanishes from the
+    # published table. `rolled` is the same check on what actually gets written,
+    # which is the arm that can see that. (Note this is a reproduction check
+    # rather than two independent derivations: both sides run the same scan on
+    # the same COGs and only the grouping differs. What it catches is a stale or
+    # different-version committed file, and band loss.)
+    check_conservation <- function(ct, arm, rolled = NULL) {
+      if (!is.null(rolled)) {
+        if (!identical(as.integer(sum(rolled$n_cells)), as.integer(sum(ct$n_cells[!is.na(ct$category)])))) {
+          stop(g, " (", arm, "): the banded table totals ", sum(rolled$n_cells),
+               " cells against ", sum(ct$n_cells[!is.na(ct$category)]),
+               " scanned -- cells were lost to the banding")
+        }
+      }
       got <- stats::aggregate(n_cells ~ category_label,
                               ct[!is.na(ct$category), ], sum)
       if (!setequal(got$category_label, ref_by$category_label)) {
@@ -1032,9 +1083,12 @@ if (arg == "corridor") {
       }
       invisible(TRUE)
     }
-    check_conservation(ct_core, "core")
-    check_conservation(ct_2017, "water2017")
-    check_conservation(ct_edge, "edge_nonwater")
+    band_core <- roll_band(ct_core)
+    band_2017 <- roll_band(ct_2017)
+    band_edge <- roll_band(ct_edge)
+    check_conservation(ct_core, "core", band_core)
+    check_conservation(ct_2017, "water2017", band_2017)
+    check_conservation(ct_edge, "edge_nonwater", band_edge)
 
     # POSITIVE CONTROLS: the comparator has two arms and one control drives only
     # one of them. Perturbing a count leaves the key sets identical, so it
@@ -1053,27 +1107,22 @@ if (arg == "corridor") {
           paste("category", drop_lab, "removed"))
     message("  conserves the committed summary_change.csv per category; both controls fire")
 
-    # BAND DEGENERACY. Every conservation arm above is satisfied by an all-zero
-    # distance raster -- which is what an inverted mask produces, since
-    # terra::distance() measures FROM the NA cells TO the non-NA ones. A mask
-    # built 1/0 rather than 1/NA bands every valid cell as `core` and still
-    # conserves every count exactly.
-    occ <- table(ct_core$band[!is.na(ct_core$category) & !is.na(ct_core$band)])
-    if (length(occ) < 3L) {
-      stop(g, ": only ", length(occ), " distance bands are occupied -- the distance ",
-           "transform is degenerate (an inverted 1/0 mask does exactly this)")
-    }
+    # BAND DEGENERACY is checked inside corridor_table(), so it runs on all three
+    # arms rather than only the first. Every conservation arm above is satisfied
+    # by an all-zero distance raster -- which is what an inverted mask produces,
+    # since terra::distance() measures FROM the NA cells TO the non-NA ones.
 
     # --- write ---------------------------------------------------------------
-    band_core <- roll_band(ct_core); band_core$reference <- "water_core"
-    band_2017 <- roll_band(ct_2017); band_2017$reference <- "water_2017"
-    band_edge <- roll_band(ct_edge); band_edge$reference <- "edge_nonwater"
+    band_core$reference <- "water_core"
+    band_2017$reference <- "water_2017"
+    band_edge$reference <- "edge_nonwater"
     bands <- rbind(band_core, band_2017, band_edge)
     bands$group <- g
     bands$dist_min_m <- band_from[bands$band]
     bands$dist_max_m <- band_to[bands$band]
     bands <- bands[c("group", "reference", "band", "band_label", "dist_min_m", "dist_max_m",
-                     "category_label", "n_cells", "area_ha", "pct_of_band")]
+                     "category_label", "n_cells", "area_ha", "n_scanned_in_band",
+                     "pct_of_scanned_in_band")]
     utils::write.csv(bands, file.path(out_dir, "summary_corridor.csv"), row.names = FALSE)
 
     # the within-class control, core reference only
@@ -1085,19 +1134,24 @@ if (arg == "corridor") {
     cls$pct_of_band_class <- round(100 * cls$n_cells /
                                      tot$n_cells[match(k, paste(tot$band, tot$from_class))], 2)
     cls$group <- g
+    cls$reference <- "water_core"     # this file is ONE arm; without the column a
+                                      # reader joining it to the bands file gets
+                                      # `n_cells` meaning two different things
     cls <- cls[order(cls$band, cls$from_class, cls$category_label),
-               c("group", "band", "band_label", "from_class", "category_label",
+               c("group", "reference", "band", "band_label", "from_class", "category_label",
                  "n_cells", "area_ha", "pct_of_band_class")]
     utils::write.csv(cls, file.path(out_dir, "summary_corridor_class.csv"), row.names = FALSE)
 
     per_group[[g]] <- list(bands = bands, class = cls, walk = ct_walk, n_core = n_core)
     print(band_core[band_core$category_label %in% c("unsettled", "stable_flicker"),
-                    c("band_label", "n_cells", "pct_of_band")])
+                    c("band_label", "n_cells", "pct_of_scanned_in_band")])
     tick(g, tg)
 
     rm(rasters, classified, res, cat5, category, from_class, stk, core01, core_mask,
        w17, ct_core, ct_2017, ct_edge, ct_walk, cls, bands, band_core, band_2017,
-       band_edge, fmax, fmin, is_w, wnear, edge_nw, byr, d_core, band_core_r)
+       band_edge, land, fmax, fmin, is_w, wnear, edge_nw, byr, r_core)
+    unlink(c(scratch, paste0(scratch, ".aux.xml")))
+    scratch <- character()
     terra::tmpFiles(remove = TRUE)
     gc(verbose = FALSE)
   }
@@ -1221,7 +1275,7 @@ t1 <- Sys.time()
 # the endpoints differ and `stable_flicker` where they agree. `changed` stays,
 # because it is a fact about the row and because read_change() needs it to map
 # the four-level files already committed.
-cat5 <- dft_rast_break_category(res, filename = tempfile(fileext = ".tif"))
+cat5 <- dft_rast_break_category(res, filename = tf())
 category <- terra::deepcopy(cat5[["category"]])
 terra::set.cats(category, layer = 1, value = NULL)   # crosstab reports LABELS on a factor
 codes <- terra::deepcopy(res$raster)
@@ -1231,7 +1285,7 @@ terra::set.cats(codes, layer = 1, value = NULL)
 changed <- terra::app(codes, fun = function(v) {
   if (!is.matrix(v)) stop("matrix chunks only")
   as.integer((v[, 1] %/% 1000L) != (v[, 1] %% 1000L))
-}, filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+}, filename = tf(), wopt = list(datatype = "INT1U"))
 ct <- terra::crosstab(c(changed, category), long = TRUE, useNA = TRUE)
 names(ct) <- c("changed", "category", "n_cells")
 ct <- ct[!is.na(ct$changed), ]
@@ -1259,9 +1313,9 @@ tick("transition_artifact", t1)
 
 t1 <- Sys.time()
 pid <- terra::rasterize(terra::vect(patches), res$raster, field = "patch_id",
-                        filename = tempfile(fileext = ".tif"))
+                        filename = tf())
 is_break <- terra::app(res$breaks[["n_flips"]], fun = function(v) as.integer(v == 1L),
-                       filename = tempfile(fileext = ".tif"), wopt = list(datatype = "INT1U"))
+                       filename = tf(), wopt = list(datatype = "INT1U"))
 z <- terra::zonal(c(is_break, res$breaks[["break_year"]], res$breaks[["n_flips"]]),
                   pid, fun = "mean", na.rm = TRUE)
 names(z) <- c("patch_id", "break_frac", "break_year_mean", "n_flips_mean")

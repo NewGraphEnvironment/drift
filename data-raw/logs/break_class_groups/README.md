@@ -55,3 +55,33 @@ replaced it.
 Two ratios in `summary_groups.csv` — `ff06_over_ff02` and `pct_area_artifact` — divide areas the
 per-group stage wrote rounded (2 dp km², 1 dp ha). Recomputed from the unrounded sources, all
 eight cells are unchanged; carry an unrounded column the next time the per-group stage runs.
+
+## The `corridor` stage (drift#73)
+
+`Rscript data-raw/break_class_groups.R corridor` — all four groups in **one** process, so the
+`rss.txt` beside it is a whole-run peak rather than the per-group trace the other stages record.
+Results are freed and `terra::tmpFiles(remove = TRUE)` called between groups.
+
+Writes, per group: `summary_corridor.csv` (temporal category by distance band, three references),
+`summary_corridor_class.csv` (the same, split by from-epoch class) and
+`summary_corridor_breakyear.csv` (`break_year` by band, clean breaks only). The rollups go to this
+directory and to `inst/extdata/temporal-composition/` for the article.
+
+Three references, and the third is the null rather than a third attempt at the first:
+`water_core` (Water in all seven years), `water_2017` (partly circular — a margin pixel that
+oscillates Water/non-Water is both near 2017 water and unsettled), and `edge_nonwater` (a
+from-epoch class boundary with no water on either side).
+
+It rewrites none of the per-group files. That is by construction — it is a separate stage rather
+than an addition to the per-group one — and was verified: after the run `git status` showed only
+new paths.
+
+Guards, each with a positive control that fires: the core cell count against the committed
+`Water,Water,stable` row; conservation against the committed `summary_change.csv` **per category**,
+joined on `category_label` and never on the integer id, because those files are in the retired
+four-level vocabulary where id 3 carries two populations; both comparator arms controlled
+separately, since a perturbed count leaves the key sets identical and drives only the value arm;
+band degeneracy, because every conservation arm is satisfied by an all-zero distance raster, which
+is what a 1/0 mask produces — `terra::distance()` measures *from* the NA cells *to* the non-NA
+ones; and the realised band set against the eight declared codes, because `classify()` leaves an
+unmatched value at its original value rather than setting NA.

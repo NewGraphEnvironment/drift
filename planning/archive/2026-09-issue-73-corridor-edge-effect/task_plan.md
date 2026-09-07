@@ -66,18 +66,19 @@ measured anywhere in this repo).
 
 ## Phase 4: notes, NEWS, issue reconciliation
 
-- [ ] `inst/notes/temporal-qa-groups.md` corridor section
-- [ ] `data-raw/logs/break_class_groups/README.md` stage documentation
-- [ ] `NEWS.md` 0.17.0 and the version bump as the final commit
-- [ ] Edit the #73 body: the non-existent sentence, the wrong boundary-signature numbers, and
-      the 1000-word cap this PR overrides. **Not** the cost premise — the issue never made it.
+- [x] `inst/notes/temporal-qa-groups.md` corridor section
+- [x] `data-raw/logs/break_class_groups/README.md` stage documentation
+- [x] `NEWS.md` 0.17.0 and the version bump as the final commit
+- [x] Edit the #73 body: the non-existent sentence, the wrong boundary-signature numbers, the
+      1000-word cap this PR overrides, and the negative corridor result. **Not** the cost
+      premise — the issue never made it.
 
 ## Validation
 
-- [ ] Tests pass; `pkgdown::check_pkgdown()` clean
+- [x] Tests pass; `pkgdown::check_pkgdown()` clean
 - [x] Article renders; body prose 1193 words under the 1200 cap; figure read and reviewed against
       the points that apply to a chart (8, 10, 12 — 1-7 are map-placement checks)
-- [ ] Restore-the-bug on the conservation guard
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion
+- [x] Restore-the-bug on the conservation guard — two controls, in the stage, run every time
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
+- [x] `/planning-archive` on completion

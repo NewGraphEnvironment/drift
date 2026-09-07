@@ -227,7 +227,7 @@ holds everywhere.
 lv <- c("0-10", "10-30", "30-50", "50-100", "100-200", "200-500", ">500")
 fl <- cor[cor$category_label %in% c("unsettled", "stable_flicker") &
             cor$reference %in% c("water_core", "edge_nonwater") & cor$band_label %in% lv, ]
-fl <- stats::aggregate(pct_of_band ~ group + reference + band_label, fl, sum)
+fl <- stats::aggregate(pct_of_scanned_in_band ~ group + reference + band_label, fl, sum)
 fl$band_label <- factor(fl$band_label, levels = lv)
 fl$panel <- factor(unname(group_name[fl$group]), levels = unname(group_name[grp$group]))
 fl$ref <- factor(ifelse(fl$reference == "water_core", "from permanent water",
@@ -235,7 +235,7 @@ fl$ref <- factor(ifelse(fl$reference == "water_core", "from permanent water",
                  levels = c("from permanent water", "from a non-water class boundary"))
 # two registry colours used as LINE identities; no hex literal enters this file
 ln <- stats::setNames(unname(pal[c("unsettled", "break_sustained")]), levels(fl$ref))
-ggplot2::ggplot(fl, ggplot2::aes(band_label, pct_of_band, colour = ref, group = ref)) +
+ggplot2::ggplot(fl, ggplot2::aes(band_label, pct_of_scanned_in_band, colour = ref, group = ref)) +
   ggplot2::geom_line(linewidth = 0.7) + ggplot2::geom_point(size = 1.1) +
   ggplot2::facet_wrap(~panel, nrow = 1) +
   ggplot2::scale_colour_manual(values = ln, name = NULL) +
@@ -251,14 +251,14 @@ tr <- corc[corc$from_class == "Trees" & corc$category_label %in% c("unsettled", 
 tr <- stats::aggregate(pct_of_band_class ~ group + band_label, tr, sum)
 tnear <- tr$pct_of_band_class[tr$band_label == "0-10"]
 tfar <- tr$pct_of_band_class[tr$band_label == ">500"]
-enear <- sapply(grp$group, function(g) sum(fl$pct_of_band[fl$group == g & fl$band_label == "0-10" & fl$reference == "edge_nonwater"]))
-efar <- sapply(grp$group, function(g) sum(fl$pct_of_band[fl$group == g & fl$band_label == ">500" & fl$reference == "edge_nonwater"]))
-wfar <- sapply(grp$group, function(g) sum(fl$pct_of_band[fl$group == g & fl$band_label == ">500" & fl$reference == "water_core"]))
+enear <- sapply(grp$group, function(g) sum(fl$pct_of_scanned_in_band[fl$group == g & fl$band_label == "0-10" & fl$reference == "edge_nonwater"]))
+efar <- sapply(grp$group, function(g) sum(fl$pct_of_scanned_in_band[fl$group == g & fl$band_label == ">500" & fl$reference == "edge_nonwater"]))
+wfar <- sapply(grp$group, function(g) sum(fl$pct_of_scanned_in_band[fl$group == g & fl$band_label == ">500" & fl$reference == "water_core"]))
 # the claims in the prose below, asserted rather than read off a figure
 stopifnot(length(tnear) == nrow(grp), all(tnear > tfar), all(enear > efar),
           all(wfar > efar),                       # water sits above the null throughout
           all((enear / efar) > (rng_w <- sapply(grp$group, function(g)
-            sum(fl$pct_of_band[fl$group == g & fl$band_label == "0-10" & fl$reference == "water_core"]))
+            sum(fl$pct_of_scanned_in_band[fl$group == g & fl$band_label == "0-10" & fl$reference == "water_core"]))
             / wfar)))                              # and the null falls further
 ```
 

@@ -138,3 +138,52 @@ cells, 4.62 ha more changed area, and the three shares within 0.03 of a point
 `Rscript data-raw/break_class_groups.R summarize`. Peak RSS was 13.7-16.3 GiB on a 64 GB machine
 for grids from 56M to 204M cells — terra sizing to available RAM, not a per-group requirement.
 The COGs are downloaded once and verified against each asset's `file:checksum`.
+
+## Q6: where the instability sits (drift#73)
+
+Added after the four Q1-Q5 runs, from a separate `corridor` stage over the same cached COGs.
+Distance is measured from a **stable water core** — pixels classed Water in all seven years, a set
+identical by definition to each group's `Water,Water,stable` row and asserted against it — into
+eight bands, crossed with the from-epoch class and the temporal category.
+
+Flicker (unsettled + stable_flicker) as a share of the scanned cells in each band:
+
+|reference | band| bulk| necr| lnth| kotl|
+|:---------|----:|----:|----:|----:|----:|
+|water core | 0-10 m| 55.2| 59.5| 51.2| 55.3|
+|water core | 30-50 m| 21.3| 25.3| 31.8| 27.4|
+|water core | >500 m| 12.4| 17.7| 16.6| 10.1|
+|non-water class boundary | 0-10 m| 40.8| 40.7| 46.4| 37.1|
+|non-water class boundary | 30-50 m| 20.0| 22.7| 24.1| 20.5|
+|non-water class boundary | >500 m| 1.7| 2.4| 1.1| 0.4|
+
+**The gradient is real and it is not about water.** The second reference is the null: a from-epoch
+class boundary with **no water on either side**, same bands, same denominator. It produces the same
+shape and falls further, to under 2.5%, while the water profile levels off at 10-18% — which is what
+a cell far from the river but near some other boundary looks like. So a water margin is the most
+unstable kind of edge rather than a different kind of thing, and the corridor visible in a reach
+figure is an edge effect in a river's shape. A split by `from_class` is a **control** for
+composition and cannot answer this; only a reference with the water removed can.
+
+**Read the all-class band share with the bias in mind.** The core removes every permanent-water
+pixel from the bands, so the near bands are by construction the cells beside permanent water that
+are *not* permanent water — the one place the modal stable class has been excised. The unbiased
+read is within a class that cannot be in the core: within **Trees**, flicker is 46.3-59.7% in the
+first ten metres against 3.3-11.1% beyond five hundred, falling in every band of every group. The
+`Water` stratum is a tautology — 0% stable in every band outside the core, necessarily.
+
+**No walk.** `break_sustained` does not establish a channel that moved: a classifier that changed
+its mind once and permanently produces the same label. The signature of a migrating bank is
+`break_year` rising with distance, and the mean break year beside permanent water is *later* than
+one far away in all four groups — the opposite direction. `summary_corridor_breakyear.csv`.
+
+**kotl's reference is a lake.** Permanent water as a share of the floodplain is 14.4% (bulk), 25.3%
+(necr), 33.7% (lnth) and **67.0%** (kotl) — Kootenay Lake, not a channel. Band occupancy is fine in
+every group (37k-2.5M cells per band); the framing is what does not transfer.
+
+The boundary reference excludes Clouds and No Data (a Trees|Clouds edge flickers by construction,
+which would inflate the null's near bands) and cells outside the floodplain.
+
+Run: `bash data-raw/break_class_groups-run.sh corridor` — 671.6 s and 16.6 GiB peak RSS for all
+four groups in one process. `terra::distance()` over BULK's 169M cells is 8.3 s of that, so the distance
+transform was never the expensive part.
