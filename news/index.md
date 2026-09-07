@@ -1,5 +1,222 @@
 # Changelog
 
+## drift 0.17.0
+
+- **The article gains patch shape and location, and the corridor
+  question comes back negative
+  ([\#73](https://github.com/NewGraphEnvironment/drift/issues/73)).**
+  [What a Land-Cover Change Figure Is Made
+  Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.html)
+  reported *how much* of a two-epoch comparison is temporally unstable
+  and never raised the spatial axis. It now reports both grains. Body
+  prose 731 -\> 1469 words against a cap raised 1000 -\> 1500; the cap
+  is a variable now, because the literal appeared twice on one line and
+  changing one would have left the message lying.
+- **Width is a size proxy, and neither geometric leg survives contact.**
+  The median sliver is **two cells**. A 1 ha patch-area sieve — the
+  standard conservative move, and one the published
+  `transition_vector.gpkg` already applies
+  ([\#67](https://github.com/NewGraphEnvironment/drift/issues/67)) —
+  keeps 2.2-4.1% of patches and 52.9-72.0% of the changed area, and only
+  1.9-7.4% of what survives is a sliver. Holding area fixed rather than
+  sieving is what separates width from size, and it **reverses** the
+  result: in the 0.2-0.5 and 0.5-1 ha bands the area-weighted
+  clean-break share is *higher* for slivers in 6 of the 8 group-and-band
+  cells (BULK 0.516 v 0.450 and 0.573 v 0.497, against 0.464 v 0.590
+  unsieved), and below 0.1 ha all but 3 of 24,151 patches are slivers so
+  width discriminates nothing at all. Read with
+  [\#62](https://github.com/NewGraphEnvironment/drift/issues/62)’s Q4,
+  where the boundary-tracing leg reverses in lnth, that is two geometric
+  signatures and neither generalises. New `summary_patch_sieve.csv` and
+  `summary_patch_area_bands.csv`.
+- **Two worked examples of a sliver**, one at a channel margin and one
+  on the edge of a clearing 13 km from any water, each with the first
+  year, the last year and the per-cell temporal category. Chosen by a
+  rule recorded beside the measurements in `bulk_slivers.csv`, from the
+  0.2-0.6 ha band — below 0.1 ha every patch is a sliver, so an example
+  from there would illustrate nothing. New `article-slivers` stage.
+- **The floodplain map is two figures now, and the overview is
+  readable.** It was one two-panel figure whose left half plotted a
+  regular 1 km grid as a point cloud through a 100-step ramp between two
+  light registry colours — 29 points of luminance, which at that cell
+  size is not a scale anyone can read. It is a raster with five bins,
+  the ramp carries on into a dark neutral for 54 points of range, and
+  the legend is placed by the measured empty block of the extent rather
+  than by a keyword: three earlier placements landed on floodplain, on
+  floodplain, and clipped off the bottom of the device. The first
+  version of the figure published with **no legend at all**, because
+  [`terra::plot()`](https://rspatial.github.io/terra/reference/plot.html)
+  leaves the device in a state where a keyword-placed
+  [`legend()`](https://rdrr.io/r/graphics/legend.html) silently draws
+  nothing.
+- **Width holds unsieved; the boundary signature does not hold at all.**
+  89-93% of change patches have an effective width under 1.5 px and
+  carry 17-31% of the changed area, and in all four groups they flicker
+  more and settle less. The article says “narrow”, not “one pixel wide”:
+  `flag_sliver` is `2A/P < 1.5` px, so a 3x3 block scores exactly 1.5
+  and is **not** flagged and the population is small compact blobs as
+  well as one-cell strips. The boundary-tracing leg separates in three
+  groups and reverses slightly in lnth (0.518 against 0.515), which is
+  what [\#62](https://github.com/NewGraphEnvironment/drift/issues/62)’s
+  Q4 already concluded; the issue body’s quoted range for it conflated
+  the sliver and artifact rows and has been corrected.
+- **Flicker concentrates at class boundaries, not at the channel.** New
+  `corridor` stage in `data-raw/break_class_groups.R`. Within the Trees
+  class alone — the class that cannot be part of the water reference, so
+  the comparison does not measure its own definition — flicker is
+  46.3-59.7% within 10 m of permanent water against 3.3-11.1% beyond 500
+  m, falling in every band of every group. **The null does not separate
+  it.** Measured against a from-epoch class boundary with no water on
+  either side, the same gradient appears and falls further, 37.1-46.4%
+  to 0.4-2.4%, while the water profile levels off at 10.1-17.7% — what a
+  cell far from the river but near some other boundary looks like. A
+  water margin is the most unstable kind of edge, not a different kind
+  of thing. A split by `from_class` is a *control* for composition and
+  structurally cannot answer this; only a reference with the water
+  removed can.
+- **And no walk.** `break_sustained` does not establish a channel that
+  moved — a classifier that changed its mind once and permanently
+  produces the same label — so the separation the issue sketched needed
+  `break_year`, which the category does not carry. The mean break year
+  beside permanent water is *later* than one far away in all four
+  groups, the opposite of a migrating bank.
+- **The reference is a stable water core, and the bias it introduces is
+  stated rather than hidden.** Pixels classed Water in all seven years —
+  a set identical by definition to each group’s `Water,Water,stable`
+  row, asserted against it per group, which is also the only thing that
+  would catch
+  [`app()`](https://rspatial.github.io/terra/reference/app.html) reading
+  a seven-column chunk transposed. It removes every permanent-water
+  pixel from the bands, so the near-band `stable` share is biased
+  downward by construction and the `Water` stratum is a tautology (0%
+  stable in every band outside the core). Hence the within-Trees
+  framing. `kotl`’s core is 67.0% of its floodplain — Kootenay Lake, not
+  a channel.
+- **New shipped data**, `summary_patch_widths.csv`,
+  `summary_corridor.csv`, `summary_corridor_class.csv` and
+  `summary_corridor_breakyear.csv` in
+  `inst/extdata/temporal-composition/`. The widths table is a reshape of
+  the four committed `summary_patch_groups.csv` files from the same
+  in-memory read that already feeds `summary_groups.csv`, not a second
+  read of one file, and carries a partition assertion — `grp()` subsets
+  with a raw logical, so an `NA` in `flag_sliver` would add a phantom
+  all-NA row to **both** the sliver and the wider group rather than
+  dropping it, and only `sliver + wider == all` sees that.
+- **Nothing committed moved.** The corridor work is a separate stage
+  rather than an edit to the per-group one, so no per-group CSV is
+  rewritten by construction; verified after the run with `git status`,
+  and `summarize` regenerated every pre-existing output byte-identical.
+- **Guards, each with a control that fires.** Conservation against the
+  committed `summary_change.csv` per category, joined on
+  `category_label` and never on the integer id, because those files are
+  in the retired four-level vocabulary where id 3 carries two
+  populations; both comparator arms controlled separately, since a
+  perturbed count leaves the key sets identical and exercises only the
+  value arm; band degeneracy, because every conservation arm is
+  satisfied by an all-zero distance raster — which is exactly what a 1/0
+  mask produces,
+  [`terra::distance()`](https://rspatial.github.io/terra/reference/distance.html)
+  measuring *from* the NA cells *to* the non-NA ones; and the realised
+  band set against the eight declared codes, because
+  [`classify()`](https://rspatial.github.io/terra/reference/classify.html)
+  leaves an unmatched value at its **original** value rather than
+  setting NA.
+- **Scale.** `bash data-raw/break_class_groups-run.sh corridor`: 671.6 s
+  and 16.6 GiB peak RSS for all four floodplains (169M-204M cells each)
+  in one process, with results freed and every intermediate unlinked by
+  path between groups —
+  [`terra::tmpFiles()`](https://rspatial.github.io/terra/reference/tmpFile.html)
+  only tracks files terra named itself and never sees an explicit
+  [`tempfile()`](https://rdrr.io/r/base/tempfile.html).
+  [`terra::distance()`](https://rspatial.github.io/terra/reference/distance.html)
+  over BULK’s 169M cells is **8.3 s** of that — the distance transform
+  was never the expensive part of this question.
+- **The share column says what its denominator is.**
+  [`distance()`](https://rspatial.github.io/terra/reference/distance.html)
+  fills the whole grid, so a band spans all 169M cells while ~2.4% of
+  them are scannable; a column called `pct_of_band` would be read as a
+  share of the ground and be wrong by two orders of magnitude in its
+  denominator. It is `pct_of_scanned_in_band`, with `n_scanned_in_band`
+  beside it, and the two single-arm files carry a `reference` column so
+  `n_cells` cannot mean two things across a join.
+- **Two defects found by review after the first run, both in the null
+  arm.** `focal(na.rm = TRUE)` stops an *inside* perimeter cell being
+  flagged for having NA neighbours; it does not stop an *outside* one,
+  so 3.8-5.2% of the boundary reference was beyond the floodplain,
+  tracing its perimeter from one cell out — the exact artifact the code
+  comment claimed was avoided. And `Clouds` is a live class, so a
+  Trees\|Clouds edge counted as a class boundary; cloud edges flicker by
+  construction, which inflates the null’s near bands in the direction
+  that makes the null look more like the channel than it is. Both fixed;
+  the conclusion is unchanged and the far-field null moved 0.3-2.5% to
+  0.4-2.4%.
+- **A guard that was vacuous, and one that could not see the loss it
+  named.** `all(x %in% y)` over
+  [`na.omit()`](https://rspatial.github.io/terra/reference/na.omit.html)
+  is TRUE on an empty vector, and
+  [`distance()`](https://rspatial.github.io/terra/reference/distance.html)
+  on an all-NA mask returns NaN everywhere with no error or warning — so
+  the band-set guard passed on precisely the degenerate case it was
+  written for. And the conservation check counted NA-band rows while the
+  published rollup dropped them, so a cell lost to the banding conserved
+  in the guard and vanished from the table, under an error message about
+  banding. Both closed, and the degeneracy check now runs on all three
+  arms rather than the first.
+- **Editorial pass on the article, from a read-through.** The 1 km
+  overview was a choropleth shaded by each cell’s unsettled share and it
+  did not earn the space — 1 km blocks average over the thing that
+  drives the pattern, distance to a boundary in tens of metres, so it
+  showed blobby variation with no readable signal while the corridor
+  figure answers the same question directly. It is now a plain locator.
+  The reach figure had the same silent-legend defect as the overview
+  ([`terra::plot()`](https://rspatial.github.io/terra/reference/plot.html)
+  leaves the device in a state where a keyword-placed
+  [`legend()`](https://rdrr.io/r/graphics/legend.html) draws nothing)
+  and shipped without one; both are now placed by explicit user
+  coordinates. The `stable_flicker` column of the exact-values table
+  read as though it were a sum of the columns beside it, and now says in
+  the caption that it is a separate population, not part of the reported
+  change nor the sum of anything, and carries the same name as its
+  category in the maps. “A quoted hectare” is named for what it is
+  throughout: area the classifier labelled differently in 2023 than
+  in 2017. The closing sections are plain-language bullets — what the
+  seven-year view shows, and what it does not — in place of two dense
+  paragraphs. Body prose 1469 -\> 1506 words at a cap of 1500 after
+  tightening six paragraphs the new summary restates.
+- **The four groups have names now, and a map.** They were referred to
+  by their four-letter codes because no source for the names was in the
+  package. New `article-context` stage: the names and the locator
+  geometry come from one BCDC record (FWA Watershed Groups) — **Bulkley
+  River, Nechako River, Lower North Thompson River, Kootenay Lake** —
+  and the article opens the generality section with a province map
+  showing where they are. Kootenay Lake naming itself is also the
+  independent confirmation of the caveat that its “channel” is a lake.
+- **The floodplain overview has a basemap and an outline.** It was
+  reverted to a locator when the choropleth proved unreadable; with
+  shaded relief behind it the choropleth works, so the shading is back.
+  The basemap ships as a 40 KB JPEG-compressed GeoTIFF rather than being
+  fetched at render time, because the article must build with no
+  network, and the stage refuses a tile with fewer than 25 grey levels —
+  a tile service returning a placeholder or a watermark is a 200 that
+  renders as a flat field. The floodplain outline ships too, and the 1
+  km cells are drawn on a white ground inside it: over relief the
+  lightest bin was indistinguishable from terrain, and where a cell
+  holds no reported change nothing is drawn at all, so neither the low
+  end of the scale nor the mapped extent was visible.
+  `fig.width`/`fig.height` are set to the basemap’s own extent ratio —
+  at any other shape terra letterboxes the raster and `plotRGB` fills
+  the bands **black**.
+- **The sliver examples are windowed on the patch, not on its bounding
+  box.** A sliver is one cell wide and tens of cells long, so a
+  bbox-plus-padding window is as long as the patch and the patch is then
+  1% of the frame — you cannot see what class is inside it, which is the
+  entire point of the figure. A fixed 41-cell window centred on the
+  patch renders one cell as a readable band, and the caption now states
+  each transition (`Water -> Trees` at the channel margin,
+  `Rangeland -> Trees` on a clearing edge 13 km away) instead of leaving
+  the reader to decode the colours.
+- No API change; `NAMESPACE` is untouched.
+
 ## drift 0.16.0
 
 - **New
