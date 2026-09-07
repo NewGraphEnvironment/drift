@@ -1,0 +1,2 @@
+2026-09-07T00:19:36Z start necr
+2026-09-07T00:25:12Z end necr (exit 0)
