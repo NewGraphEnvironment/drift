@@ -63,3 +63,35 @@ drift's unsieved change layer and the published `transition_vector.gpkg`.
 
 | Error | Resolution |
 |-------|------------|
+
+## Phase 1: the gq registry route
+
+`gq_reg_custom()` reads a fixed column set through `$` on a one-row data frame, so **an absent
+column is a length-zero `if`**, not a default. A four-column CSV failed with
+`argument is of length zero` from `csv_label`. Enumerating the reader's references mechanically
+rather than discovering them one error at a time:
+
+```
+row$fill_color  row$fill_opacity  row$stroke_color  row$stroke_width  row$stroke_opacity
+row$mark_color  row$mark_shape  row$mark_radius  row$mark_stroke_color  row$mark_stroke_width
+row$label_color  row$label_font  row$label_size  row$label_halo_color  row$label_halo_width
+row$label_offset_x  row$label_offset_y
+```
+
+plus `layer_key`, `type` (required), `source_layer`, `class_field`, `class_value`, `class_label`.
+`inst/cartography/drift_temporal.csv` carries all of them, empty where unused. An extra `notes`
+column carrying the palette source is inert — verified, not assumed.
+
+**Working accessor:** `gq_tmap_classes(reg$layers$temporal_category)` returns `$values` as a
+character vector **named by `class_value` in class order** and `$labels` unnamed in the same order.
+The named vector feeds `ggplot2::scale_fill_manual(values = )` directly, so legend and colours
+cannot desynchronise. The article uses this route only.
+
+Palette: Okabe-Ito blue / orange / reddish-purple for the three changed categories, ColorBrewer
+Greys light for stable. Colour-vision-safe and sourced, not invented.
+
+## Phase 1: `.Rbuildignore`
+
+`^vignettes/articles$` matches the directory, not the files under it — this is the form
+`usethis::use_article()` writes, and R prunes the matched directory during build. Verified at the
+tarball in Phase 5 rather than trusted from the pattern.

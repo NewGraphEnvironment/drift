@@ -1,0 +1,5 @@
+layer_key,type,source_layer,class_field,class_value,class_label,fill_color,fill_opacity,stroke_color,stroke_width,stroke_opacity,mark_color,mark_shape,mark_radius,mark_stroke_color,mark_stroke_width,label_color,label_font,label_size,label_halo_color,label_halo_width,label_offset_x,label_offset_y,notes
+temporal_category,polygon,,category,stable,Stable,#d9d9d9,1,,,,,,,,,,,,,,,,ColorBrewer Greys 3-class light
+temporal_category,polygon,,category,break_sustained,Sustained change,#0072b2,1,,,,,,,,,,,,,,,,Okabe-Ito blue
+temporal_category,polygon,,category,break_endpoint,Endpoint-only change,#e69f00,1,,,,,,,,,,,,,,,,Okabe-Ito orange
+temporal_category,polygon,,category,flicker,Unsettled,#cc79a7,1,,,,,,,,,,,,,,,,Okabe-Ito reddish purple

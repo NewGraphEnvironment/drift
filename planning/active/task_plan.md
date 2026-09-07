@@ -22,9 +22,9 @@ drift — so that a quoted hectare figure is read with the right error bar.
 
 ## Phase 1: Colour registry and build scaffolding
 
-- [ ] `inst/cartography/drift_temporal.csv` in `gq_reg_custom()` schema, four categories, sourced palette
-- [ ] Spike `gq_reg_merge(gq_reg_main(), gq_reg_custom(path))`; record the working accessor in findings.md
-- [ ] Add `^vignettes/articles$` to `.Rbuildignore`
+- [x] `inst/cartography/drift_temporal.csv` in `gq_reg_custom()` schema, four categories, sourced palette
+- [x] Spike `gq_reg_merge(gq_reg_main(), gq_reg_custom(path))`; record the working accessor in findings.md
+- [x] Add `^vignettes/articles$` to `.Rbuildignore`
 
 ## Phase 2: Extend the `summarize` stage
 
