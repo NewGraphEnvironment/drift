@@ -95,3 +95,68 @@ Greys light for stable. Colour-vision-safe and sourced, not invented.
 `^vignettes/articles$` matches the directory, not the files under it — this is the form
 `usethis::use_article()` writes, and R prunes the matched directory during build. Verified at the
 tarball in Phase 5 rather than trusted from the pattern.
+
+## Phase 2 review — round 1 (3 findings, all fixed)
+
+1. **A shipped number was wrong, by differencing already-rounded shares.** The README (and the
+   issue body) stated the Trees -> Water sensitivity as "-1.2 to +6.0 points". Measured from the
+   unrounded `pct_of_set` column: bulk +0.598, necr +0.902, lnth **-1.254**, kotl +6.000. Rounded
+   once, that is **-1.3 to +6.0**. The -1.2 comes from `15.9 - 14.7` on shares already rounded to
+   one decimal — this repo's own T6. The issue body needs the same correction (Phase 6).
+2. **`agrees()` walked the rollup's rows, not the expected set.** `match(key_roll, key_chg)`
+   compares exactly `nrow(roll)` values, so a category present in `summary_change.csv` and absent
+   from the rollup was invisible; `anyNA(idx)` only catches the opposite direction, and the
+   conservation check cannot see it either because it compares `per_class` against the file
+   `per_class` came from. Closed by asserting `setequal()` plus no duplicates on both key sets.
+   Proved by driving the real function: a matching rollup returns TRUE, one moved cell returns
+   FALSE, and a dropped `summary_change.csv` row now stops — **before the fix that third case
+   returned TRUE**.
+3. **The README documented an `article-bulk` stage that does not exist yet.** Trimmed to what this
+   commit ships; the rows return in the commit that adds the stage.
+
+Checked and clean, with measurement: the `aggregate()` NA-drop is real but unreachable (0 NAs in
+`from_class`/`to_class` across all 243/229/227/273 rows); `yr_endpoint` is positional so it
+survives a non-consecutive series, and the cross-check is genuinely independent because
+`summary_change.csv` was computed the other way round, via `pmin(n_before, n_after)` in `cat_fun`;
+`nrow(treeloss) == 24` is tight, since a `stable` category is structurally impossible under
+`from == "Trees" & to != "Trees"`; re-running writes byte-identical files, so no git churn; and
+`order()` on the nine class names sorts identically under `C` and `en_US.UTF-8`.
+
+## Phase 2 review — round 2 (3 findings, all fixed; one INSIDE round 1's fix)
+
+1. **A defect inside round 1's fix 3.** Trimming `article-bulk` from the `inst/` README left the
+   sibling logs README asserting "a third stage, `article-bulk`, writes ... Both are described in
+   that directory's own README" — false the moment the trim landed. The **mechanism**, which the
+   reviewer named: *a fact restated in prose that no code reads, so nothing contradicts it when
+   the artifact moves — and the repair is itself prose.* One `grep -rn article-bulk` would have
+   made the fix a sweep instead of a trim.
+2. **The positive control exercised only half the comparator.** `agrees()` has two failure modes
+   after round 1 — `stop()` on a set mismatch, `FALSE` on a value mismatch — and the control moves
+   a count, which leaves both key sets identical. The structural arm was a guard nobody had seen
+   fail. A second control now drives it with a dropped row on every run.
+3. **One `if` covering three conditions with a message written for one.** A duplicate-key trigger
+   made both `setdiff()`s empty and printed `only in summary_change.csv: (), only in the rollup:
+   ()`. Split into two checks with their own messages.
+
+**Terminating enumeration for the prose mechanism.** Every path- and stage-reference in both
+READMEs was extracted mechanically and resolved against the tree. Two did not resolve —
+`article-bulk` and `vignettes/articles/temporal-composition.Rmd` — both forward references to
+later commits in this PR. Removed, so each commit's prose describes only that commit; the rows
+return in the commits that make them true. Re-run at the end of Phase 4:
+
+```
+python3 - <<'PY'
+import re, pathlib
+for f in ["data-raw/logs/break_class_groups/README.md",
+          "inst/extdata/temporal-composition/README.md"]:
+    t = pathlib.Path(f).read_text()
+    for r in sorted(set(re.findall(r'`([A-Za-z0-9_./-]+\.(?:R|md|csv|rds|Rmd))`', t))):
+        print(("ok      " if pathlib.Path(r).exists() else "MISSING "), f, r)
+PY
+```
+
+Verified clean by measurement in round 2: `-1.3 to +6.0` recomputed and containing; no key
+collision across all 20 keys; `aggregate()` returns `changed` as logical, not factor; the
+conservation check is post- vs pre-aggregation and so not circular; `pct_of_pair` sums to exactly
+100 across all 221 pairs and `pct_of_set` across all 8 group x set combinations; both CSVs
+regenerate byte-identical.

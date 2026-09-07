@@ -24,6 +24,11 @@ Committed evidence (the `.tif`, `.gpkg`, `.json`, `.log` files and each group's
 - `summary_bulk_reconcile.csv` — BULK on the published grid (14651 x 11552) against the #9
   run on the grid `dft_stac_fetch()` tiled from Planetary Computer (16000 x 12000)
 
+The `summarize` stage also writes the pkgdown article's tables into
+`inst/extdata/temporal-composition/` (drift#66), described in that directory's own README. They
+are a rollup of the committed `summary_pixels.csv` files, guarded against each group's
+`summary_change.csv` on integer cell counts, so they cannot drift from the numbers above.
+
 Runs, in order: bulk 312 s / 15.4 GiB peak, kotl 323 s / 16.3 GiB, lnth 100 s / 13.7 GiB, necr
 138 s / 14.2 GiB. Peak RSS sits at 14-16 GiB whatever the grid size (56M to 204M cells), so it
 is terra sizing its working set against available RAM rather than a per-group requirement —

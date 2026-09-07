@@ -28,15 +28,15 @@ drift — so that a quoted hectare figure is read with the right error bar.
 
 ## Phase 2: Extend the `summarize` stage
 
-- [ ] Record baseline md5 of the three summarize outputs in findings.md
-- [ ] `temporal_category(status, break_year)` helper — one definition, both tables
-- [ ] Emit `inst/extdata/temporal-composition/summary_class_temporal.csv` (unrounded area_ha)
-- [ ] Emit `summary_treeloss_temporal.csv` with `class_set` named in the data
-- [ ] Emit article copy of `summary_groups.csv` as a column subset of the existing `out` object
-- [ ] Five-part guard before any write, incl. positive control that perturbs the rollup
-- [ ] `inst/extdata/temporal-composition/README.md`; update the logs README
-- [ ] Run `summarize`; assert baseline hashes unchanged and only new `inst/` files appear
-- [ ] Cross-check tree-loss table against the independent derivation
+- [x] Record baseline md5 of the three summarize outputs in findings.md
+- [x] `temporal_category(status, break_year)` helper — one definition, both tables
+- [x] Emit `inst/extdata/temporal-composition/summary_class_temporal.csv` (unrounded area_ha)
+- [x] Emit `summary_treeloss_temporal.csv` with `class_set` named in the data
+- [x] Emit article copy of `summary_groups.csv` as a column subset of the existing `out` object
+- [x] Five-part guard before any write, incl. positive control that perturbs the rollup
+- [x] `inst/extdata/temporal-composition/README.md`; update the logs README
+- [x] Run `summarize`; assert baseline hashes unchanged and only new `inst/` files appear
+- [x] Cross-check tree-loss table against the independent derivation
 
 ## Phase 3: New `article-bulk` stage and the `inst/` artifact
 

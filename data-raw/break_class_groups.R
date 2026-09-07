@@ -32,6 +32,10 @@
 # and from the summarize stage, in data-raw/logs/break_class_groups/:
 #   summary_groups.csv / .md - one row per group, every number the note quotes
 #   summary_bulk_reconcile.csv - the published-grid BULK run against the #9 run
+# and, for the pkgdown article (drift#66), in inst/extdata/temporal-composition/:
+#   summary_groups.csv            - a column subset of the object above
+#   summary_class_temporal.csv    - temporal category per transition class
+#   summary_treeloss_temporal.csv - Trees -> non-Trees, under two named class sets
 
 suppressMessages({
   library(sf)
@@ -245,6 +249,166 @@ if (arg == "summarize") {
     }
     message("note tables match summary_groups.md")
   }
+
+  # --- article tables (#66) --------------------------------------------------
+  # The pkgdown article quotes composition by transition class, and its
+  # acceptance requires every quoted value to trace to a committed CSV emitted
+  # by a committed script. summary_pixels.csv already carries status x
+  # break_year per transition class, so the composition is a rollup of it — but
+  # a rollup nobody had written down, which is the gap this closes.
+  #
+  # Identity, for a consecutive series: break_year is the FIRST year of the new
+  # class, so the second year of the series leaves n_before = 1 and the last
+  # leaves n_after = 1. Both fail pmin(n_before, n_after) >= 2 and are
+  # endpoint-only; everything between them is sustained. Derived from `years`
+  # rather than written as 2018/2023 so the identity follows the series if it
+  # ever moves. Checked against summary_change.csv on integers, below.
+  art_dir <- file.path("inst", "extdata", "temporal-composition")
+  dir.create(art_dir, recursive = TRUE, showWarnings = FALSE)
+  yr_endpoint <- c(years[2], years[length(years)])
+
+  # one definition, used by both new tables
+  temporal_category <- function(status, break_year) {
+    if (anyNA(status)) {
+      stop("summary_pixels.csv carries an NA status; the category map does not cover it")
+    }
+    out <- rep(NA_character_, length(status))
+    out[status == "stable"] <- "stable"
+    out[status == "flicker"] <- "flicker"
+    brk <- status == "break"
+    if (any(is.na(break_year[brk]))) stop("a break row carries no break_year")
+    out[brk] <- ifelse(break_year[brk] %in% yr_endpoint, "break_endpoint", "break_sustained")
+    if (anyNA(out)) stop("unmapped status value: ", paste(unique(status[is.na(out)]), collapse = ", "))
+    out
+  }
+
+  per_class <- do.call(rbind, lapply(names(groups), function(g) {
+    px <- utils::read.csv(file.path(log_root, g, "summary_pixels.csv"),
+                          stringsAsFactors = FALSE)
+    if (!all(px$break_year[px$status == "break"] %in% years[-1])) {
+      stop("break_year outside the declared series in ", g)
+    }
+    px$group <- g
+    px$category <- temporal_category(px$status, px$break_year)
+    px$changed <- px$from_class != px$to_class
+    # area, not `pct`: summary_pixels.csv's pct is the share of ALL valid pixels,
+    # so reusing it here would silently answer a different question
+    a <- stats::aggregate(px[c("n_cells", "area")],
+                          by = px[c("group", "from_class", "to_class", "changed", "category")],
+                          FUN = sum)
+    names(a)[names(a) == "area"] <- "area_ha"
+    pair <- paste(a$from_class, a$to_class, sep = "\r")
+    a$pct_of_pair <- 100 * a$n_cells / ave(a$n_cells, pair, FUN = sum)
+    a[order(a$from_class, a$to_class, a$category), ]
+  }))
+
+  # --- guard: five checks, all before any write ------------------------------
+  # so a failing run leaves no CSV behind for the next one to trust
+  stopifnot(
+    nrow(per_class) > 0L,
+    identical(sort(unique(per_class$group)), sort(names(groups))),
+    !anyNA(per_class$category), !anyNA(per_class$n_cells)
+  )
+  chg_cats <- c("break_endpoint", "break_sustained", "flicker")
+  for (g in names(groups)) {
+    pc <- per_class[per_class$group == g, ]
+    got <- sort(unique(pc$category[pc$changed]))
+    # identical() on a sorted character vector: a category that vanished fails
+    # here rather than passing on a pooled set where another group still has it
+    if (!identical(got, chg_cats)) {
+      stop("changed categories in ", g, " are (", paste(got, collapse = ", "),
+           "), expected (", paste(chg_cats, collapse = ", "), ")")
+    }
+    if (sum(pc$changed) < 40L) stop("only ", sum(pc$changed), " changed pairs in ", g)
+    # conservation: cells in equals cells out. This is the tripwire for an
+    # aggregate() that silently drops a group -- nothing else would notice.
+    px_n <- sum(utils::read.csv(file.path(log_root, g, "summary_pixels.csv"))$n_cells)
+    if (!identical(as.integer(sum(pc$n_cells)), as.integer(px_n))) {
+      stop("cells lost rolling up ", g, ": ", px_n, " in, ", sum(pc$n_cells), " out")
+    }
+  }
+
+  # cross-check the rollup against the committed per-group totals, on integers.
+  # Verified delta 0 in all four groups, so identical() is the right strength --
+  # there is no tolerance to tune and no float drift to absorb.
+  agrees <- function(roll, chg) {
+    key_roll <- paste(as.integer(roll$changed), roll$category)
+    key_chg <- paste(chg$changed, chg$category_label)
+    # walk the EXPECTED set, not only the rollup's own rows. Indexing by
+    # match(key_roll, key_chg) compares exactly nrow(roll) values, so a category
+    # present in summary_change.csv and absent from the rollup is invisible --
+    # and the conservation check above cannot see it either, because it compares
+    # per_class against the same file per_class was built from.
+    if (anyDuplicated(key_roll) || anyDuplicated(key_chg)) {
+      stop("a (changed, category) key repeats, so match() would compare one row twice: ",
+           paste(unique(c(key_roll[duplicated(key_roll)], key_chg[duplicated(key_chg)])),
+                 collapse = ", "))
+    }
+    if (!setequal(key_roll, key_chg)) {
+      stop("category sets differ; only in summary_change.csv: (",
+           paste(setdiff(key_chg, key_roll), collapse = ", "), "), only in the rollup: (",
+           paste(setdiff(key_roll, key_chg), collapse = ", "), ")")
+    }
+    idx <- match(key_roll, key_chg)
+    identical(as.integer(roll$n_cells), as.integer(chg$n_cells[idx]))
+  }
+  for (g in names(groups)) {
+    pc <- per_class[per_class$group == g, ]
+    roll <- stats::aggregate(pc["n_cells"], by = pc[c("changed", "category")], FUN = sum)
+    chg <- utils::read.csv(file.path(log_root, g, "summary_change.csv"),
+                           stringsAsFactors = FALSE)
+    if (!agrees(roll, chg)) stop("rollup does not reproduce summary_change.csv for ", g)
+    # positive control: the comparator must be capable of returning FALSE.
+    # Without this, two empty or two all-NA objects compare equal and the check
+    # above reads green having compared nothing.
+    bad <- roll; bad$n_cells[1] <- bad$n_cells[1] + 1L
+    if (agrees(bad, chg)) stop("the rollup comparator cannot fail; it is not a check")
+    # agrees() has two failure modes and the control above moves only a count, so
+    # it leaves both key sets identical and exercises the value arm alone. Drive
+    # the structural arm too, or half the comparator is never seen to fail.
+    if (!inherits(try(agrees(roll[-1, ], chg), silent = TRUE), "try-error")) {
+      stop("the structural arm does not fire on a rollup missing a row")
+    }
+  }
+  message("rollup reproduces summary_change.csv in all ", length(groups), " groups")
+
+  # --- write -----------------------------------------------------------------
+  # area_ha unrounded: the article rounds once, at display. Summing a rounded
+  # column disagrees with summary_change.csv in the last digit.
+  utils::write.csv(per_class[c("group", "from_class", "to_class", "changed", "category",
+                               "n_cells", "area_ha", "pct_of_pair")],
+                   file.path(art_dir, "summary_class_temporal.csv"), row.names = FALSE)
+
+  # Tree loss, as the two class sets the article must choose between. The set is
+  # a literal column, so "which classes is this share computed over" is answered
+  # by the data rather than by prose that can drift away from it.
+  tree_sets <- list(
+    trees_to_non_trees_excl_clouds = c("Trees", "Clouds"),
+    trees_to_non_trees_excl_clouds_water = c("Trees", "Clouds", "Water")
+  )
+  treeloss <- do.call(rbind, lapply(names(tree_sets), function(set) {
+    keep <- per_class$from_class == "Trees" & !(per_class$to_class %in% tree_sets[[set]])
+    d <- per_class[keep, ]
+    a <- stats::aggregate(d[c("n_cells", "area_ha")],
+                          by = d[c("group", "category")], FUN = sum)
+    a$class_set <- set
+    a$pct_of_set <- 100 * a$area_ha / ave(a$area_ha, a$group, FUN = sum)
+    a[order(match(a$group, names(groups)), a$category),
+      c("group", "class_set", "category", "n_cells", "area_ha", "pct_of_set")]
+  }))
+  stopifnot(nrow(treeloss) == 2L * length(groups) * length(chg_cats))
+  utils::write.csv(treeloss, file.path(art_dir, "summary_treeloss_temporal.csv"),
+                   row.names = FALSE)
+
+  # the article's group table is a COLUMN SUBSET of the object that produced
+  # summary_groups.csv above -- one derivation, so the two cannot disagree
+  utils::write.csv(out[c("group", "item", "valid_ha", "changed_ha", "pct_changed_of_valid",
+                         "pct_sustained", "pct_endpoint", "pct_flicker", "overstatement_factor",
+                         "stable_flicker_ha", "pct_stable_flicker_of_valid",
+                         "stable_flicker_over_changed")],
+                   file.path(art_dir, "summary_groups.csv"), row.names = FALSE)
+  message("article tables written to ", art_dir)
+
   message("SUMMARIZE DONE")
   quit(save = "no", status = 0)
 }
