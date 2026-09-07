@@ -497,8 +497,13 @@ if (arg == "article-bulk") {
   # the whole grid in R, and this grid is 169M cells
   pc <- terra::crosstab(c(pid, category), long = TRUE, useNA = FALSE)
   names(pc) <- c("patch_id", "category", "n_cells")
-  pc$patch_id <- as.integer(as.character(pc$patch_id))
-  pc$category <- as.integer(as.character(pc$category))
+  # as.integer() directly, as above. Safe here today only because useNA = FALSE
+  # keeps the NaN group out -- a property of one argument to the line above, not
+  # of this one, and if it were ever reached every empty group would become
+  # patch_id 0 / category 0, and category 0 is `stable`, which is exactly what
+  # the guard a dozen lines below exists to refuse.
+  pc$patch_id <- as.integer(pc$patch_id)
+  pc$category <- as.integer(pc$category)
 
   wide <- stats::reshape(pc, idvar = "patch_id", timevar = "category", direction = "wide")
   for (k in 1:3) {

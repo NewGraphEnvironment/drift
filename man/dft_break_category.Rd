@@ -41,9 +41,12 @@ whether the endpoints differ at all.
 label is a judgement, so it lives here, in one place, under a version — see
 \code{rule}. The numbers it rests on stay where they were measured.
 
-\code{NA} propagates: a pixel with an \code{NA} in any interior year cannot be scanned,
-arrives with \code{status} \code{NA}, and is labelled \code{NA} rather than refused — the
-series in this package's own examples contains one.
+\code{NA} propagates: a row whose pixels carry an \code{NA} in any interior year cannot
+be scanned, arrives from \code{\link[=dft_rast_break_class]{dft_rast_break_class()}} with \code{status} \code{NA}, and is
+labelled \code{NA} rather than refused. It is the only \code{NA} this function
+produces, which is why an unlabelable class code is an error instead. The
+bundled example series has no such row — mask a year, or classify a series
+with a real \code{NA} in it, to see one.
 
 A \code{status} value outside \code{stable} / \code{break} / \code{flicker}, or a \code{break} row
 carrying no \code{break_year}, is an error rather than an \code{NA}: both mean the

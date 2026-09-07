@@ -51,9 +51,12 @@
 #' where it is measured.
 #'
 #' @details
-#' `NA` propagates: a pixel with an `NA` in any interior year cannot be scanned,
-#' arrives with `status` `NA`, and is labelled `NA` rather than refused — the
-#' series in this package's own examples contains one.
+#' `NA` propagates: a row whose pixels carry an `NA` in any interior year cannot
+#' be scanned, arrives from [dft_rast_break_class()] with `status` `NA`, and is
+#' labelled `NA` rather than refused. It is the only `NA` this function
+#' produces, which is why an unlabelable class code is an error instead. The
+#' bundled example series has no such row — mask a year, or classify a series
+#' with a real `NA` in it, to see one.
 #'
 #' A `status` value outside `stable` / `break` / `flicker`, or a `break` row
 #' carrying no `break_year`, is an error rather than an `NA`: both mean the
