@@ -1,0 +1,5 @@
+"group","drift_patches","drift_ha","pub_patches","pub_ha","repro_patches","repro_ha","sieve_ha","clip_ha","n_classes","n_classes_differ","max_abs_d_ha","reproduced"
+"bulk",21701,4625,7161,3627.2,7161,3627.2,985.3,12.5,53,0,0,TRUE
+"necr",21990,5779.4,5692,4712.6,5692,4712.6,1049.4,17.3999999999996,44,0,0,TRUE
+"lnth",12434,1629.7,2753,1148.5,2753,1148.5,477.7,3.5,41,0,0,TRUE
+"kotl",17042,3537.8,4929,2757.8,4929,2757.8,649.5,130.5,46,0,0,TRUE

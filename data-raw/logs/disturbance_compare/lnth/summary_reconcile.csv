@@ -1,0 +1,5 @@
+"step","mechanism","n_patches","area_ha","d_n","d_ha"
+"unsieved_vectorize","drift, changes_only, no filter",12434,1629.7,NA,NA
+"after_sieve_unclipped","class-agnostic 1 ha sieve in dft_rast_transition()",2762,1152,-9672,-477.7
+"after_zone_clip","st_intersection with subbasins; area recomputed from geometry",2753,1148.5,-9,-3.5
+"published","stac-floodplains-bc transition_vector.gpkg",2753,1148.5,0,0

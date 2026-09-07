@@ -1,0 +1,9 @@
+"group","source","n_tagged","n_with_break","n_lag01","pct_lag01_of_break","pct_lag01_of_tagged"
+"bulk","fire",0,0,0,NA,NA
+"bulk","harvest",88,70,55,78.6,62.5
+"necr","fire",87,77,68,88.3,78.2
+"necr","harvest",164,129,91,70.5,55.5
+"lnth","fire",0,0,0,NA,NA
+"lnth","harvest",13,12,8,66.7,61.5
+"kotl","fire",63,46,38,82.6,60.3
+"kotl","harvest",43,39,26,66.7,60.5

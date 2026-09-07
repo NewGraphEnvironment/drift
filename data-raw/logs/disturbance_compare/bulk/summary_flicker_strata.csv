@@ -1,0 +1,13 @@
+"stratum","population","n_patches","area_ha_unclipped","area_ha_eval","flicker_frac_area_wtd","break_frac_area_wtd"
+"all","harvest_touching",120,525.3,525.3,0.207,0.793
+"all","fire_touching",35,69.9,69.9,0.143,0.857
+"all","untagged_residual",7008,3071.2,3068.4,0.475,0.525
+"sliver","harvest_touching",44,4.5,4.5,0.362,0.638
+"sliver","fire_touching",19,1.2,1.2,0.554,0.446
+"sliver","untagged_residual",5700,412.8,412.6,0.634,0.366
+"wider","harvest_touching",76,520.8,520.8,0.205,0.795
+"wider","fire_touching",16,68.7,68.7,0.136,0.864
+"wider","untagged_residual",1308,2658.4,2655.8,0.45,0.55
+"ge_0.5_ha","harvest_touching",70,518.8,518.8,0.204,0.796
+"ge_0.5_ha","fire_touching",15,68.2,68.2,0.13,0.87
+"ge_0.5_ha","untagged_residual",1030,2625.9,2623.6,0.441,0.559
