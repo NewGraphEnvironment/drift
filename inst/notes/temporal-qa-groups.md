@@ -77,6 +77,12 @@ cells, 4.62 ha more changed area, and the three shares within 0.03 of a point
   run-length filter the #9 body named is worth building), and `break_n_flips` / `break_year`
   assets beside `transition_2017_2023` in the catalogue (stac_floodplains_bc#67 — the two-epoch
   layer overstates sustained change 3.2-5.1x in every group and a consumer cannot see it).
+- These results are stated for a reader who consumes the published products and does not use the
+  package in the article
+  [What a Land-Cover Change Figure Is Made Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.html)
+  (#66), which uses BULK as the worked example and the other three groups as the test of
+  generality. Its figures and tables are built from `inst/extdata/temporal-composition/`, written
+  by the same script as the tables below.
 
 ## Tables (generated — do not edit here)
 

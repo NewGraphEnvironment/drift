@@ -1,0 +1,5 @@
+"group","item","valid_ha","changed_ha","pct_changed_of_valid","pct_sustained","pct_endpoint","pct_flicker","overstatement_factor","stable_flicker_ha","pct_stable_flicker_of_valid","stable_flicker_over_changed"
+"bulk","bulk_co_ff04",41089.7,4625,11.26,19.7,36.4,44,5.09,3186.5,7.76,0.69
+"necr","necr_ch_ff04",41838.1,5779.4,13.81,31,29.4,39.6,3.23,3828.3,9.15,0.66
+"lnth","lnth_ch_ff04",16001.8,1629.7,10.18,20.6,31,48.5,4.86,1576.7,9.85,0.97
+"kotl","kotl_bt_ff04",69377.6,3537.8,5.1,24.7,33.1,42.3,4.06,2235.5,3.22,0.63

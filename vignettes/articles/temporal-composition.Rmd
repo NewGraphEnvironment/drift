@@ -1,0 +1,236 @@
+---
+title: "What a Land-Cover Change Figure Is Made Of"
+output: bookdown::html_document2
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  dpi = 150
+)
+```
+
+```{r load}
+library(drift)
+d <- function(f) file.path(system.file("extdata", "temporal-composition", package = "drift"), f)
+
+grp <- utils::read.csv(d("summary_groups.csv"), stringsAsFactors = FALSE)
+tree <- utils::read.csv(d("summary_treeloss_temporal.csv"), stringsAsFactors = FALSE)
+grid <- utils::read.csv(d("bulk_grid_1km.csv"), stringsAsFactors = FALSE)
+win <- utils::read.csv(d("bulk_window.csv"), stringsAsFactors = FALSE)
+art <- readRDS(d("bulk_window.rds"))
+
+# colours come from the gq registry, so no hex literal appears in this article
+reg <- gq::gq_reg_merge(gq::gq_reg_main(),
+                        gq::gq_reg_custom(system.file("cartography", "drift_temporal.csv",
+                                                      package = "drift")))
+tcl <- gq::gq_tmap_classes(reg$layers$temporal_category)
+pal <- tcl$values                      # named by class_value, in class order
+lab <- stats::setNames(tcl$labels, names(pal))
+# a malformed row in the registry CSV adds a phantom layer keyed by its own text
+# and gq accepts it without a warning, so assert the class set rather than
+# assuming the file parsed as intended
+stopifnot(identical(names(pal),
+                    c("stable", "break_sustained", "break_endpoint", "flicker", "stable_flicker")))
+
+b <- grp[grp$group == "bulk", ]
+# published watershed-group codes. Only BULK is named in prose, because only
+# its full name is established here; inventing the other three would be a fact
+# with no source.
+group_name <- stats::setNames(toupper(grp$group), grp$group)
+```
+
+A published floodplain land-cover change layer is a comparison of two years. For the Bulkley
+floodplain (BULK) it says that **`r format(round(b$changed_ha), big.mark = ",")` ha** — about
+`r round(b$pct_changed_of_valid)`% of the mapped floodplain — carried a different class in 2023
+than in 2017. That number is the input to most things anyone wants to ask.
+
+This article is about what is inside it. It is not about *why* land cover changed: attributing a
+patch to a dated fire or cutblock is a separate stage of the same production run, and its results
+are written up separately. What follows is the prior question — whether the change a two-year
+comparison reports is a change that stayed.
+
+## Looking at every year, not just the ends
+
+The published series carries a classified raster for **every** year from 2017 to 2023, not only
+the two endpoints. So each pixel can be read as a seven-year sequence rather than a before-and-
+after pair, and sorted by how it behaves:
+
+- **Sustained change** — the class switches once, and holds for at least two years on each side.
+- **Endpoint-only change** — the class switches once, but one endpoint year is the only year that
+  differs. A real change in the final year of the series looks exactly like this, so it is not the
+  same thing as an error.
+- **Unsettled** — the class changes more than once and never settles.
+
+A fourth group matters too: pixels that flicker between classes but happen to hold the *same*
+class in 2017 and 2023. A two-year comparison cannot see them at all.
+
+```{r fig-patch, fig.height = 4.4, fig.cap = paste0("One ", round(win$area_ha, 2), " ha patch of the Bulkley floodplain mapped as Trees in 2017 and Rangeland in 2023, shown for each year of the series. The outline is the patch; classes are Esri IO LULC. The patch was selected by rule, not by eye: of ", format(win$n_candidates_all, big.mark = ","), " change patches, ", win$n_candidates_transition, " are Trees to Rangeland, ", win$n_candidates_area, " of those are 1 to 4 ha, and ", win$n_candidates_balanced, " of those carry all three temporal categories at 10% or more of their cells. This is the most evenly split of the ", win$n_candidates_balanced, ".")}
+lulc <- terra::unwrap(art$lulc)
+ct <- dft_class_table("io-lulc")
+present <- sort(unique(stats::na.omit(as.vector(terra::values(lulc)))))
+ct <- ct[match(present, ct$code), ]
+cols <- ct$color
+
+# A colour TABLE, keyed by cell value. `type = "classes"` with a levels/col pair
+# maps each layer's own sorted unique values onto the vector positionally, so a
+# year that happens to contain no Snow/Ice shifts every class after it -- 2023's
+# Rangeland drew in Snow/Ice's blue. Five of the seven years are missing a class,
+# so five of seven panels were wrong, and only reading the picture showed it.
+tab <- data.frame(value = ct$code, col = ct$color)
+for (i in seq_len(terra::nlyr(lulc))) terra::coltab(lulc, layer = i) <- tab
+
+op <- graphics::par(mfrow = c(2, 4), mar = c(0.4, 0.4, 1.6, 0.4), oma = c(0, 0, 0, 0))
+for (i in seq_len(terra::nlyr(lulc))) {
+  terra::plot(lulc[[i]], legend = FALSE, axes = FALSE, mar = NA, main = names(lulc)[i])
+  plot(sf::st_geometry(art$patch), add = TRUE, border = "black", lwd = 1.6)
+}
+graphics::plot.new()
+graphics::legend("center", legend = ct$class_name, fill = cols, bty = "n", cex = 0.95)
+graphics::par(op)
+```
+
+The patch above is mapped as Trees in 2017 and Rangeland in 2023, so the
+published layer counts all `r round(win$area_ha, 2)` ha of it as tree loss. Reading across the
+years, only part of it behaves that way.
+
+## The same split across a whole floodplain
+
+```{r fig-map, fig.height = 3.6, fig.cap = paste0("Bulkley floodplain change by temporal category. Left: the whole floodplain, aggregated to 1 km cells and shaded by the share of that cell's changed area that never settles; the box marks the detail at right. Right: a 4 km reach at the mapped 10 m resolution. The floodplain is the drawn area — there is no basemap, so nothing outside the mapped extent is shown.")}
+op <- graphics::par(mfrow = c(1, 2), mar = c(0.4, 0.4, 1.8, 0.4))
+
+sub <- grid[grid$sustained_ha + grid$endpoint_ha + grid$unsettled_ha > 0, ]
+frac <- sub$unsettled_ha / (sub$sustained_ha + sub$endpoint_ha + sub$unsettled_ha)
+ramp <- grDevices::colorRampPalette(c(pal[["stable"]], pal[["flicker"]]))(100)
+plot(sub$x, sub$y, pch = 15, cex = 0.28, asp = 1, axes = FALSE, ann = FALSE,
+     col = ramp[pmax(1, ceiling(frac * 100))])
+graphics::title("Whole floodplain, 1 km cells", cex.main = 1.15, font.main = 1)
+graphics::rect(win$reach_xmin, win$reach_ymin, win$reach_xmax, win$reach_ymax,
+               border = "black", lwd = 1.4)
+graphics::legend("bottomleft", title = "share of this cell's\nchange that never settles",
+                 legend = c("none", "half", "all"),
+                 fill = c(ramp[1], ramp[50], ramp[100]), bty = "n", cex = 0.95,
+                 title.cex = 0.9, title.adj = 0)
+
+reach <- terra::unwrap(art$reach)
+keys <- c("stable", "break_sustained", "break_endpoint", "flicker", "stable_flicker")
+# value-keyed here too: fig_cat codes 0-4 in the order of `keys`
+terra::coltab(reach, layer = 1) <- data.frame(value = 0:4, col = unname(pal[keys]))
+terra::plot(reach, legend = FALSE, axes = FALSE, mar = NA,
+            main = "4 km reach, 10 m cells", cex.main = 1.15, font.main = 1)
+# topleft: the reach runs bottom-left to top-right, so this is the empty corner.
+# At bottom-left the legend sat on top of the floodplain.
+graphics::legend("topleft", legend = unname(lab[keys]), fill = unname(pal[keys]),
+                 bty = "n", cex = 0.95)
+graphics::par(op)
+```
+
+Across the whole Bulkley floodplain, **`r b$pct_sustained`%** of the changed area is a sustained
+switch. **`r b$pct_endpoint`%** turns on a single endpoint year, and **`r b$pct_flicker`%** never
+settles. Separately, **`r format(round(b$stable_flicker_ha), big.mark = ",")` ha** —
+`r b$pct_stable_flicker_of_valid`% of the floodplain — flickers between classes while reading
+identically in 2017 and 2023.
+
+## Does Bulkley generalise?
+
+```{r fig-groups, fig.height = 3.4, fig.cap = "Temporal composition of change in the four watershed groups that publish a complete 2017-2023 series, for all change (left) and for tree loss alone (right). Tree loss is every Trees to non-Trees transition except Trees to Clouds, with no patch-size threshold. Four groups is not a sample; the panel shows that the ordering holds and the magnitude moves."}
+keys3 <- c("break_sustained", "break_endpoint", "flicker")
+all_ch <- data.frame(
+  group = rep(grp$group, 3),
+  category = rep(keys3, each = nrow(grp)),
+  pct = c(grp$pct_sustained, grp$pct_endpoint, grp$pct_flicker),
+  panel = "All change")
+tl <- tree[tree$class_set == "trees_to_non_trees_excl_clouds", ]
+tl <- data.frame(group = tl$group, category = tl$category, pct = tl$pct_of_set,
+                 panel = "Tree loss")
+# derived, not typed: the prose below quotes both
+tree_bulk <- sum(tree$area_ha[tree$group == "bulk" &
+                              tree$class_set == "trees_to_non_trees_excl_clouds"])
+sus <- function(cs) {
+  x <- tree[tree$class_set == cs & tree$category == "break_sustained", ]
+  stats::setNames(x$pct_of_set, x$group)
+}
+shift <- sus("trees_to_non_trees_excl_clouds_water") - sus("trees_to_non_trees_excl_clouds")
+dd <- rbind(all_ch, tl)
+dd$category <- factor(dd$category, levels = rev(keys3), labels = rev(unname(lab[keys3])))
+dd$group <- factor(dd$group, levels = rev(grp$group), labels = rev(unname(group_name[grp$group])))
+
+ggplot2::ggplot(dd, ggplot2::aes(x = pct, y = group, fill = category)) +
+  ggplot2::geom_col(width = 0.7) +
+  ggplot2::facet_wrap(~panel) +
+  ggplot2::scale_fill_manual(values = stats::setNames(unname(pal[keys3]), unname(lab[keys3])),
+                             breaks = unname(lab[keys3])) +
+  ggplot2::scale_x_continuous(expand = c(0, 0), breaks = c(0, 25, 50, 75)) +
+  ggplot2::labs(x = "% of changed area", y = NULL, fill = NULL) +
+  ggplot2::theme_minimal(base_size = 11) +
+  ggplot2::theme(legend.position = "bottom", panel.grid.major.y = ggplot2::element_blank(),
+                 panel.spacing.x = grid::unit(1.4, "lines"))
+```
+
+The sustained share runs from `r min(grp$pct_sustained)`% to `r max(grp$pct_sustained)`% across
+the four groups, and the unsettled share from `r min(grp$pct_flicker)`% to
+`r max(grp$pct_flicker)`%. The magnitude moves, and in every group the unsettled share is the
+largest of the three. It is not a fixed ordering below that: sustained change is the smallest
+category in three groups but not in NECR, where endpoint-only change is slightly smaller.
+
+For tree loss the picture is the same shape but shifted: sustained shares of
+`r paste0(round(min(tl$pct[tl$category == "break_sustained"])), "-", round(max(tl$pct[tl$category == "break_sustained"])), "%")`.
+Shares are quoted rather than hectares because the two are not equally robust — excluding Trees to
+Water alone moves the sustained share by up to `r round(max(shift))` points, which is why the class
+set is stated in the caption.
+
+> **Two totals circulate for Bulkley tree loss, and they measure different populations.** The
+> published item property `gross_loss_ha` is 1,565.1 ha: patches, after a 1 ha sieve and a
+> sub-basin clip. The pixel-level total behind the shares above is
+> `r format(round(tree_bulk, 1), big.mark = ",", nsmall = 1)` ha, with no sieve and no clip. The
+> ratio between them is the sieve, not a disagreement — it was reconciled separately.
+
+## What this means for a quoted hectare
+
+```{r tbl-groups}
+tb <- data.frame(
+  Group = unname(group_name[grp$group]),
+  `Floodplain (ha)` = round(grp$valid_ha), `Change 2017-2023 (ha)` = round(grp$changed_ha),
+  `Sustained (%)` = grp$pct_sustained, `Endpoint-only (%)` = grp$pct_endpoint,
+  `Unsettled (%)` = grp$pct_flicker,
+  `Stable but flickering (ha)` = round(grp$stable_flicker_ha),
+  check.names = FALSE)
+knitr::kable(tb, format.args = list(big.mark = ","),
+             caption = "Exact values behind this article. Every cell is a column of a CSV shipped with the package and written by a committed script.")
+```
+
+A hectare figure from a two-year comparison is not wrong, but it answers a narrower question than
+it appears to: *how much area carried a different label in the second year*. On these four
+floodplains, between a fifth and a third of that area is change that stayed put for at least two
+years on each side. Where the question is durable land-cover change, the sustained share is the
+number to reach for — and where it is disturbance extent in a particular year, the endpoint-only
+share matters, because a genuine final-year change lives there.
+
+## What this does not support
+
+Four groups is not a sample, and nothing here is a statistical inference; the four are simply the
+groups that publish a complete series. Two of them were produced through a different processing
+path than the other two and return lower unsettled fractions, so processing and landscape cannot
+be separated at this size. And an endpoint-only switch is not evidence of a labelling error: a
+real change in the last year of the series produces exactly the same signature, and this method
+cannot tell the two apart.
+
+```{r wordcount, include = FALSE}
+f <- knitr::current_input()
+if (!is.null(f)) {
+  x <- readLines(f, warn = FALSE)
+  y <- utils::tail(x, -utils::head(which(x == "---"), 2)[2])   # drop the YAML header
+  fence <- cumsum(grepl("^```", y)) %% 2 == 1
+  y <- y[!fence & !grepl("^```", y)]
+  y <- gsub("`r [^`]*`", "", y)          # inline code is not body prose
+  y <- y[!grepl("^\\[\\^|^\\s*$", y)]
+  n <- sum(lengths(strsplit(trimws(y), "\\s+")))
+  message("body prose: ", n, " words")
+  if (n > 1000) stop("body prose is ", n, " words; the cap is 1000")
+}
+```
