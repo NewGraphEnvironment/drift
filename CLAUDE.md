@@ -1239,6 +1239,98 @@ caught it.
 Keep the default (`USE.NAMES = TRUE`) when you index rows by name; the column names it adds
 are the input strings and cost nothing. Index positionally only with a comment saying why.
 
+### `source()`ing a config into the render environment leaks it into the next render
+
+`source(params$config)` inside an Rmd puts every config value into the environment `render()`
+evaluates in. Render a second config in the same session and every value the second file does not
+set is inherited from the first — silently, as wrong content rather than as an error. Verified in
+safety_plan_template: a second config omitting `date_start` still resolved to the first config's
+value. `render()`'s `envir` defaults to the caller's frame, so an `Rscript` loop over configs and
+an interactive re-render after switching configs both hit it.
+
+What it costs scales with what the config names. Here it reached a safety document: a plan could
+render carrying another trip's dates, partner crew and emergency contacts, and — since those names
+drive the output filename — overwrite that trip's PDF on the way past.
+
+Source into its own environment, and clear the previous generation's names before copying:
+
+```r
+cfg <- new.env()
+source(params$config, local = cfg)
+if (exists(".cfg_names")) rm(list = intersect(.cfg_names, ls()))
+.cfg_names <- ls(cfg)
+for (.nm in .cfg_names) assign(.nm, get(.nm, envir = cfg))
+```
+
+**Guarding each read with `exists()` is not sufficient** — a stale value is exactly what `exists()`
+is satisfied by. The guard reports the variable present, and the render proceeds on the last
+render's answer.
+
+This does not conflict with `bookdown.md`'s "Fresh-Rscript scoping gotcha — use
+`render_book(envir = globalenv())`". That rule is about helper **functions** resolving through the
+closure chain; this one is about per-render **config values**. Sourcing config into its own env and
+then copying into the render frame preserves the shared lookup chain that rule needs
+(safety_plan_template, commits `2cb8745`, `239b6ad`, 2026-09-06).
+
+### One very long table cell hangs paged.js, and it presents as a Chrome timeout
+
+A ~600-character free-text field in a `kable` cell wedged `pagedown::chrome_print` indefinitely.
+The symptom is `Failed to generate output in N seconds (timeout)` followed by
+`handle_read_frame error: asio.system:54 (Connection reset by peer)`, which reads as a Chrome or
+environment problem — so the repairs it invites are environmental. Raising the timeout to 300 s and
+isolating the Chrome profile both failed here before the real cause surfaced. paged.js was not
+slow; it was not converging on a layout for a cell it could not break.
+
+One call separates the two: `chrome_print()` a trivial HTML file. If that succeeds, Chrome and the
+environment are fine and the document is at fault — then look for unbounded free-text columns in
+rendered tables. Fix at the source, dropping or truncating narrative columns before they reach a
+letter-width table, rather than tuning the renderer around content it cannot lay out
+(safety_plan_template, commits `2cb8745`, `239b6ad`, 2026-09-06).
+
+### `stats::aggregate()` has three separate silent behaviours, and each fails in a different direction
+
+All three measured on R 4.5, all three met inside one 800-line script (drift#67).
+
+**It ERRORS on an empty subset instead of returning a 0-row frame.**
+
+```r
+aggregate(n ~ id, df[df$keep, ], sum)      # df[df$keep, ] has 0 rows
+#> Error in aggregate.data.frame(lhs, mf[-1L], FUN = FUN, ...) : no rows to aggregate
+```
+
+So a guard written *to keep an empty stratum alive* is exactly the branch that kills the run —
+and it dies at whatever stage the empty subset first appears, which on a long pipeline is
+usually the last one. Wrap it: return a typed 0-row frame when `nrow(sub) == 0`.
+
+**`aggregate(formula)` applies `na.action = na.omit` to the model frame BEFORE `FUN` runs**, so
+any `na.rm = TRUE` inside `FUN` is dead code and a row with `NA` in *any* referenced column is
+deleted outright — not passed through as `NA`.
+
+```r
+aggregate(area ~ id, data.frame(id = 1:3, area = c(1, NA, 3)), sum)
+#>   id area          <- id 2 is GONE, not NA
+#> 1  1    1
+#> 2  3    3
+```
+
+The damage lands downstream: an **inner** `merge()` onto that result then drops the row from the
+data entirely, and a later `is.na(x) <- 0` fill turns a record that had a value into one that
+reads as a legitimate zero. Pass `na.action = stats::na.pass` and merge with `all.x = TRUE` —
+noting `sum(c(1, NA))` is `NA`, so the NA state persists under a different cause and may still
+need asserting.
+
+**`by = list(...)` silently DROPS NA groups.** So adding rows with an `NA` key — the natural way
+to carry "this item produced no result" into the same table as the ones that did — deletes
+exactly those rows. `addNA(factor(x), ifany = TRUE)` keeps them; recover the values with
+`as.integer(as.character(...))`, which returns `NA_integer_` for the NA level without a warning.
+
+Related, same family and same script: **`x$col <- value` errors on a 0-row data frame** —
+`replacement has 1 row, data has 0`. A `write.csv` / `read.csv` round trip of a 0-row frame
+gives a header-only file that reads back with **every column typed `logical`**, so the crash
+appears at the consumer, far from the producer that legitimately emitted nothing.
+`x$col <- rep(value, nrow(x))` is 0-row-safe.
+
+
 
 # Code Check — Shell
 
@@ -2669,6 +2761,70 @@ Read through GDAL (`sf::gdal_utils("info", …, "-json")`), not `terra::metags()
 terra is the library under suspicion — and select the default domain **by position**, since
 its key is the empty string and `md[[""]]` silently matches nothing.
 
+### `ggmap`: a fixed `zoom` silently crops points off the basemap, and `calc_zoom()` does not fix it
+
+`ggmap::get_map()` fetches ONE fixed-size image at whatever `zoom` it is given. Points outside
+that image are still drawn by `geom_point()`, land off the basemap, and are clipped away — the
+map renders successfully, looks plausible, and is missing sites. No warning and no error, so the
+loss is invisible unless you already know how many points you expected. A hardcoded `zoom = 9`
+did this in safety_plan_template: 8 sites spanning 1.5 degrees of latitude showed as 2 pins, on a
+map crews navigate by.
+
+`ggmap::calc_zoom()` is not the fix — it ignores Mercator latitude compression and returns the
+same too-tight zoom. A 640 px Google static image spans `900/2^z` degrees of longitude, but those
+same pixels cover only `cos(latitude)` as much **latitude**, a factor of ~1.75 at 55 N. At zoom 9
+near Chetwynd the image covers 1.76 lon x 1.00 lat against the 1.88 x 1.72 needed: the longitude
+axis fits, the latitude axis loses three quarters of the sites, and only one of the two axes is
+the one anybody checks.
+
+Solve both axes and take the looser one:
+
+```r
+map_cos  <- cos(mean(bb[c("bottom","top")]) * pi/180)
+map_zoom <- floor(min(log2(900 / diff(bb[c("left","right")])),
+                      log2(900 * map_cos / diff(bb[c("bottom","top")]))))
+map_zoom <- max(3L, min(as.integer(map_zoom), 13L))   # guard identical coords -> Inf
+```
+
+The clamp is load-bearing rather than cosmetic: one site, or two sites at the same coordinates,
+gives `diff() == 0` and `log2(x/0) == Inf`.
+
+**Verify rather than eyeball** — count the points falling inside `attr(basemap, "bb")` and assert
+it equals `nrow()`. A visual check is precisely the check this failure defeats, since the map that
+dropped six of eight sites is a clean and credible map (safety_plan_template, commit `7d25df4`,
+2026-09-06).
+
+### terra: `zonal()` outside its six-function fast path materializes the WHOLE grid in R
+
+`terra::zonal()` dispatches to C++ only when `fun` is one of `max`, `min`, `mean`, `sum`,
+`notNA`, `isNA`. Anything else — `"modal"`, a quantile, any R closure — falls through to
+
+```r
+xz <- c(x[[i]], z); v <- as.data.frame(xz, na.rm = FALSE)
+stats::aggregate(v[, 1], v[, 2, drop = FALSE], fun, ...)
+```
+
+which is one data-frame row per cell, per layer. On a floodplain grid that is 169M rows (BULK)
+or 204M (KOTL), ~2.7 GB as doubles before `aggregate` copies it — so the obvious answer to
+"take the modal value per zone rather than the mean" is a silent OOM on a machine that handles
+the mean fine. Read from the method body, terra 1.9.34.
+
+**Use `terra::crosstab(c(zone, layer), long = TRUE, useNA = TRUE)` instead.** It is
+`x@pntr$crosstab()`, pure C++ and streamed, and `long = TRUE` returns only observed
+combinations with zeros dropped — cells per (zone, value), from which the modal value, the full
+within-zone distribution and exact denominators all follow, with no statistic chosen in advance.
+Measured on a 10x10 fixture: columns come back **numeric, not factor**, and `useNA = TRUE` keeps
+the NA group, so `as.integer()` on a value column is the value and not a level index.
+
+Two things `zonal(fun = "mean", na.rm = TRUE)` also gets wrong that the crosstab does not:
+it computes over **non-NA cells rather than zone cells**, which is a different denominator than
+most callers mean and is invisible in the result; and it returns `NaN`, not `NA`, for an
+all-NA zone, which `merge(all.x = TRUE)` will not surface as missing.
+
+Caught 2026-09-06 in drift#67, by a reviewer disassembling the method rather than by a test —
+both paths return the same numbers on a fixture small enough to run.
+
+
 
 # Code Check Conventions
 
@@ -2737,6 +2893,7 @@ fire and one that must not. A guard nobody has seen fail is decoration.
 | 2026-09-05 | stac_floodplains_bc#61 | **A currency gate read from the artifact the assertion pins downgrades FAIL to SKIP** — a byte-identity assertion pinned a built `meta.json`'s digest and gated itself on that same file's `produced_datetime`, so it would skip whenever upstream had re-run. Any regression that moved or nulled that field — a broken provenance read, a lost section, a rename — therefore made the gate skip **under a message blaming upstream**, on the one arm that exists to notice the code moving the artifact. Read a currency gate from the independent source it is really about (the producer's own file), never from the subject. A pin needs one gate per **independent input** to the digest, too: the same assertion's second gate covers the local sf/GDAL/PROJ triple, because the areas and geometry inside that file are computed on the machine that runs it, and an ungated toolchain difference FAILS rather than skipping |
 | 2026-09-05 | rfp#281 | **A render or export API returns Success when its inputs silently failed to load** — `QgsLayoutExporter.exportToImage()` returned `ExportResult.Success` for a report figure whose basemap and every remote raster were missing: under `--network none` the same project read **42 invalid layers against 18** and exported in 3.6 s against 9.5 s, with the same return code both times. The result code answers *did the writer run*, never *is the output what was asked for* — and the degraded output is a plausible picture, so nothing downstream looks wrong either. Same for a missing font, an unresolved image path (three logos rendered as red-X placeholders, still Success) or a layer whose style failed to load. **Gate on the count of inputs that failed to resolve, not on the return code** — and gate it *differentially*, since real projects arrive already carrying some (18 here before anything was driven), the same reasoning as `.qgs_dangling_refs()`. The rendering sibling of "A wrapper's exit is not the work": there the wrapper lies about the work, here the work lies about itself |
 | 2026-09-05 | floodplains#83 | **The one destructive step is the one that must not go unchecked, and `file.rename()` returns FALSE rather than erroring** — a repair verified four properties before replacing a file and then discarded both renames' return values. Measured with the target made immutable so only the rename could fail: it reported `Repaired 1 of 1`, exited **0**, and left the file carrying the tags it existed to remove — while the summary's `FAILED (left untouched)` line became uncontradictable, since the one state where it is false could never enter the failed set. Same family as `file.copy()` above, one verb over, and worse because it is the *last* step: everything before it aborted safely. Where two files must move together, rename the one whose failure moves nothing **first**, and report a half-completed pair as exactly that rather than as a success |
+| 2026-09-06 | drift#67 | **A content hash computed at the END of a run stamps the file as it finished, not as it ran** — a `script_sha` written where the metadata is assembled records the state of the source *after* any mid-run edit, so a uniformity check across parallel outputs sees one value and accepts two definitions of the same measurand. That is the guard against mixing versions failing toward pass, on the one thing it exists to catch, and it was live: the file genuinely was edited between group runs. Hash at the **start**, beside the run timestamp, and use the captured value. `digest(file =)` errors loudly on an unresolvable path, so a bad working directory stops rather than writing NA. Generalises to any provenance stamp — git SHA, config digest, tool version — read at write time rather than at read time |
 | — | — | **Silent Failures** — `\|\| true` hides real errors; an empty variable before `rm`/`destroy` needs `[ -n "$VAR" ] \|\| exit 1`; `grep` returning empty feeds downstream silently |
 
 ### A fixture that cannot reach the failure mode
@@ -3121,6 +3278,7 @@ request treated as evidence, and assert it at a size larger than any plausible d
 | — / 2026-07-30 | — / mdb-export | **Counting lines: `wc -l` and `grep -c` fail in opposite directions** — `grep -c` returned 1 for 102,460 single-line JSON records; `wc -l` reported 556 lines for 517 records with embedded newlines, and the number reached a README; use a `count_lines()` helper (`grep -c ''` with `\|\| n=0`) checked against all four inputs — empty, unterminated, terminated, missing — and parse records inside a structured file rather than counting lines |
 | 2026-08-30 / 08-31 | stac_dem_bc; STAC catalogue | **A paginated API's default page size silently truncates a lookup used as a check** · **A paged API's default `limit` reads as absence** — `POST /search` with 600 ids returned 10; `limit=200` reported two of sixteen surveys absent; paging returned 230 with every one present |
 | 2026-09-03 | rtj#259/#260 | **The set you compare against, derived from the artifact under test** — an acceptance script asserted a GeoPackage held only its form's own tables, and built "its own tables" from `st_layers()` on the *deployed* file. That listing includes the foreign table the check was hunting, so `setdiff()` came back empty and it passed on exactly the file it existed to flag; a fixture carrying `layer_styles` reported 0 failures until the set came from the *shipped* artifact instead. Not caught by four review rounds — found by running the check against a deliberately-bad fixture. **For a guard of the form "X contains only the expected set", the expected set must come from a producer the subject cannot influence**, and the same iteration must then walk the expected set rather than the subject's, or a *missing* member is invisible too |
+| 2026-09-06 | drift#67 | **One column NAME carrying different populations across files is the same defect as one fact derived twice, and it is harder to see because nothing is duplicated** — five review rounds on one script, each finding the next instance *inside* the previous round's fix. At its worst `area_ha` carried three populations across four CSVs (unclipped patch / clipped published row / evaluated-area), `n_patches` counted published rows in two files and vectorized patches in two others, and one weighted mean was published under a single name with two different weights. Each was locally correct; the reader combining two tables is the one who is wrong. Two habits: **compute the measurand, its weight and any stratum threshold on ONE population**, and where a boundary case is excluded from one table and included in another, publish the reconciling count rather than the difference. Terminate by **enumerating every derived column with its population and its precision** and showing none disagrees with its name — a quiet review round cannot close this class, because the columns are individually right |
 | 2026-09-04 | floodplains#77 | **A fix that derives one literal introduces another whose other half lives in a file the code never opens** — the mechanism behind four review rounds (7, 4, 7, 9 findings). Each round replaced a hardcoded value with one read from an artifact, added a new literal beside it, and wrote a *comment asserting the agreement* instead of a line checking it. Three of those comments were measurably false: `BYPRODUCTS` claimed to be `.gitignore`'s list and was missing two entries; a figure caption claimed to describe `config/disturbance.yml` while the cause list stayed hardcoded; and `nzchar()` claimed to filter empty cells it could not reach. **Terminate by partitioning every literal**, not by another round: a **contract this repo chose** must be hardcoded or the guard can never fail, and a **fact about another artifact** must be read from it or `stop()` on divergence — the two genuinely unavoidable ones carry a source-and-date stamp naming the file that makes them true. And enumerate *mechanically*: a curated list of 22 missed 7, all on one axis — literals inside strings that get **printed** (titles, captions, `fig.alt`) rather than inside values that get used, which is where a wrong caption hides because nothing consumes it |
 
 ## Rules that stand alone
@@ -3598,7 +3756,9 @@ immutable history and are never rewritten this way.
 **The failure mode that keeps recurring: research findings feel like
 commentary.** They are not — they are the spec. If a finding changes what
 someone would *build*, it belongs in the body, with the durable version in
-`research/` and the body linking to it.
+`research/` and the body linking to it. What `research/` holds, how a file is
+named and what its header carries is `planning.md`, "`research/` — what is
+known, outliving the issue that found it".
 
 **Bodies drift at the moment work finishes, not while it is in flight.** Four
 instances in a single day of rfp work, all of the same shape — the code learned
@@ -4669,7 +4829,97 @@ Three rules on those sections:
 attach to — `/planning-init` takes an issue number, and exploratory runs often *produce*
 the issues rather than follow them. That measurement belongs in the issue or PR it
 spawned, with the log directory's own README as the index. Do not build a third system
-to close this gap.
+to close this gap. The *finding* it settles goes where every settled finding goes —
+`research/`, next section — which is not a third record of the run but the one place its
+verdict is kept current.
+
+## `research/` — what is known, outliving the issue that found it
+
+Three homes, one job each: **the PWF archive is the story, committed logs are the
+measurements, `research/` is the durable verdict** — floodplains' `research/README.md`
+had that framing before this section existed. A research file holds what is now *known*: a
+settled method, a measured fact about an external system, a search that established an
+absence — so that someone picking the work up months later does not re-derive it.
+`planning/archive/<issue>/` holds what was *done*, in order, for one issue, and is rarely
+opened by anyone who never saw that issue. The research file is the one they will look for.
+
+What does **not** go there: a work log; a run record (Run / Hardware / Software /
+Configuration blocks — that is the archive README's `Measurement` and `Evidence`, above);
+the raw numbers (committed logs). Measured 2026-09-06 across the seven repos carrying a
+`research/`, 40 topic files: link's `provincial_parity_2026_05_*.md` are four run records in
+25 days, each dated by the run it records and carrying that run's setup and metrics, while
+its living documents, `bcfishpass_methodology.md`,
+`study_area_run.md` and `provincial_run_runbook.md`, are single files revised as the
+knowledge moved. The second shape is the one that moves the state of knowledge; the first
+duplicates the archive.
+
+### One topic file, revised in place — git is the version record
+
+`research/<topic>.md`, noun-first, **no date in the filename**. A new measurement that
+changes what is known revises the topic file; it does not add a dated sibling.
+`git log --follow research/<topic>.md` is the dated history, the archive README it cites
+is the *why*, and the logs are the numbers — everything an R&D claim needs, with no second
+copy of any of it.
+
+Existing dated files — `20260711_…`, `…_2026_05_25.md` — are **not renamed**. They are
+cited by path from `CLAUDE.md` files and from other conventions (`bookdown.md`,
+`karpathy.md` §7), and a rename breaks the citation the way it breaks log evidence
+(`newgraph.md`, "Which logs to commit"). Convergence is forward-only, and the README says
+when.
+
+### The header is the provenance, in prose
+
+No research file in any repo carries YAML frontmatter and nothing consumes it, so
+provenance is one line under the H1. floodplains' is the shape to adapt — it already carries
+the date and the issues, and names its log prefix in the body:
+
+```markdown
+**Date opened:** 2026-07-11 · **Issue:** #8 · **drift:** 0.6.0 (`dft_stac_fetch(tile_size=)`,
+drift#36) · **Status:** OPEN — design set, runs pending.
+```
+
+Three things the line must carry — `**Verified:** <date> · **Issues:** … · **Produced by:** …`
+is the minimal form:
+
+- **When it was last true.** The file's date, and a section-level date wherever one
+  section is re-verified alone. A research file whose numbers cannot be re-derived ages
+  into folklore, and one that states a scope or a quantity drifts silently when the code
+  moves — three link documents, two of them research files, asserted a recompute "runs over
+  every WSG in the schema" after two commits had changed it (`karpathy.md` §7, "Documents
+  that share an ancestor corroborate nothing"). When code changes a behaviour a research
+  file describes, grep `research/` for the sentence. Files written before 2026-09-06 gain
+  the line when next revised; no fleet sweep is required.
+- **What produced it.** The script path or log prefix for a measurement; the source list or
+  reference-manager collection for a literature review. Never a number without its producer.
+- **Which issues it came from and which it spawned.** The issue body links the research
+  file (`feature-workflow.md`, "Issue bodies get edited, not appended"); the research file
+  names its issues; and an archive README whose `Measurement` was distilled into a research
+  file links it. Both ways, every time — one direction leaves the other end unfindable.
+
+### The directory carries a README
+
+An index: one row per file, what it covers — rfp's is the model. Where other repos hold
+related work, a "Related work" list of links. Where two naming patterns coexist, the
+cutover line in the form `newgraph.md` uses for logs:
+
+```markdown
+Naming: `<topic>.md`, revised in place, from 2026-09-06.
+Files dated before that carry a `yyyymmdd_` prefix; they are not being renamed.
+```
+
+The README is the index. `CLAUDE.md` links the README once and cites an individual file
+only where a rule depends on it. Twenty-three topic files with no README and a `CLAUDE.md`
+citing four of them by path — link, measured 2026-09-06 — is the state this prevents.
+
+### R packages and public repos
+
+`research/` is top-level and excluded from the tarball: `^research$` in `.Rbuildignore`
+(`code-check-r.md`, "`R CMD build` ships every top-level directory not in
+`.Rbuildignore`"). Not `inst/notes/` or `inst/research/`, which ship inside the installed
+package — the three packages carrying those (eight files, 2026-09-06) migrate by issue,
+forward-only. In a package, `research/` is also where durable reference notes go, because
+`docs/` belongs to pkgdown and `inst/` ships. And a public tool repo's `research/` is
+public: report findings from internal work aggregated, never by the names of who it was for.
 
 ## Atomic Commits (Critical)
 
