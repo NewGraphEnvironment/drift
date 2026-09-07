@@ -21,7 +21,7 @@ signal actually moved, this asks whether the labels themselves settled."><meta p
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.15.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.16.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -97,7 +97,7 @@ When <code>NULL</code>, loaded via <code><a href="dft_class_table.html">dft_clas
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list with three elements:</p><ul><li><p><code>raster</code>: a single-layer factor <code>SpatRaster</code> named <code>transition</code>,
+    <p>A list with four elements:</p><ul><li><p><code>raster</code>: a single-layer factor <code>SpatRaster</code> named <code>transition</code>,
 encoding the <strong>first-year to last-year</strong> class pair of every pixel as
 <code>from * 1000 + to</code> with levels labelled <code>"from_class -&gt; to_class"</code> —
 identical to <code>dft_rast_transition(x, from = &lt;first&gt;, to = &lt;last&gt;)$raster</code>,
@@ -105,9 +105,12 @@ so it feeds <code><a href="dft_transition_vectors.html">dft_transition_vectors()
 unchanged.</p></li>
 <li><p><code>breaks</code>: a four-layer integer <code>SpatRaster</code> of per-pixel evidence:</p><ul><li><p><code>break_year</code> — the first year of the new class for a clean switch;
 <code>NA</code> for stable and flicker pixels</p></li>
-<li><p><code>n_before</code>, <code>n_after</code> — years in the old and new class either side of
-the switch; <code>NA</code> unless <code>n_flips == 1</code>. Confidence is <code>min(n_before, n_after)</code>: a pixel whose last year alone differs is a clean switch
-with <code>n_after == 1</code>, and one whose first year alone differs has
+<li><p><code>n_before</code>, <code>n_after</code> — <strong>observations</strong> in the old and new class either
+side of the switch; <code>NA</code> unless <code>n_flips == 1</code>. Their <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmin()</a></code> is the
+switch's <strong>strength</strong> — see <code><a href="dft_break_strength.html">dft_break_strength()</a></code>, which is the one
+name this quantity goes by — and a switch is only as sure as its
+shorter side: a pixel whose last observation alone differs is a clean
+switch with <code>n_after == 1</code>, and one whose first alone differs has
 <code>n_before == 1</code>.</p></li>
 <li><p><code>n_flips</code> — number of year-to-year class changes: <code>0</code> stable, <code>1</code> a
 clean switch, <code>2</code> or more flicker</p></li>
@@ -117,6 +120,9 @@ clean switch, <code>2</code> or more flicker</p></li>
 pixels. <code>status</code> is <code>"stable"</code> (<code>n_flips == 0</code>), <code>"break"</code> (<code>1</code>) or
 <code>"flicker"</code> (<code>&gt;= 2</code>), or <code>NA</code> where an interior year is <code>NA</code>;
 <code>break_year</code> is <code>NA</code> except for <code>"break"</code> rows.</p></li>
+<li><p><code>years</code>: the observation years, sorted ascending — the series the
+other three elements were measured over, so <code><a href="dft_break_category.html">dft_break_category()</a></code> can
+apply the endpoint threshold without being told it again.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -130,7 +136,10 @@ two-epoch comparison cannot: a pixel that switched and switched back, which
 reads as stable on the endpoints and is flicker here.</p>
 <p>No threshold is applied — every measurement is reported and the caller
 composes, e.g. <code>n_flips == 1 &amp; pmin(n_before, n_after) &gt;= 2</code> for a switch
-sustained at least two years on each side. Compare <code><a href="dft_rast_consensus.html">dft_rast_consensus()</a></code>,
+sustained at least two observations on each side. <code><a href="dft_break_category.html">dft_break_category()</a></code>
+is that composition, versioned and in one place; use it rather than
+re-deriving the split, and <code><a href="dft_break_strength.html">dft_break_strength()</a></code> for the number it
+thresholds. Compare <code><a href="dft_rast_consensus.html">dft_rast_consensus()</a></code>,
 which votes a real mid-window switch back to its old class because the
 pre-change years outnumber the post-change ones; here that pixel is a dated
 break.</p>

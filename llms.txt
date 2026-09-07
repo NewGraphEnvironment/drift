@@ -53,6 +53,10 @@ at the [pkgdown site](https://www.newgraphenvironment.com/drift/).
 
 ## All functions
 
+- [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+  : Temporal category of every row of a break-class summary
+- [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+  : How many observations a dated class switch held, either side
 - [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
   : Clear the drift tile cache
 - [`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
@@ -69,6 +73,8 @@ at the [pkgdown site](https://www.newgraphenvironment.com/drift/).
   : Interactive leaflet map for classified rasters and transitions
 - [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
   : Detect per-pixel index-trajectory breakpoints
+- [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  : Temporal category of every pixel in a break-class scan
 - [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
   : Detect sustained class switches across an annual classified series
 - [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)

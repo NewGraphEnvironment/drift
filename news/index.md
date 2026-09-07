@@ -1,5 +1,102 @@
 # Changelog
 
+## drift 0.16.0
+
+- **New
+  [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md),
+  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  and
+  [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+  ([\#72](https://github.com/NewGraphEnvironment/drift/issues/72)).**
+  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  still reports every measurement and thresholds nothing; composing them
+  into a label is a judgement, and it now lives in one exported,
+  versioned place instead of being re-derived in four scripts. The label
+  functions are split by grain rather than switched by an argument — the
+  row-grain one is pure R over a `$summary`-shaped frame, the
+  pixel-grain one a single streamed
+  [`terra::app()`](https://rspatial.github.io/terra/reference/app.html)
+  pass — and both call one internal map, so two exports do not make two
+  rules. A future patch-grain function
+  ([\#67](https://github.com/NewGraphEnvironment/drift/issues/67)) is a
+  third return shape and slots in the same way.
+- **Five categories, and `flicker` is retired.** `stable` /
+  `break_sustained` / `break_endpoint` / `unsettled` / `stable_flicker`,
+  ids `0:4`. The last two are what the old four-level vocabulary pooled:
+  `unsettled` is flicker whose endpoints differ, which a two-epoch
+  comparison reports as change, and `stable_flicker` is flicker whose
+  endpoints agree, which it cannot see at all. On BULK that is 2,032.9
+  ha against 3,186.5 ha, so summing them gives 7,811.5 ha of “changed”
+  area where the published layer says 4,625.0 — a 69% overstatement.
+  Nothing shipped ever pooled them, and no committed number moves in
+  this release; what changes is that the vocabulary no longer invites
+  it. `pct_flicker` becomes `pct_unsettled` in `summary_groups.csv` and
+  the note tables.
+- **The confidence number survives as a number.**
+  `pmin(n_before, n_after)` — the observations a switch held on its
+  shorter side, 1 to 3 on a seven-year series — is returned as a
+  `strength` column and layer, and recoverable from `break_year` alone
+  via
+  [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+  for a summary read back from CSV. Its threshold is deliberately not an
+  argument: a free threshold would mean `rule = "v1"` no longer
+  identifies the labelling. The `rule` travels as a column, not an
+  attribute, because every consumer here writes CSV. Note the unit is
+  **observations, not calendar years** — on a gapped series a break
+  flanked by three years each side can still score 1.
+- **[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  gains `$years`.** Additive; `$summary` and `status` are untouched, and
+  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  does not require it, so a result saved by an earlier version still
+  works.
+- **Migrated:** `data-raw/break_class_groups.R` (both the per-group and
+  the summarize stages, and the article-bulk figure data) and
+  `data-raw/disturbance_compare.R`. Verified behaviour-preserving rather
+  than assumed: the summarize rollup reproduces each group’s committed
+  `summary_change.csv` on integer cell counts in all four groups;
+  `summary_class_temporal.csv` comes back with 539 rows in and out, key
+  sets identical under the four-to-five level map, and **zero rows whose
+  `n_cells` or `area_ha` moved**; `is_sustained()` is equivalent on
+  every input its caller can reach for series lengths 2 through 9; and
+  `bulk_grid_1km.csv`, the `.rds` crops and every conservation total
+  regenerate unchanged. The committed per-group `summary_change.csv`
+  files are **not** rewritten — they record a run made under the
+  four-level vocabulary and are mapped on read, a bijection with
+  `(changed, four-level)`.
+- **Scale (`data-raw/benchmark_break_category_bulk.R`, committed
+  evidence in `data-raw/logs/benchmark_break_category/`).** BULK
+  floodplain, 14651 x 11552 = 169,248,352 cells at 10 m:
+  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  60.6 s,
+  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  **26.8 s**, a reconciliation crosstab 16.5 s, and peak RSS **8.79
+  GiB** across the whole run — every figure from `timings.csv` and
+  `rss_summary.csv` in that directory.5 s,
+  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  **26.5 s**, a reconciliation crosstab 16.3 s, and peak RSS **8.82
+  GiB** across the whole run — every figure from `timings.csv` and
+  `rss_summary.csv` in that directory. The pixel-grain category
+  reproduces the committed four-level run cell for cell once mapped, and
+  90,935 sustained cells carry `strength >= 2` against 168,269
+  endpoint-only at exactly 1.
+- **`as.integer("NaN")` is `0`, with no warning**, where
+  `as.integer(NaN)` is `NA` and `as.numeric("NaN")` is `NaN` (R 4.5.2).
+  `terra::crosstab(useNA = TRUE)` returns numeric columns carrying `NaN`
+  for the group with no value, so the idiom
+  `as.integer(as.character(x))` publishes a plausible zero for every
+  category that has no strength — and, in the article-bulk self-check,
+  would have labelled an unscannable pixel `stable`. Coerce crosstab
+  columns directly; the string round trip is the bug.
+- **Measured, and it decided the implementation:** terra 1.9.34 reads a
+  two-column
+  [`app()`](https://rspatial.github.io/terra/reference/app.html) return
+  on a two-column raster as *transposed* and scrambles it silently
+  (widths 1 and 3-6 are correct).
+  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  pads at `ncol == 5` because its own return is five columns, so the new
+  function needed its own condition at 2 — and the existing width sweep,
+  4/5/6, could not have reached it.
+
 ## drift 0.15.0
 
 - **New pkgdown article, [What a Land-Cover Change Figure Is Made

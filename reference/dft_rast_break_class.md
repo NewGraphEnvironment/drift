@@ -47,7 +47,7 @@ dft_rast_break_class(x, class_table = NULL, source = "io-lulc", unit = "ha")
 
 ## Value
 
-A list with three elements:
+A list with four elements:
 
 - `raster`: a single-layer factor `SpatRaster` named `transition`,
   encoding the **first-year to last-year** class pair of every pixel as
@@ -65,11 +65,15 @@ A list with three elements:
   - `break_year` — the first year of the new class for a clean switch;
     `NA` for stable and flicker pixels
 
-  - `n_before`, `n_after` — years in the old and new class either side
-    of the switch; `NA` unless `n_flips == 1`. Confidence is
-    `min(n_before, n_after)`: a pixel whose last year alone differs is a
-    clean switch with `n_after == 1`, and one whose first year alone
-    differs has `n_before == 1`.
+  - `n_before`, `n_after` — **observations** in the old and new class
+    either side of the switch; `NA` unless `n_flips == 1`. Their
+    [`pmin()`](https://rdrr.io/r/base/Extremes.html) is the switch's
+    **strength** — see
+    [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md),
+    which is the one name this quantity goes by — and a switch is only
+    as sure as its shorter side: a pixel whose last observation alone
+    differs is a clean switch with `n_after == 1`, and one whose first
+    alone differs has `n_before == 1`.
 
   - `n_flips` — number of year-to-year class changes: `0` stable, `1` a
     clean switch, `2` or more flicker
@@ -79,6 +83,11 @@ A list with three elements:
   pixels. `status` is `"stable"` (`n_flips == 0`), `"break"` (`1`) or
   `"flicker"` (`>= 2`), or `NA` where an interior year is `NA`;
   `break_year` is `NA` except for `"break"` rows.
+
+- `years`: the observation years, sorted ascending — the series the
+  other three elements were measured over, so
+  [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+  can apply the endpoint threshold without being told it again.
 
 ## Details
 
@@ -94,7 +103,12 @@ endpoints and is flicker here.
 
 No threshold is applied — every measurement is reported and the caller
 composes, e.g. `n_flips == 1 & pmin(n_before, n_after) >= 2` for a
-switch sustained at least two years on each side. Compare
+switch sustained at least two observations on each side.
+[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+is that composition, versioned and in one place; use it rather than
+re-deriving the split, and
+[`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+for the number it thresholds. Compare
 [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md),
 which votes a real mid-window switch back to its old class because the
 pre-change years outnumber the post-change ones; here that pixel is a
