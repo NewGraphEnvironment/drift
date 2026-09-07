@@ -55,3 +55,72 @@ replaced it.
 Two ratios in `summary_groups.csv` — `ff06_over_ff02` and `pct_area_artifact` — divide areas the
 per-group stage wrote rounded (2 dp km², 1 dp ha). Recomputed from the unrounded sources, all
 eight cells are unchanged; carry an unrounded column the next time the per-group stage runs.
+
+## The `corridor` stage (drift#73)
+
+`Rscript data-raw/break_class_groups.R corridor` — all four groups in **one** process, so the
+`rss.txt` beside it is a whole-run peak rather than the per-group trace the other stages record.
+Results are freed and `terra::tmpFiles(remove = TRUE)` called between groups.
+
+Writes, per group: `summary_corridor.csv` (temporal category by distance band, three references),
+`summary_corridor_class.csv` (the same, split by from-epoch class) and
+`summary_corridor_breakyear.csv` (`break_year` by band, clean breaks only). The rollups go to this
+directory and to `inst/extdata/temporal-composition/` for the article.
+
+Three references, and the third is the null rather than a third attempt at the first:
+`water_core` (Water in all seven years), `water_2017` (partly circular — a margin pixel that
+oscillates Water/non-Water is both near 2017 water and unsettled), and `edge_nonwater` (a
+from-epoch class boundary with no water on either side).
+
+It rewrites none of the per-group files. That is by construction — it is a separate stage rather
+than an addition to the per-group one — and was verified: after the run `git status` showed only
+new paths.
+
+Guards, each with a positive control that fires: the core cell count against the committed
+`Water,Water,stable` row; conservation against the committed `summary_change.csv` **per category**,
+joined on `category_label` and never on the integer id, because those files are in the retired
+four-level vocabulary where id 3 carries two populations; both comparator arms controlled
+separately, since a perturbed count leaves the key sets identical and drives only the value arm;
+band degeneracy, because every conservation arm is satisfied by an all-zero distance raster, which
+is what a 1/0 mask produces — `terra::distance()` measures *from* the NA cells *to* the non-NA
+ones; and the realised band set against the eight declared codes, because `classify()` leaves an
+unmatched value at its original value rather than setting NA.
+
+## The `article-slivers` stage (drift#73)
+
+`Rscript data-raw/break_class_groups.R article-slivers`. Two outputs, both into
+`inst/extdata/temporal-composition/`.
+
+The **sieve tables** read the four gitignored `summary_patches.csv` files, and the unsieved row of
+each is asserted against that group's committed `summary_patch_groups.csv` — same file, but a
+rollup this stage did not write, so it catches reading a different patch set than the article's
+other numbers describe. `summary_patch_area_bands.csv` is the control a sieve structurally cannot
+give: sieving compares a sliver-rich small population against a sliver-poor large one and so
+cannot separate width from area, while holding area fixed can.
+
+The **two example patches** are chosen from BULK by a rule recorded in `bulk_slivers.csv` beside
+the measurements: `flag_sliver`, 0.2-0.6 ha, then either within 15 m of permanent water with Water
+in the transition, or beyond 200 m with no Water and `flag_boundary` — median-area candidate, ties
+to the lower `patch_id`. The 0.2-0.6 ha band is deliberate: below 0.1 ha every patch is a sliver,
+so an example from there would illustrate nothing about width.
+
+## The `article-context` stage (drift#73)
+
+`Rscript data-raw/break_class_groups.R article-context`. Everything the article needs to say where
+it is, none of which existed in the package.
+
+The four groups' **names** and boundaries come from one BCDC record (FWA Watershed Groups,
+`51f20b1a-ab75-42de-809d-bf415a0f9c62`) — Bulkley River, Nechako River, Lower North Thompson River
+and Kootenay Lake. Before this the article used the four-letter codes and said so, because no
+source for the names was in the repo.
+
+The **basemap** is one `maptiles` fetch of Esri.WorldShadedRelief at zoom 8, reprojected to the
+group's CRS and written JPEG-compressed: 40 KB against 213 KB for DEFLATE, and lossy costs nothing
+in a photographic backdrop. It is shipped rather than fetched at render time because the article
+must build with no network. A tile service returning a placeholder or a "key required" watermark is
+a 200 that renders as a flat field, so the stage refuses a tile with fewer than 25 grey levels or a
+standard deviation under 5 rather than trusting the status code.
+
+Simplification tolerances are set to well under a rendered pixel at the scale each layer is drawn
+(2 km for the province outline, 1 km for the groups, 60 m for the floodplain), and the results are
+checked for empty and GEOMETRYCOLLECTION geometries, which would draw as nothing and say nothing.

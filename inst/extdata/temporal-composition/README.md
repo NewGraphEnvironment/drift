@@ -14,9 +14,74 @@ Produced by `data-raw/break_class_groups.R`, which is not part of the package bu
 | `bulk_grid_1km.csv` | `article-bulk` | Bulkley floodplain aggregated to 1 km, hectares per category |
 | `bulk_window.csv` | `article-bulk` | the selected example patch, its extent, and the selection rule as a literal sentence |
 | `bulk_window.rds` | `article-bulk` | `terra::wrap()`ped crops for the patch and reach figures, plus the patch outline |
+| `summary_patch_widths.csv` | `summarize` | change patches grouped by width and artifact signature — a reshape of the four committed `summary_patch_groups.csv` files, from the same read that feeds `summary_groups.csv` |
+| `summary_corridor.csv` | `corridor` | temporal category by distance band, under **three** references |
+| `summary_corridor_class.csv` | `corridor` | the same, kept split by from-epoch class |
+| `summary_corridor_breakyear.csv` | `corridor` | `break_year` by distance band, for clean breaks only |
+| `summary_patch_sieve.csv` | `article-slivers` | patch counts, area and temporal evidence at 0, 0.5 and 1 ha area sieves |
+| `summary_patch_area_bands.csv` | `article-slivers` | the same, split by area band instead — the control a sieve cannot give |
+| `bulk_slivers.csv` | `article-slivers` | the two example patches, their measurements and the selection rule |
+| `bulk_slivers.rds` | `article-slivers` | `terra::wrap()`ped crops for those two, plus their outlines |
+| `watershed_groups.csv` | `article-context` | the four groups' codes and **names**, with the BCDC record they came from |
+| `watershed_groups.rds` | `article-context` | BC outline, the four group polygons, and the Bulkley floodplain outline, simplified for a locator |
+| `bulk_basemap.tif` | `article-context` | shaded relief behind the floodplain overview, reprojected and JPEG-compressed to 40 KB |
 
 Regenerate with `Rscript data-raw/break_class_groups.R summarize`, then
-`Rscript data-raw/break_class_groups.R article-bulk`.
+`Rscript data-raw/break_class_groups.R article-bulk`, then
+`Rscript data-raw/break_class_groups.R corridor`, then
+`Rscript data-raw/break_class_groups.R article-slivers`, then
+`Rscript data-raw/break_class_groups.R article-context`.
+
+## The corridor files carry three references, and which one you read is the finding
+
+`summary_corridor.csv` has a `reference` column with three values. They are not three attempts at
+one measurement; the third is the null for the first.
+
+- **`water_core`** — pixels classed Water in **all seven** years. Every core cell is stable by
+  construction, and the core count is identical to that group's `Water,Water,stable` row in
+  `summary_pixels.csv`, which is the same set by definition.
+- **`water_2017`** — the from-epoch Water class. Partly circular: a margin pixel that oscillates
+  Water/non-Water is both *near 2017 water* and *unsettled*. Kept as a sensitivity arm.
+- **`edge_nonwater`** — a from-epoch class boundary with **no water on either side**. This is the
+  null. A share split by `from_class` is a *control* for composition; it cannot say whether water
+  is special. This can: if flicker rises toward any edge the way it rises toward the channel, the
+  corridor framing is not what is going on.
+
+**Read the null before quoting a corridor number.** It does not separate — flicker rises toward a
+non-water class boundary at least as steeply as toward the channel — so these files support an
+*edge* effect and not a channel-specific one.
+
+## Two things `summary_corridor*.csv` will mislead you about if you skip this
+
+**The `core` band is a definition, not a measurement.** Under `water_core` it reads 100% stable
+because that is what the core is. It is the internal control. Do not plot it and do not quote it.
+
+**The all-class band share is biased against `stable` in the near bands.** The core removes every
+permanent-water pixel from the band population, so the 0-10 m ring is by construction the set of
+cells beside permanent water that are *not* permanent water — the one band where the modal stable
+class has been excised. `summary_corridor_class.csv` is the honest read: restrict to a class that
+**cannot** be in the core. `Trees` is the one to use. `Water` there is a tautology — it reads 0%
+stable in every band outside the core, necessarily, because a 2017-Water cell that is not core
+either changed or flickered.
+
+## A sieve is not a width filter, and the width result does not survive one
+
+`summary_patch_sieve.csv` and `summary_patch_area_bands.csv` exist because narrow and small are
+nearly the same thing here. The median sliver is **two cells**. A 1 ha area sieve — which the
+published `transition_vector.gpkg` already applies — keeps 2.2-4.1% of patches and 52.9-72.0% of
+the changed area, and only 1.9-7.4% of what survives is a sliver.
+
+**Do not quote the unsieved sliver-versus-wider gap as a width effect.** Hold area fixed instead
+and it reverses: in the 0.2-0.5 and 0.5-1 ha bands the clean-break share is *higher* for slivers in
+6 of 8 group-and-band cells. Below 0.1 ha every patch but three is a sliver, so there is nothing
+for width to separate. `summary_patch_area_bands.csv` is the table that shows this;
+`summary_patch_widths.csv` is the unsieved comparison and is only safe to read beside it.
+
+## `kotl`'s reference is a lake
+
+Permanent water as a share of the floodplain: bulk 14.4%, necr 25.3%, lnth 33.7%, **kotl 67.0%**.
+Kootenay Lake is two thirds of that floodplain, so "distance to the channel" reads as "distance to
+a regulated lake shore" for `kotl`. Reported, not corrected.
 
 ## Three things worth knowing before quoting these numbers
 

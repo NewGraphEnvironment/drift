@@ -1,0 +1,2 @@
+2026-09-07T20:02:40Z start corridor
+2026-09-07T20:13:55Z end corridor (exit 0)

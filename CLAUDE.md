@@ -130,7 +130,14 @@ Tag PR bodies with `Relates to NewGraphEnvironment/sred-2025-2026#16` (the issue
   changed-but-unsettled with the flicker whose endpoints agree (2,032.9 vs 3,186.5 ha on BULK), and
   summing them as one "flicker" overstates changed area by 69%. `dft_break_category()` (#72) names
   them apart as `unsettled` and `stable_flicker`; compose with it rather than re-deriving the split.
-- [`inst/notes/temporal-qa-groups.md`](inst/notes/temporal-qa-groups.md) — `dft_rast_break_class()` across the four published seven-year groups (#62): sustained-break share 20-31% of 2017-2023 change, flicker 40-49%, 2017 the odd endpoint everywhere; the shape proxies and why the per-stream segment layer was rejected. Read before quoting a `transition_2017_2023` hectare as change.
+  Extended in #73 with patch shape and location. **Read the null before quoting a corridor number:**
+  flicker does rise steeply toward the channel, but it rises at least as steeply toward a
+  *non-water* class boundary, so it is an edge effect and not a channel-specific one. And
+  `flag_sliver` is an effective width (`2A/P < 1.5` px), not literally one pixel wide — and
+  **width is a size proxy**: the median sliver is two cells, a 1 ha sieve (which the published
+  layer already applies) leaves 1.9-7.4% slivers, and holding area fixed reverses the
+  sliver-settles-less result in 6 of 8 bands. Neither geometric leg generalises.
+- [`inst/notes/temporal-qa-groups.md`](inst/notes/temporal-qa-groups.md) — `dft_rast_break_class()` across the four published seven-year groups (#62): sustained-break share 20-31% of 2017-2023 change, flicker 40-49%, 2017 the odd endpoint everywhere; the shape proxies and why the per-stream segment layer was rejected. Q6 (#73) adds distance from permanent water: the gradient is real, the null does not separate it from any other class boundary, the near-band `stable` share is biased down by construction because the reference excises the permanent-water pixels, and `break_year` runs the opposite way to a migrating bank. Read before quoting a `transition_2017_2023` hectare as change.
 - [`inst/notes/temporal-qa-disturbance.md`](inst/notes/temporal-qa-disturbance.md) — does dated fire/harvest corroborate the temporal QA (#67): the published `transition_vector.gpkg` is drift's own change layer after a 1 ha class-agnostic sieve and a sub-basin clip, reproduced exactly in all four groups (0 of 53/44/41/46 classes differ), which closes the two-totals problem; `break_year` lands at lag 0 or +1 for 86% of discriminating fire patches that broke and 72% of harvest (70.7% / 58.4% of all tagged), mode +1; flicker is LOWER in disturbed patches, so it does not read as succession. Read before treating drift's patch count and the published one as the same population.
 - [`inst/notes/gdalcubes-pc-gotchas.md`](inst/notes/gdalcubes-pc-gotchas.md) — non-obvious gdalcubes 0.7.3 + Planetary Computer Sentinel-2 gotchas (filter_geom segfault, reduce_time worker closures, terra↔gdalcubes NetCDF round-trip, the S2 +1000 DN offset boundary at 2022-01-25, PC pagination). Read before touching the continuous pipeline.
 

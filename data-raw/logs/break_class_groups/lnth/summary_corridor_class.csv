@@ -1,0 +1,237 @@
+"group","reference","band","band_label","from_class","category_label","n_cells","area_ha","pct_of_band_class"
+"lnth","water_core",1,"core","Water","stable",539130,5391.3,100
+"lnth","water_core",2,"0-10","Bare Ground","break_endpoint",1091,10.91,37.7
+"lnth","water_core",2,"0-10","Bare Ground","break_sustained",171,1.71,5.91
+"lnth","water_core",2,"0-10","Bare Ground","stable",22,0.22,0.76
+"lnth","water_core",2,"0-10","Bare Ground","stable_flicker",1029,10.29,35.56
+"lnth","water_core",2,"0-10","Bare Ground","unsettled",581,5.81,20.08
+"lnth","water_core",2,"0-10","Built Area","break_endpoint",38,0.38,4.04
+"lnth","water_core",2,"0-10","Built Area","break_sustained",55,0.55,5.84
+"lnth","water_core",2,"0-10","Built Area","stable",413,4.13,43.89
+"lnth","water_core",2,"0-10","Built Area","stable_flicker",263,2.63,27.95
+"lnth","water_core",2,"0-10","Built Area","unsettled",172,1.72,18.28
+"lnth","water_core",2,"0-10","Clouds","unsettled",3,0.03,100
+"lnth","water_core",2,"0-10","Crops","break_endpoint",55,0.55,13.06
+"lnth","water_core",2,"0-10","Crops","break_sustained",46,0.46,10.93
+"lnth","water_core",2,"0-10","Crops","stable",84,0.84,19.95
+"lnth","water_core",2,"0-10","Crops","stable_flicker",98,0.98,23.28
+"lnth","water_core",2,"0-10","Crops","unsettled",138,1.38,32.78
+"lnth","water_core",2,"0-10","Flooded Vegetation","break_endpoint",58,0.58,35.37
+"lnth","water_core",2,"0-10","Flooded Vegetation","break_sustained",1,0.01,0.61
+"lnth","water_core",2,"0-10","Flooded Vegetation","stable_flicker",3,0.03,1.83
+"lnth","water_core",2,"0-10","Flooded Vegetation","unsettled",102,1.02,62.2
+"lnth","water_core",2,"0-10","Rangeland","break_endpoint",591,5.91,15.35
+"lnth","water_core",2,"0-10","Rangeland","break_sustained",356,3.56,9.25
+"lnth","water_core",2,"0-10","Rangeland","stable",597,5.97,15.51
+"lnth","water_core",2,"0-10","Rangeland","stable_flicker",1458,14.58,37.87
+"lnth","water_core",2,"0-10","Rangeland","unsettled",848,8.48,22.03
+"lnth","water_core",2,"0-10","Trees","break_endpoint",1597,15.97,14.52
+"lnth","water_core",2,"0-10","Trees","break_sustained",1223,12.23,11.12
+"lnth","water_core",2,"0-10","Trees","stable",1990,19.9,18.09
+"lnth","water_core",2,"0-10","Trees","stable_flicker",3931,39.31,35.74
+"lnth","water_core",2,"0-10","Trees","unsettled",2258,22.58,20.53
+"lnth","water_core",2,"0-10","Water","break_endpoint",7457,74.57,41.45
+"lnth","water_core",2,"0-10","Water","break_sustained",2342,23.42,13.02
+"lnth","water_core",2,"0-10","Water","stable_flicker",5173,51.73,28.76
+"lnth","water_core",2,"0-10","Water","unsettled",3017,30.17,16.77
+"lnth","water_core",3,"10-30","Bare Ground","break_endpoint",551,5.51,5.64
+"lnth","water_core",3,"10-30","Bare Ground","break_sustained",459,4.59,4.7
+"lnth","water_core",3,"10-30","Bare Ground","stable",2134,21.34,21.85
+"lnth","water_core",3,"10-30","Bare Ground","stable_flicker",5782,57.82,59.21
+"lnth","water_core",3,"10-30","Bare Ground","unsettled",839,8.39,8.59
+"lnth","water_core",3,"10-30","Built Area","break_endpoint",107,1.07,3.49
+"lnth","water_core",3,"10-30","Built Area","break_sustained",29,0.29,0.94
+"lnth","water_core",3,"10-30","Built Area","stable",2296,22.96,74.79
+"lnth","water_core",3,"10-30","Built Area","stable_flicker",428,4.28,13.94
+"lnth","water_core",3,"10-30","Built Area","unsettled",210,2.1,6.84
+"lnth","water_core",3,"10-30","Clouds","unsettled",4,0.04,100
+"lnth","water_core",3,"10-30","Crops","break_endpoint",186,1.86,10.24
+"lnth","water_core",3,"10-30","Crops","break_sustained",63,0.63,3.47
+"lnth","water_core",3,"10-30","Crops","stable",793,7.93,43.67
+"lnth","water_core",3,"10-30","Crops","stable_flicker",427,4.27,23.51
+"lnth","water_core",3,"10-30","Crops","unsettled",347,3.47,19.11
+"lnth","water_core",3,"10-30","Flooded Vegetation","break_endpoint",18,0.18,7.5
+"lnth","water_core",3,"10-30","Flooded Vegetation","break_sustained",19,0.19,7.92
+"lnth","water_core",3,"10-30","Flooded Vegetation","stable",28,0.28,11.67
+"lnth","water_core",3,"10-30","Flooded Vegetation","stable_flicker",43,0.43,17.92
+"lnth","water_core",3,"10-30","Flooded Vegetation","unsettled",132,1.32,55
+"lnth","water_core",3,"10-30","Rangeland","break_endpoint",354,3.54,3.17
+"lnth","water_core",3,"10-30","Rangeland","break_sustained",509,5.09,4.56
+"lnth","water_core",3,"10-30","Rangeland","stable",5577,55.77,50
+"lnth","water_core",3,"10-30","Rangeland","stable_flicker",3643,36.43,32.66
+"lnth","water_core",3,"10-30","Rangeland","unsettled",1070,10.7,9.59
+"lnth","water_core",3,"10-30","Trees","break_endpoint",988,9.88,3.28
+"lnth","water_core",3,"10-30","Trees","break_sustained",409,4.09,1.36
+"lnth","water_core",3,"10-30","Trees","stable",19730,197.3,65.58
+"lnth","water_core",3,"10-30","Trees","stable_flicker",6815,68.15,22.65
+"lnth","water_core",3,"10-30","Trees","unsettled",2142,21.42,7.12
+"lnth","water_core",3,"10-30","Water","break_endpoint",3199,31.99,33.33
+"lnth","water_core",3,"10-30","Water","break_sustained",2988,29.88,31.13
+"lnth","water_core",3,"10-30","Water","stable_flicker",1021,10.21,10.64
+"lnth","water_core",3,"10-30","Water","unsettled",2389,23.89,24.89
+"lnth","water_core",4,"30-50","Bare Ground","break_endpoint",241,2.41,2.25
+"lnth","water_core",4,"30-50","Bare Ground","break_sustained",357,3.57,3.33
+"lnth","water_core",4,"30-50","Bare Ground","stable",4954,49.54,46.24
+"lnth","water_core",4,"30-50","Bare Ground","stable_flicker",4695,46.95,43.82
+"lnth","water_core",4,"30-50","Bare Ground","unsettled",467,4.67,4.36
+"lnth","water_core",4,"30-50","Built Area","break_endpoint",89,0.89,5.15
+"lnth","water_core",4,"30-50","Built Area","break_sustained",18,0.18,1.04
+"lnth","water_core",4,"30-50","Built Area","stable",1266,12.66,73.31
+"lnth","water_core",4,"30-50","Built Area","stable_flicker",218,2.18,12.62
+"lnth","water_core",4,"30-50","Built Area","unsettled",136,1.36,7.87
+"lnth","water_core",4,"30-50","Clouds","unsettled",3,0.03,100
+"lnth","water_core",4,"30-50","Crops","break_endpoint",189,1.89,9.88
+"lnth","water_core",4,"30-50","Crops","break_sustained",51,0.51,2.67
+"lnth","water_core",4,"30-50","Crops","stable",951,9.51,49.71
+"lnth","water_core",4,"30-50","Crops","stable_flicker",467,4.67,24.41
+"lnth","water_core",4,"30-50","Crops","unsettled",255,2.55,13.33
+"lnth","water_core",4,"30-50","Flooded Vegetation","break_endpoint",26,0.26,20.63
+"lnth","water_core",4,"30-50","Flooded Vegetation","break_sustained",7,0.07,5.56
+"lnth","water_core",4,"30-50","Flooded Vegetation","stable",5,0.05,3.97
+"lnth","water_core",4,"30-50","Flooded Vegetation","stable_flicker",15,0.15,11.9
+"lnth","water_core",4,"30-50","Flooded Vegetation","unsettled",73,0.73,57.94
+"lnth","water_core",4,"30-50","Rangeland","break_endpoint",314,3.14,2.92
+"lnth","water_core",4,"30-50","Rangeland","break_sustained",419,4.19,3.89
+"lnth","water_core",4,"30-50","Rangeland","stable",6466,64.66,60.1
+"lnth","water_core",4,"30-50","Rangeland","stable_flicker",2751,27.51,25.57
+"lnth","water_core",4,"30-50","Rangeland","unsettled",808,8.08,7.51
+"lnth","water_core",4,"30-50","Trees","break_endpoint",423,4.23,1.66
+"lnth","water_core",4,"30-50","Trees","break_sustained",163,1.63,0.64
+"lnth","water_core",4,"30-50","Trees","stable",18918,189.18,74.28
+"lnth","water_core",4,"30-50","Trees","stable_flicker",4518,45.18,17.74
+"lnth","water_core",4,"30-50","Trees","unsettled",1445,14.45,5.67
+"lnth","water_core",4,"30-50","Water","break_endpoint",827,8.27,23.47
+"lnth","water_core",4,"30-50","Water","break_sustained",1278,12.78,36.28
+"lnth","water_core",4,"30-50","Water","stable_flicker",351,3.51,9.96
+"lnth","water_core",4,"30-50","Water","unsettled",1067,10.67,30.29
+"lnth","water_core",5,"50-100","Bare Ground","break_endpoint",312,3.12,2.16
+"lnth","water_core",5,"50-100","Bare Ground","break_sustained",472,4.72,3.27
+"lnth","water_core",5,"50-100","Bare Ground","stable",9052,90.52,62.8
+"lnth","water_core",5,"50-100","Bare Ground","stable_flicker",4116,41.16,28.56
+"lnth","water_core",5,"50-100","Bare Ground","unsettled",461,4.61,3.2
+"lnth","water_core",5,"50-100","Built Area","break_endpoint",129,1.29,5.45
+"lnth","water_core",5,"50-100","Built Area","break_sustained",85,0.85,3.59
+"lnth","water_core",5,"50-100","Built Area","stable",1694,16.94,71.6
+"lnth","water_core",5,"50-100","Built Area","stable_flicker",187,1.87,7.9
+"lnth","water_core",5,"50-100","Built Area","unsettled",271,2.71,11.45
+"lnth","water_core",5,"50-100","Clouds","unsettled",6,0.06,100
+"lnth","water_core",5,"50-100","Crops","break_endpoint",261,2.61,6.65
+"lnth","water_core",5,"50-100","Crops","break_sustained",83,0.83,2.11
+"lnth","water_core",5,"50-100","Crops","stable",2215,22.15,56.4
+"lnth","water_core",5,"50-100","Crops","stable_flicker",957,9.57,24.37
+"lnth","water_core",5,"50-100","Crops","unsettled",411,4.11,10.47
+"lnth","water_core",5,"50-100","Flooded Vegetation","break_endpoint",15,0.15,11.28
+"lnth","water_core",5,"50-100","Flooded Vegetation","break_sustained",2,0.02,1.5
+"lnth","water_core",5,"50-100","Flooded Vegetation","stable_flicker",2,0.02,1.5
+"lnth","water_core",5,"50-100","Flooded Vegetation","unsettled",114,1.14,85.71
+"lnth","water_core",5,"50-100","Rangeland","break_endpoint",548,5.48,2.75
+"lnth","water_core",5,"50-100","Rangeland","break_sustained",780,7.8,3.91
+"lnth","water_core",5,"50-100","Rangeland","stable",12150,121.5,60.97
+"lnth","water_core",5,"50-100","Rangeland","stable_flicker",4911,49.11,24.64
+"lnth","water_core",5,"50-100","Rangeland","unsettled",1538,15.38,7.72
+"lnth","water_core",5,"50-100","Trees","break_endpoint",794,7.94,1.9
+"lnth","water_core",5,"50-100","Trees","break_sustained",383,3.83,0.92
+"lnth","water_core",5,"50-100","Trees","stable",31308,313.08,74.85
+"lnth","water_core",5,"50-100","Trees","stable_flicker",6917,69.17,16.54
+"lnth","water_core",5,"50-100","Trees","unsettled",2426,24.26,5.8
+"lnth","water_core",5,"50-100","Water","break_endpoint",594,5.94,21.88
+"lnth","water_core",5,"50-100","Water","break_sustained",933,9.33,34.36
+"lnth","water_core",5,"50-100","Water","stable_flicker",331,3.31,12.19
+"lnth","water_core",5,"50-100","Water","unsettled",857,8.57,31.57
+"lnth","water_core",6,"100-200","Bare Ground","break_endpoint",160,1.6,2.36
+"lnth","water_core",6,"100-200","Bare Ground","break_sustained",96,0.96,1.42
+"lnth","water_core",6,"100-200","Bare Ground","stable",5085,50.85,75.07
+"lnth","water_core",6,"100-200","Bare Ground","stable_flicker",1132,11.32,16.71
+"lnth","water_core",6,"100-200","Bare Ground","unsettled",301,3.01,4.44
+"lnth","water_core",6,"100-200","Built Area","break_endpoint",208,2.08,5.54
+"lnth","water_core",6,"100-200","Built Area","break_sustained",108,1.08,2.88
+"lnth","water_core",6,"100-200","Built Area","stable",2768,27.68,73.75
+"lnth","water_core",6,"100-200","Built Area","stable_flicker",197,1.97,5.25
+"lnth","water_core",6,"100-200","Built Area","unsettled",472,4.72,12.58
+"lnth","water_core",6,"100-200","Crops","break_endpoint",671,6.71,9.44
+"lnth","water_core",6,"100-200","Crops","break_sustained",216,2.16,3.04
+"lnth","water_core",6,"100-200","Crops","stable",4220,42.2,59.37
+"lnth","water_core",6,"100-200","Crops","stable_flicker",1320,13.2,18.57
+"lnth","water_core",6,"100-200","Crops","unsettled",681,6.81,9.58
+"lnth","water_core",6,"100-200","Flooded Vegetation","break_endpoint",150,1.5,47.47
+"lnth","water_core",6,"100-200","Flooded Vegetation","unsettled",166,1.66,52.53
+"lnth","water_core",6,"100-200","Rangeland","break_endpoint",544,5.44,1.82
+"lnth","water_core",6,"100-200","Rangeland","break_sustained",735,7.35,2.46
+"lnth","water_core",6,"100-200","Rangeland","stable",20598,205.98,68.88
+"lnth","water_core",6,"100-200","Rangeland","stable_flicker",5858,58.58,19.59
+"lnth","water_core",6,"100-200","Rangeland","unsettled",2171,21.71,7.26
+"lnth","water_core",6,"100-200","Trees","break_endpoint",1444,14.44,3.08
+"lnth","water_core",6,"100-200","Trees","break_sustained",733,7.33,1.56
+"lnth","water_core",6,"100-200","Trees","stable",35567,355.67,75.92
+"lnth","water_core",6,"100-200","Trees","stable_flicker",6795,67.95,14.5
+"lnth","water_core",6,"100-200","Trees","unsettled",2310,23.1,4.93
+"lnth","water_core",6,"100-200","Water","break_endpoint",200,2,20.04
+"lnth","water_core",6,"100-200","Water","break_sustained",269,2.69,26.95
+"lnth","water_core",6,"100-200","Water","stable_flicker",53,0.53,5.31
+"lnth","water_core",6,"100-200","Water","unsettled",476,4.76,47.7
+"lnth","water_core",7,"200-500","Bare Ground","break_endpoint",917,9.17,45.19
+"lnth","water_core",7,"200-500","Bare Ground","break_sustained",61,0.61,3.01
+"lnth","water_core",7,"200-500","Bare Ground","stable",413,4.13,20.35
+"lnth","water_core",7,"200-500","Bare Ground","stable_flicker",42,0.42,2.07
+"lnth","water_core",7,"200-500","Bare Ground","unsettled",596,5.96,29.37
+"lnth","water_core",7,"200-500","Built Area","break_endpoint",116,1.16,1.15
+"lnth","water_core",7,"200-500","Built Area","break_sustained",167,1.67,1.66
+"lnth","water_core",7,"200-500","Built Area","stable",8570,85.7,85.13
+"lnth","water_core",7,"200-500","Built Area","stable_flicker",814,8.14,8.09
+"lnth","water_core",7,"200-500","Built Area","unsettled",400,4,3.97
+"lnth","water_core",7,"200-500","Clouds","break_endpoint",6,0.06,75
+"lnth","water_core",7,"200-500","Clouds","unsettled",2,0.02,25
+"lnth","water_core",7,"200-500","Crops","break_endpoint",2588,25.88,10.69
+"lnth","water_core",7,"200-500","Crops","break_sustained",562,5.62,2.32
+"lnth","water_core",7,"200-500","Crops","stable",15437,154.37,63.76
+"lnth","water_core",7,"200-500","Crops","stable_flicker",3967,39.67,16.38
+"lnth","water_core",7,"200-500","Crops","unsettled",1659,16.59,6.85
+"lnth","water_core",7,"200-500","Flooded Vegetation","break_endpoint",833,8.33,60.36
+"lnth","water_core",7,"200-500","Flooded Vegetation","unsettled",547,5.47,39.64
+"lnth","water_core",7,"200-500","Rangeland","break_endpoint",2699,26.99,3.64
+"lnth","water_core",7,"200-500","Rangeland","break_sustained",2074,20.74,2.8
+"lnth","water_core",7,"200-500","Rangeland","stable",50757,507.57,68.53
+"lnth","water_core",7,"200-500","Rangeland","stable_flicker",12166,121.66,16.43
+"lnth","water_core",7,"200-500","Rangeland","unsettled",6370,63.7,8.6
+"lnth","water_core",7,"200-500","Trees","break_endpoint",1646,16.46,2.68
+"lnth","water_core",7,"200-500","Trees","break_sustained",728,7.28,1.19
+"lnth","water_core",7,"200-500","Trees","stable",47174,471.74,76.85
+"lnth","water_core",7,"200-500","Trees","stable_flicker",8572,85.72,13.97
+"lnth","water_core",7,"200-500","Trees","unsettled",3261,32.61,5.31
+"lnth","water_core",7,"200-500","Water","break_endpoint",1,0.01,1.96
+"lnth","water_core",7,"200-500","Water","break_sustained",11,0.11,21.57
+"lnth","water_core",7,"200-500","Water","stable_flicker",16,0.16,31.37
+"lnth","water_core",7,"200-500","Water","unsettled",23,0.23,45.1
+"lnth","water_core",8,">500","Bare Ground","break_endpoint",944,9.44,36.2
+"lnth","water_core",8,">500","Bare Ground","break_sustained",80,0.8,3.07
+"lnth","water_core",8,">500","Bare Ground","stable",120,1.2,4.6
+"lnth","water_core",8,">500","Bare Ground","stable_flicker",25,0.25,0.96
+"lnth","water_core",8,">500","Bare Ground","unsettled",1439,14.39,55.18
+"lnth","water_core",8,">500","Built Area","break_endpoint",496,4.96,1.1
+"lnth","water_core",8,">500","Built Area","break_sustained",343,3.43,0.76
+"lnth","water_core",8,">500","Built Area","stable",38106,381.06,84.35
+"lnth","water_core",8,">500","Built Area","stable_flicker",4295,42.95,9.51
+"lnth","water_core",8,">500","Built Area","unsettled",1938,19.38,4.29
+"lnth","water_core",8,">500","Clouds","break_endpoint",7,0.07,18.42
+"lnth","water_core",8,">500","Clouds","unsettled",31,0.31,81.58
+"lnth","water_core",8,">500","Crops","break_endpoint",4274,42.74,8.89
+"lnth","water_core",8,">500","Crops","break_sustained",4624,46.24,9.62
+"lnth","water_core",8,">500","Crops","stable",19607,196.07,40.77
+"lnth","water_core",8,">500","Crops","stable_flicker",12167,121.67,25.3
+"lnth","water_core",8,">500","Crops","unsettled",7414,74.14,15.42
+"lnth","water_core",8,">500","Flooded Vegetation","break_endpoint",26,0.26,30.23
+"lnth","water_core",8,">500","Flooded Vegetation","unsettled",60,0.6,69.77
+"lnth","water_core",8,">500","Rangeland","break_endpoint",6214,62.14,3.45
+"lnth","water_core",8,">500","Rangeland","break_sustained",5636,56.36,3.13
+"lnth","water_core",8,">500","Rangeland","stable",128991,1289.91,71.57
+"lnth","water_core",8,">500","Rangeland","stable_flicker",26493,264.93,14.7
+"lnth","water_core",8,">500","Rangeland","unsettled",12904,129.04,7.16
+"lnth","water_core",8,">500","Trees","break_endpoint",5198,51.98,1.9
+"lnth","water_core",8,">500","Trees","break_sustained",3352,33.52,1.23
+"lnth","water_core",8,">500","Trees","stable",240348,2403.48,88.01
+"lnth","water_core",8,">500","Trees","stable_flicker",13189,131.89,4.83
+"lnth","water_core",8,">500","Trees","unsettled",10990,109.9,4.02
+"lnth","water_core",8,">500","Water","break_endpoint",75,0.75,25
+"lnth","water_core",8,">500","Water","break_sustained",20,0.2,6.67
+"lnth","water_core",8,">500","Water","stable_flicker",23,0.23,7.67
+"lnth","water_core",8,">500","Water","unsettled",182,1.82,60.67
