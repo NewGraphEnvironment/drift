@@ -187,3 +187,34 @@ which would inflate the null's near bands) and cells outside the floodplain.
 Run: `bash data-raw/break_class_groups-run.sh corridor` — 671.6 s and 16.6 GiB peak RSS for all
 four groups in one process. `terra::distance()` over BULK's 169M cells is 8.3 s of that, so the distance
 transform was never the expensive part.
+
+## Q7: does a patch-size sieve change the width story (drift#73)
+
+It removes it. Width and area are not separable in this data, and the geometric leg #62's Q4
+reported is mostly an area effect.
+
+The median sliver is **two cells** (p90 0.11-0.13 ha). A patch-area sieve is the standard
+conservative move and the published `transition_vector.gpkg` already applies 1 ha (#67), so this
+matters for anyone reading the published layer rather than drift's raw output:
+
+|group | patches kept >=1 ha| area kept| of what is kept, sliver|
+|:-----|-------------------:|---------:|-----------------------:|
+|bulk  |               3.4% |    62.9% |                   3.7% |
+|necr  |               4.1% |    72.0% |                   1.9% |
+|lnth  |               2.2% |    52.9% |                   2.2% |
+|kotl  |               2.8% |    66.9% |                   7.4% |
+
+So the sieve discards 96-98% of the patches and a third to a half of the changed area, and what
+survives is almost entirely non-sliver.
+
+**Holding area fixed, rather than sieving, is what separates width from size — and the effect
+reverses.** Below 0.1 ha all but 3 of 24,151 patches across the four groups are slivers, so width
+cannot discriminate there at all. In the bands where narrow and compact patches of the same size
+both exist in numbers (0.2-0.5 and 0.5-1 ha), the area-weighted clean-break share is **higher** for
+slivers in 6 of the 8 group-and-band cells — the opposite direction to the unsieved comparison.
+BULK: 0.516 v 0.450 at 0.2-0.5 ha and 0.573 v 0.497 at 0.5-1 ha, against 0.464 v 0.590 unsieved.
+
+Read together with Q4, that is two geometric legs and neither survives contact: the
+boundary-tracing leg does not generalise across groups (it reverses in lnth), and the width leg
+does not survive an area control. `summary_patch_sieve.csv` and `summary_patch_area_bands.csv`,
+written by the `article-slivers` stage.

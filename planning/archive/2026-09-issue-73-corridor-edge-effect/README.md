@@ -42,6 +42,21 @@ Three numbers changed how the work was expressed:
 - **The boundary-signature range in the issue body was two rows conflated**, and the effect
   reverses in lnth (0.518 against 0.515). Width is the leg that holds in all four.
 
+## The sieve, added after review by the user
+
+Asked what a 0.5 or 1 ha patch-size screen would do to the width result — the standard
+conservative workflow — the answer turned out to remove it. The median sliver is **two cells**, so
+narrow and small are nearly the same population here. A 1 ha sieve keeps 2.2-4.1% of patches and
+52.9-72.0% of the area, leaving 1.9-7.4% slivers. And holding area fixed rather than sieving, the
+clean-break gap **reverses**: slivers settle *more* than compact patches of the same size in 6 of
+8 group-and-band cells. Below 0.1 ha all but 3 of 24,151 patches are slivers, so width has nothing
+to separate.
+
+So the article's original claim, "width is the leg that holds everywhere", was true only as an
+unconditional comparison and wrong as a statement about width. It was rewritten. This is the
+proxy-is-not-the-property mechanism arriving in prose: width was standing in for size, and the
+question that exposed it came from someone who knew the workflow, not from any guard.
+
 ## Errors worth keeping
 
 - **The reference excises the population it is compared against.** The stable water core is every

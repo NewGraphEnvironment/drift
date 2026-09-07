@@ -18,10 +18,15 @@ Produced by `data-raw/break_class_groups.R`, which is not part of the package bu
 | `summary_corridor.csv` | `corridor` | temporal category by distance band, under **three** references |
 | `summary_corridor_class.csv` | `corridor` | the same, kept split by from-epoch class |
 | `summary_corridor_breakyear.csv` | `corridor` | `break_year` by distance band, for clean breaks only |
+| `summary_patch_sieve.csv` | `article-slivers` | patch counts, area and temporal evidence at 0, 0.5 and 1 ha area sieves |
+| `summary_patch_area_bands.csv` | `article-slivers` | the same, split by area band instead — the control a sieve cannot give |
+| `bulk_slivers.csv` | `article-slivers` | the two example patches, their measurements and the selection rule |
+| `bulk_slivers.rds` | `article-slivers` | `terra::wrap()`ped crops for those two, plus their outlines |
 
 Regenerate with `Rscript data-raw/break_class_groups.R summarize`, then
 `Rscript data-raw/break_class_groups.R article-bulk`, then
-`Rscript data-raw/break_class_groups.R corridor`.
+`Rscript data-raw/break_class_groups.R corridor`, then
+`Rscript data-raw/break_class_groups.R article-slivers`.
 
 ## The corridor files carry three references, and which one you read is the finding
 
@@ -54,6 +59,19 @@ class has been excised. `summary_corridor_class.csv` is the honest read: restric
 **cannot** be in the core. `Trees` is the one to use. `Water` there is a tautology — it reads 0%
 stable in every band outside the core, necessarily, because a 2017-Water cell that is not core
 either changed or flickered.
+
+## A sieve is not a width filter, and the width result does not survive one
+
+`summary_patch_sieve.csv` and `summary_patch_area_bands.csv` exist because narrow and small are
+nearly the same thing here. The median sliver is **two cells**. A 1 ha area sieve — which the
+published `transition_vector.gpkg` already applies — keeps 2.2-4.1% of patches and 52.9-72.0% of
+the changed area, and only 1.9-7.4% of what survives is a sliver.
+
+**Do not quote the unsieved sliver-versus-wider gap as a width effect.** Hold area fixed instead
+and it reverses: in the 0.2-0.5 and 0.5-1 ha bands the clean-break share is *higher* for slivers in
+6 of 8 group-and-band cells. Below 0.1 ha every patch but three is a sliver, so there is nothing
+for width to separate. `summary_patch_area_bands.csv` is the table that shows this;
+`summary_patch_widths.csv` is the unsieved comparison and is only safe to read beside it.
 
 ## `kotl`'s reference is a lake
 

@@ -85,3 +85,21 @@ band degeneracy, because every conservation arm is satisfied by an all-zero dist
 is what a 1/0 mask produces — `terra::distance()` measures *from* the NA cells *to* the non-NA
 ones; and the realised band set against the eight declared codes, because `classify()` leaves an
 unmatched value at its original value rather than setting NA.
+
+## The `article-slivers` stage (drift#73)
+
+`Rscript data-raw/break_class_groups.R article-slivers`. Two outputs, both into
+`inst/extdata/temporal-composition/`.
+
+The **sieve tables** read the four gitignored `summary_patches.csv` files, and the unsieved row of
+each is asserted against that group's committed `summary_patch_groups.csv` — same file, but a
+rollup this stage did not write, so it catches reading a different patch set than the article's
+other numbers describe. `summary_patch_area_bands.csv` is the control a sieve structurally cannot
+give: sieving compares a sliver-rich small population against a sliver-poor large one and so
+cannot separate width from area, while holding area fixed can.
+
+The **two example patches** are chosen from BULK by a rule recorded in `bulk_slivers.csv` beside
+the measurements: `flag_sliver`, 0.2-0.6 ha, then either within 15 m of permanent water with Water
+in the transition, or beyond 200 m with no Water and `flag_boundary` — median-area candidate, ties
+to the lower `patch_id`. The 0.2-0.6 ha band is deliberate: below 0.1 ha every patch is a sliver,
+so an example from there would illustrate nothing about width.

@@ -14,6 +14,7 @@
 #   Rscript data-raw/break_class_groups.R summarize   # assemble summary_groups.*
 #   Rscript data-raw/break_class_groups.R article-bulk  # BULK figure data for the #66 article
 #   Rscript data-raw/break_class_groups.R corridor   # distance-to-channel profile (#73)
+#   Rscript data-raw/break_class_groups.R article-slivers  # sieve table + sliver examples (#73)
 #
 # Sample RSS from outside while a group runs (KiB every 2 s):
 #   Rscript data-raw/break_class_groups.R necr > data-raw/logs/break_class_groups/necr/run.log 2>&1 &
@@ -63,9 +64,9 @@ api_url <- "https://images.a11s.one/collections/stac-floodplains-bc/items"
 log_root <- file.path("data-raw", "logs", "break_class_groups")
 
 arg <- commandArgs(trailingOnly = TRUE)[1]
-if (is.na(arg) || !(arg %in% c(names(groups), "summarize", "article-bulk", "corridor"))) {
+if (is.na(arg) || !(arg %in% c(names(groups), "summarize", "article-bulk", "corridor", "article-slivers"))) {
   stop("usage: Rscript data-raw/break_class_groups.R <", paste(names(groups), collapse = "|"),
-       "|summarize|article-bulk|corridor>", call. = FALSE)
+       "|summarize|article-bulk|corridor|article-slivers>", call. = FALSE)
 }
 
 # --- helpers ---------------------------------------------------------------
@@ -1186,6 +1187,189 @@ if (arg == "corridor") {
   timings[["wall"]] <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 1)
   utils::write.csv(data.frame(stage = names(timings), seconds = unlist(timings)),
                    file.path(cor_dir, "timings.csv"), row.names = FALSE)
+  message("ALL STAGES DONE")
+  quit(save = "no", status = 0)
+}
+# --- article slivers + patch-size sieve (#73) -------------------------------
+# Two questions the corridor stage does not answer.
+#
+# 1. A sliver is a *narrow* patch, and narrow is not the same as small -- except
+#    that here it very nearly is. The median sliver is two cells. A patch-area
+#    sieve is the standard conservative move (the published transition_vector
+#    layer already applies 1 ha, drift#67), so a reader needs to know what the
+#    sieve does to the width story before quoting any of it.
+# 2. What a sliver actually LOOKS like, at a water margin and at a boundary
+#    with no water in it.
+#
+# Needs the gitignored BULK COGs and summary_patches.csv for all four groups.
+
+if (arg == "article-slivers") {
+  art_dir <- file.path("inst", "extdata", "temporal-composition")
+  dir.create(art_dir, recursive = TRUE, showWarnings = FALSE)
+  scratch <- character()
+  tf <- function() { f <- tempfile(fileext = ".tif"); scratch <<- c(scratch, f); f }
+  on.exit(unlink(c(scratch, paste0(scratch, ".aux.xml"))), add = TRUE)
+
+  # --- 1. the sieve table, all four groups -----------------------------------
+  sieves <- c(0, 0.5, 1)
+  bands_ha <- c(0.02, 0.1, 0.2, 0.5, 1, Inf)
+  band_lab <- c("0.02-0.1", "0.1-0.2", "0.2-0.5", "0.5-1", ">=1")
+  wmean <- function(x, w) if (length(x)) stats::weighted.mean(x, w, na.rm = TRUE) else NA_real_
+
+  sieve_rows <- list(); band_rows <- list()
+  for (g in names(groups)) {
+    f <- file.path(log_root, g, "summary_patches.csv")
+    if (!file.exists(f)) stop("missing ", f, " -- run the ", g, " stage first")
+    p <- utils::read.csv(f, stringsAsFactors = FALSE)
+    stopifnot(nrow(p) > 0, !anyNA(p$area_ha), is.logical(p$flag_sliver))
+    # the committed patch-group table is the independent witness for the
+    # unsieved row: same file, but a rollup this stage did not write
+    ref <- utils::read.csv(file.path(log_root, g, "summary_patch_groups.csv"),
+                           stringsAsFactors = FALSE)
+
+    for (th in sieves) {
+      k <- p[p$area_ha >= th, ]
+      s <- k[k$flag_sliver, ]; w <- k[!k$flag_sliver, ]
+      sieve_rows[[length(sieve_rows) + 1L]] <- data.frame(
+        group = g, sieve_ha = th,
+        n_patches = nrow(k), pct_patches_kept = round(100 * nrow(k) / nrow(p), 1),
+        area_ha = round(sum(k$area_ha), 1),
+        pct_area_kept = round(100 * sum(k$area_ha) / sum(p$area_ha), 1),
+        n_sliver = nrow(s), pct_kept_sliver = round(100 * nrow(s) / nrow(k), 1),
+        sliver_area_ha_median = round(stats::median(s$area_ha), 3),
+        sliver_area_ha_p90 = round(stats::quantile(s$area_ha, 0.9), 3),
+        break_frac_sliver = round(wmean(s$break_frac, s$area_ha), 3),
+        break_frac_wider = round(wmean(w$break_frac, w$area_ha), 3),
+        n_flips_sliver = round(wmean(s$n_flips_mean, s$area_ha), 2),
+        n_flips_wider = round(wmean(w$n_flips_mean, w$area_ha), 2))
+    }
+    # PREMISE: the unsieved row must reproduce the committed rollup, or this
+    # stage is reading a different patch set than the article's other numbers
+    u <- sieve_rows[[length(sieve_rows) - length(sieves) + 1L]]
+    stopifnot(identical(as.integer(u$n_patches),
+                        as.integer(ref$n_patches[ref$group == "all"])),
+              identical(as.integer(u$n_sliver),
+                        as.integer(ref$n_patches[ref$group == "sliver"])),
+              isTRUE(all.equal(u$break_frac_sliver,
+                               ref$break_frac_area_wtd[ref$group == "sliver"], tolerance = 5e-4)))
+
+    # The control a sieve structurally cannot give. Sieving compares a
+    # sliver-rich small population against a sliver-poor large one, so it
+    # cannot separate width from area; holding area fixed can.
+    for (i in seq_along(band_lab)) {
+      k <- p[p$area_ha >= bands_ha[i] & p$area_ha < bands_ha[i + 1], ]
+      s <- k[k$flag_sliver, ]; w <- k[!k$flag_sliver, ]
+      band_rows[[length(band_rows) + 1L]] <- data.frame(
+        group = g, area_band = band_lab[i], n_patches = nrow(k),
+        pct_sliver = round(100 * mean(k$flag_sliver), 1),
+        width_px_median = round(stats::median(k$width_px), 2),
+        n_sliver = nrow(s), n_wider = nrow(w),
+        break_frac_sliver = round(wmean(s$break_frac, s$area_ha), 3),
+        break_frac_wider = round(wmean(w$break_frac, w$area_ha), 3))
+    }
+  }
+  sieve <- do.call(rbind, sieve_rows); rownames(sieve) <- NULL
+  bandt <- do.call(rbind, band_rows);  rownames(bandt) <- NULL
+  utils::write.csv(sieve, file.path(art_dir, "summary_patch_sieve.csv"), row.names = FALSE)
+  utils::write.csv(bandt, file.path(art_dir, "summary_patch_area_bands.csv"), row.names = FALSE)
+  print(sieve[sieve$group == "bulk", ])
+  print(bandt[bandt$group == "bulk", ])
+
+  # --- 2. two example slivers ------------------------------------------------
+  g <- "bulk"
+  out_dir <- file.path(log_root, g)
+  rasters <- lapply(stats::setNames(years, as.character(years)), function(yr) {
+    dest <- file.path(out_dir, sprintf("classified_%d.tif", yr))
+    if (!file.exists(dest)) stop("missing ", dest, " -- run the ", g, " stage first")
+    terra::rast(dest)
+  })
+  classified <- dft_rast_classify(rasters, source = "io-lulc")
+  res <- dft_rast_break_class(classified)
+  cat5 <- dft_rast_break_category(res, filename = tf())
+  category <- terra::deepcopy(cat5[["category"]])
+  terra::set.cats(category, layer = 1, value = NULL)
+
+  lulc <- dft_class_table("io-lulc")
+  water_code <- lulc$code[lulc$class_name == "Water"]
+  stk <- terra::rast(unname(rasters))
+  core01 <- terra::app(stk, fun = function(v) {
+    if (!is.matrix(v)) stop("matrix chunks only")
+    as.integer(rowSums(v == water_code, na.rm = TRUE) == ncol(v))
+  }, filename = tf(), wopt = list(datatype = "INT1U", steps = 64))
+  core_mask <- terra::ifel(core01 == 1L, 1L, NA, filename = tf())
+  dwat <- terra::distance(core_mask, filename = tf())
+
+  patches <- dft_transition_vectors(res$raster, changes_only = TRUE)
+  tagged <- dft_transition_artifact(patches, res$raster)
+  pid <- terra::rasterize(terra::vect(patches), res$raster, field = "patch_id", filename = tf())
+  # crosstab, not zonal: zonal() outside its six-function fast path materialises
+  # the whole 169M-cell grid in R
+  zd <- terra::zonal(dwat, pid, fun = "mean", na.rm = TRUE)   # mean IS in the fast path
+  names(zd) <- c("patch_id", "dist_water_m")
+  tg <- merge(sf::st_drop_geometry(tagged), zd, by = "patch_id", all.x = TRUE)
+  tg <- merge(tg, data.frame(patch_id = patches$patch_id), by = "patch_id")
+
+  # SELECTION RULE, stated and written out with the figure data. Both examples
+  # are slivers in the 0.2-0.6 ha band -- the band where width is genuinely
+  # variable (below 0.1 ha every patch is a sliver, so an example from there
+  # would illustrate nothing) and still small enough to see whole.
+  cand <- tg[tg$flag_sliver & !is.na(tg$area_ha) &
+               tg$area_ha >= 0.2 & tg$area_ha <= 0.6, ]
+  wet <- cand[!is.na(cand$dist_water_m) & cand$dist_water_m <= 15 &
+                grepl("Water", cand$transition), ]
+  dry <- cand[!is.na(cand$dist_water_m) & cand$dist_water_m >= 200 &
+                !grepl("Water", cand$transition) &
+                !is.na(cand$flag_boundary) & cand$flag_boundary, ]
+  if (!nrow(wet) || !nrow(dry)) stop("no candidate sliver in one of the two settings")
+  # deterministic: the median-area candidate, ties to the lower patch_id
+  pickmed <- function(d) d$patch_id[order(abs(d$area_ha - stats::median(d$area_ha)), d$patch_id)][1]
+  ids <- c(water = pickmed(wet), boundary = pickmed(dry))
+  message("example slivers: water ", ids[["water"]], ", boundary ", ids[["boundary"]])
+
+  pad <- 25L   # cells of context either side
+  crops <- lapply(names(ids), function(nm) {
+    geom <- patches[patches$patch_id == ids[[nm]], ]
+    e <- terra::ext(terra::vect(geom))
+    r <- terra::res(res$raster)[1]
+    e2 <- terra::ext(e[1] - pad * r, e[2] + pad * r, e[3] - pad * r, e[4] + pad * r)
+    list(from = terra::crop(rasters[["2017"]], e2), to = terra::crop(rasters[["2023"]], e2),
+         cat = terra::crop(category, e2), geom = geom["patch_id"])
+  })
+  names(crops) <- names(ids)
+
+  prov <- do.call(rbind, lapply(names(ids), function(nm) {
+    d <- tg[tg$patch_id == ids[[nm]], ]
+    data.frame(setting = nm, patch_id = d$patch_id, transition = d$transition,
+               area_ha = round(d$area_ha, 3), width_px = round(d$width_px, 2),
+               boundary_frac = round(d$boundary_frac, 3),
+               dist_water_m = round(d$dist_water_m, 1),
+               n_candidates = if (nm == "water") nrow(wet) else nrow(dry),
+               rule = paste("flag_sliver, 0.2-0.6 ha,",
+                            if (nm == "water") "mean distance to permanent water <= 15 m and Water in the transition"
+                            else "mean distance to permanent water >= 200 m, no Water in the transition, flag_boundary",
+                            "-- median-area candidate, ties to the lower patch_id"),
+               # bare EPSG code, matching bulk_window.csv -- one column name in
+               # two shipped files must not carry two formats
+               crs = as.integer(terra::crs(res$raster, describe = TRUE)$code),
+               terra = as.character(utils::packageVersion("terra")),
+               drift = as.character(utils::packageVersion("drift")),
+               date = format(Sys.Date()))
+  }))
+  stopifnot(is.integer(prov$crs), !anyNA(prov$crs))
+  utils::write.csv(prov, file.path(art_dir, "bulk_slivers.csv"), row.names = FALSE)
+  print(prov[c("setting", "patch_id", "transition", "area_ha", "width_px", "dist_water_m")])
+
+  art <- lapply(crops, function(x) list(from = terra::wrap(x$from), to = terra::wrap(x$to),
+                                        cat = terra::wrap(x$cat), geom = x$geom))
+  out_rds <- file.path(art_dir, "bulk_slivers.rds")
+  tmp_rds <- tempfile(fileext = ".rds")
+  saveRDS(art, tmp_rds, compress = "xz")
+  if (file.size(tmp_rds) > 300e3) {
+    stop("sliver artifact is ", round(file.size(tmp_rds) / 1024), " KB, over the 300 KB budget")
+  }
+  if (!file.copy(tmp_rds, out_rds, overwrite = TRUE)) stop("could not write ", out_rds)
+  message("wrote ", out_rds, " (", round(file.size(out_rds) / 1024), " KB)")
+
   message("ALL STAGES DONE")
   quit(save = "no", status = 0)
 }
