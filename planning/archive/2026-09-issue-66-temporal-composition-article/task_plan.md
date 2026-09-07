@@ -69,14 +69,14 @@ drift — so that a quoted hectare figure is read with the right error bar.
 ## Phase 6: Cross-links, bookkeeping, PR
 
 - [x] Link from `inst/notes/temporal-qa-groups.md` above line 81
-- [ ] Link from #64, #46, stac_floodplains_bc#67
+- [x] Link from #64, #46, stac_floodplains_bc#67
 - [x] Reconcile issue #66 body (#67 closed; 2,050.4 ha confirmed derivable)
 - [x] `NEWS.md`; `DESCRIPTION` -> 0.15.0 as the final commit
-- [ ] `/planning-archive`; `/gh-pr-push`
+- [x] `/planning-archive`; `/gh-pr-push`
 
 ## Validation
 
 - [x] Tests pass
 - [x] `/code-check` clean on each commit
 - [x] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion
+- [x] `/planning-archive` on completion
