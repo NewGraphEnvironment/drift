@@ -455,6 +455,43 @@ prevented it.
 - Applies to every replacement form — `attr<-`, `[[<-`, `dim<-`, `st_crs<-`. If
   the left side has two calls, one of them has to move to its own line.
 
+### A replacement function on an `xml_missing` node is a silent no-op
+
+`xml2::xml_find_first()` returns an `xml_missing` object when nothing matches — not
+`NULL`, not an error. Assigning through it does nothing at all, quietly:
+
+```r
+d <- xml2::read_xml("<a><b>x</b></a>")
+m <- xml2::xml_find_first(d, "./nope")
+class(m)                    #> "xml_missing"
+xml2::xml_text(m) <- "z"    #> no error, no warning, document unchanged
+```
+
+It bites hardest in a **test fixture**, where the mutation is the whole premise. A test
+that plants a duplicate by renaming a node, then asserts the code refuses the duplicate,
+keeps passing once the xpath stops matching — it now asserts a refusal that cannot
+happen, and reports a pass. The trigger is ordinary: the fixture is a shipped artifact
+and something renames a layer in it.
+
+Guard the node before assigning, in fixtures as well as in production code:
+
+```r
+ml <- xml2::xml_find_first(doc, "./projectlayers/maplayer[layername='X']")
+expect_false(inherits(ml, "xml_missing"))        # or stop() outside a test
+```
+
+And assert the mutation **took** — count the thing you just created (`expect_identical(sum(nm == "X"), 2L)`)
+rather than trusting the write. Same family as "A fixture that cannot reach the failure
+mode" in `code-check.md`, arriving through a silent write rather than through the data.
+
+Sibling reads are equally quiet and fail toward *pass*: `xml_find_all()` on an
+`xml_missing` returns a length-0 nodeset, `xml_attr()` of that is `character(0)`, and
+`any(character(0) %in% x)` is `FALSE` — so an assertion of the form *"the output must not
+contain Y"* is satisfied by no output having been written at all. Pin the premise
+(`expect_false(inherits(node, "xml_missing"))`) beside it. Both measured on xml2 1.5.2
+(rfp#293); the read half was found by suppressing the writer entirely and watching the
+test stay green.
+
 ### `download.file(quiet = TRUE)` never tells you the HTTP status — read it from `curl`
 
 `utils::download.file(method = "libcurl")` sets `CURLOPT_FAILONERROR`, so on a 4xx with a
@@ -1397,6 +1434,184 @@ planted <- function(image = "forbidden") NULL
 expect_true(grepl("forbidden", paste(deparse(planted), collapse = "\n"), fixed = TRUE))
 expect_false(grepl("forbidden", paste(deparse(body(planted)), collapse = "\n"), fixed = TRUE))
 ```
+
+
+### `tryCatch(warning = )` DISCARDS the value the expression produced
+
+A `warning =` handler is not a filter — it replaces the whole expression, so a call that
+**succeeded** and merely warned returns the handler's value and the result is thrown away.
+The entry above covers a `warning =` that unwinds too early to see a status; this is the
+opposite direction, and it is worse because the call worked.
+
+`read.table` is the routine way to meet it. It warns `incomplete final line found by
+readTableHeader` whenever a small file has no trailing newline and `readTableHead` reaches
+EOF, so a table that parsed perfectly is refused:
+
+```r
+d <- tryCatch(read.csv(path),
+              error   = function(e) structure(list(), msg = conditionMessage(e)),
+              warning = function(w) structure(list(), msg = conditionMessage(w)))  # WRONG
+# 1-4 data rows, no trailing newline -> refused as "could not be parsed"
+# 5+ data rows                       -> parses
+d <- tryCatch(suppressWarnings(read.csv(path)),                                    # right
+              error = function(e) structure(list(), msg = conditionMessage(e)))
+```
+
+The row-count threshold is what makes it invisible: measured on R 4.5, files of 1-4 data
+rows were refused and 5+ parsed. Any fixture of a realistic size passes, and a small real
+input — a 3-frame archive, a 2-row config — fails in production.
+
+**Suppress the warnings you do not want; never handle them, unless the warning genuinely
+means the value is unusable.** And note the two are separable: a binary file read through
+`read.csv` warns about embedded nulls *and* returns a garbage frame, which the next
+validation step rejects on its own. Letting it through the parse loses nothing.
+
+Caught 2026-09-06 in fly#50 (review round 4), inside the fix for a different instance of
+the same mechanism — two states given one representation while the fact that separates
+them (`d` *is* a data.frame) sits computed and unread.
+
+### `match()` treats NA as a matchable VALUE, so two unknowns join to each other
+
+`match(NA, c("1", NA))` is **2**. So an `NA` on the left matches an `NA` on the right, and
+a lookup keyed on a column that may be blank silently attributes one record's data to
+another:
+
+```r
+m <- match(id_frame, tab$id)   # id_frame all-NA (the caller has no such column)
+                               # tab$id has one NA (the source left it blank)
+                               # -> every unmatched record gets that row
+```
+
+It fails toward a **confident wrong answer** rather than a miss, and downstream code has
+no way to tell. Guard both sides explicitly — the left because the caller may not carry
+the key at all, the right because the source may leave it blank:
+
+```r
+m <- match(a, b)
+m[is.na(a) | is.na(b[m])] <- NA_integer_
+```
+
+**And a key built with `paste0()` defeats the guard before it runs.** `paste0("r_", NA)`
+is the three-character string `"r_NA"`, so both sides become a real value that matches:
+by the time `match()` sees it there is no `NA` left to test. Return `NA_character_` from
+the key builder instead, and then guard the `match()` as above — the two fixes are not
+alternatives, they close the same hole one step apart.
+
+```r
+key <- function(a, b) { out <- paste0(a, "_", b); out[is.na(a) | is.na(b)] <- NA_character_; out }
+```
+
+Worst form: an identifier scheme the parser cannot read at all — an alphanumeric frame
+number where an integer was assumed — collapses *every* record onto one key on both sides.
+
+Measured 2026-09-06 in fly#50: a photo frame present in no source file was handed another
+frame's camera, with the "this was resolved exactly" flag set. Same family as
+`nzchar(NA)` being `TRUE` above — a value meaning "absent" that a predicate reads as
+present.
+
+### `expect_message(expr, regexp)` checks only the FIRST condition, so a progress line hides the message under test
+
+testthat 3e captures the first message the expression emits and matches the regexp
+against **that one**. A function that prints progress before the thing you are asserting
+therefore fails the expectation, and the real message escapes to the console — where you
+can see it, printed a few lines above a failure saying no such message was thrown. The
+output contradicts the verdict, which sends you looking at the function rather than at
+the assertion.
+
+```r
+expect_message(f(x), "could not be unpacked")   # f() prints "Downloaded 1 of 1 files" first
+#> Error: `f(x)` did not throw the expected message.
+#> (and the expected message is right there in the console output)
+
+expect_true(any(grepl("could not be unpacked", testthat::capture_messages(f(x)))))   # right
+```
+
+`capture_messages()` returns all of them and the assertion says what it means. Use it for
+anything that emits more than one message, which in practice is anything that reports
+progress. Caught 2026-09-06 in fly#50, where the same call also cost a detour into
+whether a temporary fixture directory was being deleted early — it was not.
+
+### `pak` refuses to install a package that needs no compiler
+
+`pak::pak()` routes through `pkgbuild::check_build_tools()`, which fails with *"Could
+not find tools necessary to compile a package"* whenever `xcode-select -p` points at
+`/Applications/Xcode.app/...` while the Command Line Tools are what is actually
+installed — **regardless of whether the package has any compiled code**. Measured
+2026-09-07 on macOS: a pure-R package with no `src/` and no `NeedsCompilation` field
+was refused, and the same source installed in seconds with
+
+```bash
+R CMD INSTALL ~/Projects/repo/<pkg>
+```
+
+The failure reads as *this package cannot be installed here*, so the reflex is a machine
+change — `sudo xcode-select -s /Library/Developer/CommandLineTools`, which needs a TTY
+and so becomes a hand-over to the user, stalling an unattended run. That fix is correct
+and worth making eventually; it is not a prerequisite for the install in front of you.
+
+- **Check `ls <checkout>/src` before believing the message.** No `src/` and no
+  `NeedsCompilation: yes` means no compiler is required and `R CMD INSTALL` is the route.
+- **Install from a checkout only when it is clean and level with origin.** It installs
+  the working tree, so a peer repo mid-edit ships someone's half-finished state — the
+  "dirty peer repo" rule in `code-check.md` applied to installation. Assert it:
+  `git -C <checkout> status --porcelain` empty and `git rev-list --count HEAD..origin/main`
+  zero. Otherwise install from a throwaway clone of the default branch.
+- **`R CMD INSTALL` still prints `xcode-select: Failed to locate 'otool'`** on such a
+  host and completes anyway. Gate on the final `* DONE (<pkg>)` and on
+  `packageVersion()`, not on the absence of warnings.
+- **Verify the thing you came for, not the version number.** The reason to reinstall is
+  usually one behaviour; assert it directly — `"names_used" %in% names(formals(pkg:::.fn))`
+  — since a stale build can carry a bumped `DESCRIPTION`.
+### `as.integer("NaN")` is `0`, and `as.integer(NaN)` is `NA`
+
+The string round trip is the bug. Measured on R 4.5.2:
+
+```r
+as.character(NaN)                #> "NaN"
+as.integer("NaN")                #> 0        <- no warning
+as.numeric("NaN")                #> NaN
+as.integer(NaN)                  #> NA
+as.integer(as.numeric("NaN"))    #> NA
+```
+
+So `as.integer(as.character(x))` turns a **missing** value into a legitimate, in-range
+one — silently, and `0` is a value most integer codings already use for something.
+
+**`terra::crosstab(long = TRUE, useNA = TRUE)` is where this arrives**, because it
+returns *numeric* columns carrying `NaN` for the group that has no value (`code-check-spatial.md`,
+"`zonal()` outside its six-function fast path"). Measured 2026-09-07 in drift#72: a
+committed `summary_strength.csv` published `strength = 0` for three categories that have
+no strength at all, against a documented `NA` contract, and the two `!anyNA()` guards
+under it could not fire. Worse in a sibling script, where the same idiom indexed a label
+vector — `levels[as.integer(as.character(category)) + 1L]` — so a `NaN` category became
+index 1, which was **`stable`**: a pixel that could not be scanned would have been
+compared as a stable one, and that is precisely what a guard a dozen lines below existed
+to refuse.
+
+Coerce the numeric column directly. Where the code must go through a string, route via
+`as.numeric()` first, which preserves `NaN`.
+
+**This does not contradict the `addNA()` remedy above**, and the two are easy to
+conflate. There the input is a *factor* whose NA level stringifies to `NA_character_`, and
+`as.integer(as.character(...))` correctly yields `NA_integer_`. Here the input is a
+*numeric* carrying `NaN`, which stringifies to `"NaN"` — a three-character string that
+parses as a number nowhere and coerces to zero. Same idiom, opposite outcome, decided by
+the input's type. Check which one you have before reaching for it.
+
+Two habits, since neither a test nor a reviewer found this — reading a committed number
+and asking what it meant did:
+
+- **`is.numeric()` before the coercion**, as a premise. It costs one line and it is what
+  separates the two cases above.
+- **Read a published table against its own documented contract.** A column documented as
+  `NA` off some branch, showing `0` on every row of that branch, is the whole tell — and
+  it survives any number of green runs, because `0` is in range.
+
+Related, same session and same `crosstab()` output: **`df[cond, ]` where `cond` holds an
+`NA` returns an all-`NA` ROW** rather than dropping it. So `st[st$label == "x", ]$strength`
+came back `c(2, 3, NA)` and `all(c(2, 3, NA) >= 2)` was `NA`, failing a `stopifnot` on
+entirely correct data — which reads as a bug in the code under test rather than in the
+assertion. Use `%in%` for the subset, and assert `!anyNA()` on what it returns.
 
 
 # Code Check — Shell
@@ -3228,6 +3443,7 @@ not by a reviewer saying you have converged: the class recurs one axis over, and
 | 2026-09-05 | rtj#293 | **A guard outlives the upstream behaviour it was written against, and its continued refusing reads as correctness** — a refresh driver refused to run whenever the project root held a `.geojson`, then deleted every one after its passes, because an upstream script ran `rm -f *.geojson` there. That script had since been removed upstream and the intermediate moved to a `tempfile()` workdir, so **the only thing deleting those files was the guard's own sibling cleanup** — a matched pair defending nothing. Nothing signals this: a guard that refuses looks exactly as correct on its last day as its first, and here it blocked the work on three of four projects and sent the design toward a keep-list nobody needed. **Five documents asserted the dead premise** — two READMEs, a CLAUDE.md, an ops doc and two code comments — which is the shared-ancestor problem in `karpathy.md` with the guard itself as the loudest witness. Before designing around a constraint a guard encodes, **read the upstream that imposed it**, not the guard or the prose describing it; a one-line `grep` for the script named in the comment ended it. Sibling of the vendored-witness row: there the copy went stale, here the *world* moved and the guard did not |
 | 2026-09-06 | rtj#285 | **A guard that returns the offenders and lets the caller build the complement will have the complement built wrong, on the branch that fires** — a `.qml` check correctly scoped to a split-layer directory returned only the offenders; the call site then captioned *every* `.qml` on the server as "elsewhere, untouched by the split" and `basename()`-stripped it, so the one offending file printed indistinguishably from a benign root sidecar precisely when the guard FAILED. The helper was right, and the seven tests written with it all drove the helper in isolation, so restoring the defect left them green. "Write the partition down beside the guard" (the stac_floodplains_bc#26 row above) is not enough when the guard hands back half of it: **return the partition** — `list(bad, other)` — so "the halves are disjoint and together cover everything" becomes a property a test holds rather than a convention the call site has to remember; the three assertions written that way fail on the old composition and the helper-only ones do not. The original scope was itself the coincidence this mechanism names: the check passed only because the single project it had ever run against carried no `.qml` anywhere, while the other three carried 7, 3 and 4 |
 | 2026-09-06 | rtj#298 | **A guard against a silent drop must be keyed to the OUTCOME, not to the flag that caused it** — the conjunction of the row above and the rfp#243 row, and it cost three review rounds on one PR. A refresh driver gained `--only=` and `--types=`; `--add=` combined with `--only=` silently dropped the added layer, so a guard was written as `setdiff(add, only)`. It closed `--only` and left `--types` wide open — the types branch zeroes a non-matching type's refresh AND add, so `--add=<aws layer> --types=bcdata` refreshed 29 layers and dropped the requested one without a word (measured live). A per-flag rule has to be re-derived for every narrowing flag, and the third one misses again; `setdiff(add, kept)` — *did what was asked for survive?* — cannot, whatever narrows the run. **And the tests could not see either version.** The one written for it drove the validator directly, which has no type information, so it passed trivially; then deleting the **call site** left all 86 checks green, because every assertion drove the extracted helper. Two things closed that: a structural assertion that the driver still calls its extracted decision (`grepl("check_adds_survived", deparse(plan_refresh))` — weak, but it always runs and catches the deletion that happened), and an end-to-end arm through the driver against a real project, reported as SKIPPED rather than passed when absent. Both end-to-end arms then failed on the *good* file — **including the positive control**, which is what said it was the harness and not the guard: a sourced dependency was missing. With only the negative arm it would have read as the guard being broken |
+| 2026-09-06 | rfp#293 | **A remedy is a claim about a second system, so fixing it in one message leaves it standing in every sibling — and correcting one made a function contradict itself.** Four functions refused when a layer name did not identify one layer, all ending in some spelling of *"resolve via `rfp_qgs_rename()`"*. None could: that function renames **every** copy, so the name asked for survives on none — `Duplicate layer names in source` becomes `Layer(s) not found in source`, and the theme writer writes **four themes without the basemap they name** while reporting them added, a bigger number that reads as success. Review round 2 corrected the `stop()`; round 3 found the same remedy in the roxygen ten lines away, which is where a user actually looks; round 4 found it in three sibling messages, one of them now contradicting its own docs. **Fixing instances is what kept it alive for four rounds.** The remedy is structural — one internal constant holding the sentence, plus a test asserting each caller reaches it and carries no copy of the old wording, proven by reverting each site — and it generalises past error messages: the same unexecuted-claim class lives in roxygen, code comments, test comments claiming what a test pins, and CLAUDE.md. **Terminate by enumerating the claims, not by another round**: list every statement the diff makes about behaviour elsewhere, by the place it lives, and execute each. Eighteen rows the first time, of which the single row marked "read" rather than "measured" was the one that was wrong |
 
 ### A fix lands in one of two callers that share a harness
 
