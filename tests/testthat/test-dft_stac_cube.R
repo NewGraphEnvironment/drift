@@ -711,3 +711,21 @@ test_that("cache_write_atomic moves a terra .aux.json sidecar with the raster", 
   # the sidecar, when the driver writes one, sits under the canonical name
   expect_true(all(files %in% c("entry.tif", "entry.tif.aux.json", "entry.tif.aux.xml")))
 })
+
+test_that("stac_query_geometry sends the union below the vertex limit and a hull above", {
+  # Planetary Computer returns HTTP 413 above ~1 MiB of POST body; BULK's
+  # floodplain (104,584 vertices) could not be queried at all (#79).
+  aoi <- sf::st_transform(
+    sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                quiet = TRUE), 4326)
+  u <- sf::st_geometry(sf::st_union(aoi))[[1]]
+  n <- nrow(sf::st_coordinates(u))
+  # below the limit: exactly the union, so existing queries are unchanged
+  expect_identical(drift:::stac_query_geometry(aoi, max_vertices = n), u)
+  # above it: a hull, far smaller, still covering the AOI
+  expect_message(h <- drift:::stac_query_geometry(aoi, max_vertices = n - 1L),
+                 "convex hull")
+  expect_lt(nrow(sf::st_coordinates(h)), n / 10)
+  expect_true(isTRUE(sf::st_covers(sf::st_sfc(h, crs = 4326),
+                                   sf::st_sfc(u, crs = 4326), sparse = FALSE)[1, 1]))
+})

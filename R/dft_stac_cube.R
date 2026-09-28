@@ -399,7 +399,7 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
       # union so a multi-feature AOI queries its whole footprint, matching the
       # cube extent and the terra::mask() clip (a single first-feature geometry
       # would leave silent NoData holes over the other features)
-      intersects = sf::st_geometry(sf::st_union(aoi_wgs84))[[1]],
+      intersects = stac_query_geometry(aoi_wgs84),
       datetime = datetime,
       limit = 500
     ) |>
@@ -446,6 +446,29 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
   list(features = items$features, is_pre = is_pre)
 }
 
+
+#' The geometry sent as a STAC `intersects` query: the AOI union, or its hull
+#'
+#' Planetary Computer rejects a search whose POST body is over about 1 MiB with
+#' HTTP 413 (measured 2026-09-28, #79: accepted at 21,348 vertices / 860 KB of
+#' GeoJSON, rejected at 26,508 / 1.07 MB). A floodplain polygon crosses that
+#' easily; BULK's is 104,584 vertices (4.2 MB), so neither dft_stac_cube() nor
+#' dft_stac_composite() could query it at all. Above `max_vertices` the query
+#' uses the convex hull instead. That is a superset, so no scene over the AOI is
+#' lost; the extra scenes it admits lie outside the AOI, gdalcubes reads only
+#' images overlapping the view, and the output is clipped, so pixels over the AOI
+#' are unchanged. At or below the threshold the query is exactly the union, as
+#' before, so any AOI that could be queried until now gets the same item set.
+#' @noRd
+stac_query_geometry <- function(aoi_wgs84, max_vertices = 20000L) {
+  u <- sf::st_union(aoi_wgs84)
+  n <- nrow(sf::st_coordinates(u))
+  if (n > max_vertices) {
+    message("  AOI has ", n, " vertices; querying its convex hull (STAC body limit)")
+    u <- sf::st_convex_hull(u)
+  }
+  sf::st_geometry(u)[[1]]
+}
 
 #' Assemble a masked cube stack over the AOI, tiled or not
 #'
