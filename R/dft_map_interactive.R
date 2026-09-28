@@ -167,6 +167,8 @@ dft_map_interactive <- function(x = NULL,
     bbox <- raster_bbox_4326(x[[1]])
   } else if (!is.null(rgb) && !rgb_cog) {
     bbox <- raster_bbox_4326(rgb[[1]])
+  } else if (!is.null(transition)) {
+    bbox <- raster_bbox_4326(transition$raster)
   } else {
     bbox <- NULL
   }
@@ -263,19 +265,19 @@ dft_map_interactive <- function(x = NULL,
       title = "Land Cover",
       opacity = 1
     )
+  }
 
-    # Legend — transitions
-    if (length(trans_groups) > 0) {
-      trans_colors <- attr(trans_result, "colors")
-      map <- leaflet::addLegend(
-        map,
-        position = legend_position,
-        colors = trans_colors,
-        labels = trans_groups,
-        title = "Transitions",
-        opacity = 1
-      )
-    }
+  # Legend — transitions (independent of `x`, which may be NULL)
+  if (!is.null(legend_position) && length(trans_groups) > 0) {
+    trans_colors <- attr(trans_result, "colors")
+    map <- leaflet::addLegend(
+      map,
+      position = legend_position,
+      colors = trans_colors,
+      labels = trans_groups,
+      title = "Transitions",
+      opacity = 1
+    )
   }
 
   # Layer control + fullscreen

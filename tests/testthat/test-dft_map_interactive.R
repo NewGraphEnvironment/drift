@@ -287,3 +287,16 @@ test_that("classified layers are handed to leaflet in EPSG:3857", {
   expect_true(length(crs_seen) > 0)
   expect_true(all(crs_seen == "3857"))
 })
+
+test_that("transitions keep their legend and centre the map when x is NULL", {
+  classified <- load_classified_list()
+  trans <- dft_rast_transition(classified, from = "2017", to = "2023",
+                               from_class = "Trees")
+  map <- dft_map_interactive(transition = trans,
+                             rgb = c(img = "https://b/c.tif"),
+                             titiler_url = "https://ti.example")
+  legends <- map$x$calls[map_methods(map) == "addLegend"]
+  titles <- vapply(legends, function(c) c$args[[1]]$title, character(1))
+  expect_equal(titles, "Transitions")
+  expect_false(is.null(map$x$setView))   # centred from the transition raster
+})

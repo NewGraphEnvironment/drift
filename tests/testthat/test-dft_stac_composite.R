@@ -256,3 +256,30 @@ test_that("a missing gdalcubes names the GitHub install (#80)", {
   expect_error(dft_stac_composite(aoi_pkg(), years = 2023),
                "appelmar/gdalcubes", fixed = TRUE)
 })
+
+test_that("a built composite leaves only its COG in the cache, no sidecar", {
+  # Drives the real build and write path offline: the STAC query and the
+  # gdalcubes assembly are stubbed with a synthetic three-band stack. A time
+  # stamped before a COG write makes terra emit a .aux.json that
+  # cache_write_atomic() does not move, which strands under the temp name.
+  skip_if_not_installed("gdalcubes")
+  aoi <- aoi_pkg()
+  aoi_t <- sf::st_transform(aoi, 32609)
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) list(features = list(), is_pre = logical(0)),
+    stac_cube_assemble = function(...) {
+      r <- terra::rast(terra::ext(aoi_t), resolution = 50, crs = "EPSG:32609",
+                       nlyrs = 3, vals = 0.05)
+      names(r) <- c("blue", "green", "red")   # alphabetical, as terra reads it
+      r
+    }
+  )
+  cache <- tempfile("drift_composite_build_")
+  out <- suppressMessages(dft_stac_composite(aoi, years = 2023, cache_dir = cache))
+  dir <- drift:::cache_scheme_dir(cache, "sentinel-2-l2a")
+  files <- list.files(dir, all.files = TRUE, no.. = TRUE)
+  expect_length(files, 1L)
+  expect_match(files, "^composite_[0-9a-f]{16}\\.tif$")
+  expect_equal(names(out[[1]]), c("red", "green", "blue"))
+  expect_equal(terra::time(out[[1]])[1], as.Date("2023-06-01"))
+})
