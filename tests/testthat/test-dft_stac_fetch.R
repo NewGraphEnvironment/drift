@@ -19,6 +19,22 @@ test_that("auto_utm_epsg handles prime meridian", {
   expect_equal(epsg, "EPSG:32631")
 })
 
+test_that("a missing gdalcubes names the GitHub install, not only CRAN", {
+  # gdalcubes is archived on CRAN (#80), so a bare install offer fails; the
+  # message has to say where it lives now. The tests below skip whenever
+  # gdalcubes is installed, so this simulates its absence through the seam.
+  testthat::local_mocked_bindings(gdalcubes_available = function() FALSE)
+  expect_error(drift:::check_gdalcubes("to fetch STAC rasters"),
+               "appelmar/gdalcubes", fixed = TRUE)
+  expect_error(drift:::check_gdalcubes("to fetch STAC rasters"),
+               "to fetch STAC rasters", fixed = TRUE)
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  expect_error(dft_stac_fetch(aoi, source = "io-lulc", years = 2020),
+               "appelmar/gdalcubes", fixed = TRUE)
+  expect_error(dft_stac_cube(aoi), "appelmar/gdalcubes", fixed = TRUE)
+})
+
 test_that("dft_stac_fetch requires gdalcubes", {
   skip_if(requireNamespace("gdalcubes", quietly = TRUE),
           "gdalcubes is installed, can't test missing-package path")

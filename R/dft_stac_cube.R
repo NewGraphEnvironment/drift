@@ -162,7 +162,7 @@ dft_stac_cube <- function(aoi,
                           cache_dir = NULL,
                           force = FALSE,
                           sign_fn = rstac::sign_planetary_computer()) {
-  rlang::check_installed("gdalcubes", reason = "to fetch STAC cubes")
+  check_gdalcubes("to fetch STAC cubes")
 
   # gdalcubes worker processes for the read. drift never set this before v0.9.0,
   # so every fetch ran single-threaded — not a considered choice, just the
