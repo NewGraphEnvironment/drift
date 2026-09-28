@@ -616,7 +616,7 @@ test_that("dft_stac_fetch tiled result matches untiled over the AOI", {
       cfg$stac_url, cfg$collection, cfg$asset, tile_size = NULL
     )
   )
-  expect_length(list.files(file.path(cache, "io-lulc"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "io-lulc"),
                            pattern = paste0("^2020_", attr(untiled_list, "cache_key"),
                                             "\\.nc$")), 1)
   # small tile_size relative to the AOI bbox → several tiles, most bbox-only
@@ -629,9 +629,9 @@ test_that("dft_stac_fetch tiled result matches untiled over the AOI", {
   expect_s4_class(tiled, "SpatRaster")
   expect_equal(terra::nlyr(tiled), 1L)
   # extension routing: untiled caches a gdalcubes .nc, tiled a terra .tif
-  expect_length(list.files(file.path(cache, "io-lulc"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "io-lulc"),
                            pattern = "^2020_.*\\.nc$"), 1)
-  expect_length(list.files(file.path(cache, "io-lulc"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "io-lulc"),
                            pattern = "^2020_.*\\.tif$"), 1)
   # tiled == untiled over their common in-AOI cells: tiling changes only which
   # bbox pixels are streamed, not the classification. Put the tiled mosaic onto

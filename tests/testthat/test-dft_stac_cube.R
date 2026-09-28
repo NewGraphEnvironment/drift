@@ -401,8 +401,8 @@ test_that("dft_stac_cube fetches an index stack end-to-end", {
   # and coverage is not one surviving pixel. Loose on purpose: cloud masking
   # legitimately removes a lot, so this guards the degenerate case, not quality.
   expect_lt(mean(is.na(vals[inpoly, , drop = FALSE])), 0.9)
-  # second call hits the cache (one cube_<key>.tif under the source dir)
-  expect_length(list.files(file.path(cache, "sentinel-2-l2a"),
+  # the call cached exactly one cube_<key>.tif under the source dir (#48 scheme)
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
                            pattern = "^cube_.*\\.tif$"), 1)
 })
 
@@ -441,7 +441,7 @@ test_that("dft_stac_cube tiled read reproduces the untiled cube over the AOI", {
   expect_equal(terra::nlyr(tiled), terra::nlyr(untiled))   # same monthly axis
   expect_false(anyNA(terra::time(tiled)))                  # time set per layer
   # tiled and untiled each cache one cube_<key>.tif, keyed apart (2 files total)
-  expect_length(list.files(file.path(cache, "sentinel-2-l2a"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
                            pattern = "^cube_.*\\.tif$"), 2)
 
   # the efficiency claim: for this diagonal reach the tiled read streams fewer
