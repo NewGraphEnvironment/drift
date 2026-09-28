@@ -33,3 +33,10 @@
   - Served the widgets on localhost and inspected them in Chrome. Both layers render opaque and register with the Esri basemap. 2023 Aug-Sep reads darker and hazier than 2017 Jun-Jul under the shared stretch. Medians (red, green, blue): 2017 0.030, 0.050, 0.022; 2023 0.036, 0.050, 0.030. One scene seam is visible in 2017.
   - Pre-existing and unrelated: the default "Light" basemap (CartoDB.Positron) now serves "API KEY REQUIRED" tiles.
 - Phase 5 done: re-read #79 (unchanged since the gate), ran the HLS spike (findings.md), filed #82, filed #83 (pre-existing cube-query defects), and edited the #79 body (HLS -> #82, scale pivot, #80 dependency).
+- Code-check (`review-79-round{1,2,3}.md`):
+  - R1: the COG sidecar orphan and the transition legend with x = NULL, both fixed.
+  - R2: **a defect inside the R1 fix.** The NetCDF-read time persisted, and the fixture had no time. Fixed by stripping time and moving `.aux.json` in `cache_write_atomic()`.
+  - R3: the enumeration of every raster write and every stub. No production defect; two test gaps fixed, and the layer-reorder mutant is now killed offline. The loop ended on that enumeration.
+- **BULK chips:** 100 buffered points (300 m), 2023 Jul-Aug, 84.1 min wall. Per chip: median 40.2 s, mean 50.5 s, max 140.9 s. 3,660 cells per chip, a 3.8 MB cache, peak RSS 0.48 GiB. The time is COG reads (the query is about 2 s), so concurrent chips are filed as #85.
+- **BULK floodplain, first attempt:** HTTP 413 in 9 s. The 104,584-vertex floodplain made a 4.2 MB POST body; PC accepts at 860 KB and rejects at 1.07 MB. Pre-existing for `dft_stac_cube()` too. Fixed by querying with the convex hull above 20,000 vertices (fecdae9). The re-run got past the query: 72 items, 30 tiles.
+- Filed #85 (concurrent chips) and soul#281 (report times in Vancouver local).

@@ -64,11 +64,11 @@ Plan-gate decisions (2026-09-28):
 
 ## Phase 6: scale test, docs, release
 
-- [ ] BULK scale test with the RSS sampler. Record wall time and peak RSS for the PR:
+- [x] BULK scale test (chips done; floodplain stage re-running after the 413 fix) with the RSS sampler. Record wall time and peak RSS for the PR:
   - `dft_stac_composite()` on `bulk_co_ff04`, one year, `tile_size` set;
   - a chip run over ~100 scattered buffered points.
   Also note what `dft_map_interactive(rgb=)` does with a floodplain-size local raster (maxBytes), to confirm the doc points to the COG path.
-- [ ] Update NEWS.md, the CLAUDE.md Core Pipeline (the composite call and the chip pattern), and the gotchas note if anything turns up.
+- [ ] Update NEWS.md, the CLAUDE.md Core Pipeline (CLAUDE.md done, 2c30c3c) (the composite call and the chip pattern), and the gotchas note if anything turns up.
 - [ ] Bump the version (minor) as the final commit.
 
 ## Validation
