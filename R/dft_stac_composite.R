@@ -214,7 +214,7 @@ dft_stac_composite <- function(aoi,
         offset = offset, offset_before = offset_before, pixel_fn = pixel_fn,
         tile_size = tile_size
       )
-      composite_layers_check(stk, bands, label, w)
+      stk <- composite_layers_order(stk, bands, label, w)
       if (isTRUE(clip)) stk <- stac_cube_clip(stk, aoi_target)
       cube_check_nonempty(stk, cfg$collection, w$datetime, cached = FALSE)
       stk <- composite_finish(stk, bands, w$t0)
@@ -276,14 +276,15 @@ composite_offset_check <- function(is_pre, label, boundary) {
 }
 
 
-#' Check a composite has one layer per band, in band order
+#' Put a composite's layers in band order, by name, checking there is one per band
 #'
-#' Two ways it can go wrong, both silent downstream: a window and `dt` that
-#' disagree give more than one time step, and a multi-variable NetCDF read back
-#' by terra in an order other than the bands' would put the wrong band in a
-#' channel when the layers are renamed by position.
+#' terra reads a multi-variable gdalcubes NetCDF with its variables in
+#' ALPHABETICAL order (measured: `blue`, `green`, `red` for a true-colour
+#' request), so renaming the layers by position would silently swap red and
+#' blue. Layers are therefore selected by name. A window and `dt` that disagree
+#' would give more than one time step, which is refused too.
 #' @noRd
-composite_layers_check <- function(stk, bands, label, w) {
+composite_layers_order <- function(stk, bands, label, w) {
   if (terra::nlyr(stk) != length(bands)) {
     cli::cli_abort(c(
       "The {label} composite has {terra::nlyr(stk)} layer{?s}; expected \\
@@ -292,13 +293,14 @@ composite_layers_check <- function(stk, bands, label, w) {
              a single time step."
     ))
   }
-  if (!all(startsWith(names(stk), bands))) {
+  idx <- match(bands, names(stk))
+  if (anyNA(idx)) {
     cli::cli_abort(c(
-      "The {label} composite's layers are not in band order.",
+      "The {label} composite's layers do not match its bands.",
       "x" = "Layers: {.val {names(stk)}}; bands: {.val {bands}}."
     ))
   }
-  invisible(TRUE)
+  stk[[idx]]
 }
 
 #' Name a composite's layers by band role and stamp the window start

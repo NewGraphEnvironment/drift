@@ -144,16 +144,20 @@ test_that("a window straddling the offset boundary is refused, not covered", {
   expect_true(drift:::composite_offset_check(c(FALSE, FALSE), "2023 Jan", "2022-01-25"))
 })
 
-test_that("composite_layers_check catches a second time step and a band reorder", {
-  r <- terra::rast(nrows = 2, ncols = 2, nlyrs = 3, vals = 1)
-  names(r) <- c("red", "green", "blue")
-  w <- drift:::composite_window(2017, 6:7)
-  expect_true(drift:::composite_layers_check(r, c("red", "green", "blue"), "x", w))
-  expect_error(drift:::composite_layers_check(c(r, r), c("red", "green", "blue"), "x", w),
-               "expected 3")
+test_that("composite_layers_order selects layers by name, not position", {
+  # terra reads gdalcubes' multi-variable NetCDF alphabetically (measured live:
+  # blue, green, red), so position would swap red and blue.
+  r <- terra::rast(nrows = 2, ncols = 2, nlyrs = 3, vals = 0)
+  terra::values(r) <- cbind(rep(3, 4), rep(2, 4), rep(1, 4))
   names(r) <- c("blue", "green", "red")
-  expect_error(drift:::composite_layers_check(r, c("red", "green", "blue"), "x", w),
-               "not in band order")
+  w <- drift:::composite_window(2017, 6:7)
+  out <- drift:::composite_layers_order(r, c("red", "green", "blue"), "x", w)
+  expect_equal(names(out), c("red", "green", "blue"))
+  expect_equal(unname(unlist(terra::global(out, "max"))), c(1, 2, 3))
+  expect_error(drift:::composite_layers_order(c(r, r), c("red", "green", "blue"), "x", w),
+               "expected 3")
+  expect_error(drift:::composite_layers_order(r, c("nir", "red", "green"), "x", w),
+               "do not match")
 })
 
 test_that("an empty year is dropped with a warning and the others are kept", {

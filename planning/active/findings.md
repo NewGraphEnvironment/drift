@@ -29,7 +29,27 @@ drift already fetches Sentinel-2 L2A cubes (`dft_stac_cube()`, with cloud maskin
 - **floodplains#93:** "for each sample point: a map zoomed to the point, the dated composites as switchable layers". The review runs over whole floodplains, not a reach, which is why this issue has to hold at floodplain scale.
 - The new_graphiti post `2026-01-08-stac-ortho-mosaics` is the starting point: rstac, bbox search, `eo:cloud_cover <= 20`, B04/B03/B02, `dt = P2M`, median, `leafem::addRasterRGB(quantiles = c(0.02, 0.98))`. It has no cloud mask and no offset handling, and stretches each layer on its own.
 
+## HLS spike (Phase 5, probed live 2026-09-28)
+
+Probe scripts are `hls_probe.R`, `hls_read*.R` and `hls_query*.R` in the session scratchpad. The AOI is the packaged Neexdzii Kwa reach, July 2023.
+
+- **Search needs no auth.** `https://cmr.earthdata.nasa.gov/stac/LPCLOUD`, collections `HLSS30_2.0` (Sentinel-2, from 2015-11-28) and `HLSL30_2.0` (Landsat). The reach returned 11 S30 and 7 L30 items for July 2023, tile `T09UXA`.
+- **CMR-STAC is not Planetary Computer, and drift's query shape fails on it in two ways:**
+  - `intersects` returns **HTTP 500** on POST, while `bbox` works on both GET and POST. An HLS source needs a bbox query plus the client-side AOI clip drift already does.
+  - The CQL2 `eo:cloud_cover <= 20` filter is **silently ignored**. It returned covers 3, 19, 21, 29, 41, 55, 69, 73, 75, 88 and 100. The cloud pre-filter has to be client-side.
+- **Reading needs Earthdata Login.**
+  - Assets are under `data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/`. An unauthenticated `/vsicurl/` read returns 404, not 401, which is misleading.
+  - `earthdatalogin::edl_netrc()` with its **built-in default credentials no longer works**: `edl_set_token()` returns HTTP 401, and the netrc read comes back "not recognized as being in a supported file format", which is the login page.
+  - A real Earthdata Login account is required. Passing it via `edl_netrc(username, password)` or `EARTHDATA_USER`/`EARTHDATA_PASSWORD`, which sets `GDAL_HTTP_NETRC_FILE` and the cookie jar, was **not verified end to end**, because no account was available to the session.
+- **Band names differ between the two collections.** Both have `B02`/`B03`/`B04` for blue/green/red. NIR is `B8A` in S30 (the narrow NIR HLS harmonizes on) and `B05` in L30. SWIR16 is `B11` in S30 and `B06` in L30; SWIR22 is `B12` and `B07`. A single "hls" source therefore needs per-collection role maps, or two sources.
+- **Masking.** `Fmask` is a **bit** mask (1 cloud, 2 adjacent cloud, 3 cloud shadow, 4 snow/ice, 5 water; 6-7 aerosol), not SCL class values. `gdalcubes::image_mask()` has `bits =` (args: band, min, max, values, bits, invert), so it is expressible. The source config needs a mask-bits field beside `mask_values`.
+- **Scale.** HLS v2.0 reflectance is scale 1e-4 with no offset, so there is no baseline split.
+
 ## Errors Encountered
 
 | Error | Resolution |
 |-------|------------|
+| Network e2e `expect_length(list.files(file.path(cache, src)))` fails on every run | Since #48 the cache lives under `v2/<source>`. Use `cache_scheme_dir()` (fixed on #80 and here) |
+| The Write tool turned `"\\u2013"` escapes into literal en dashes | Re-escape string literals in code; en dashes in comments are fine (the package already has them) |
+| `format(c(0, 0.3))` gives `"0.0" "0.3"` (common width) | Format per element with `vapply` |
+| Mocking `leaflet::addRasterImage` did not intercept leafem's call | leafem calls it through its own imports; mock with `.package = "leafem"` |
