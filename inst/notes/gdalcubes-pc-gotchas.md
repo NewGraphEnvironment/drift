@@ -10,6 +10,12 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
 (`8bad203`), which is 0.7.4 plus the `filter_geom` segfault fix — with terra
 1.9.34. Each bullet says which.
 
+**Where gdalcubes comes from now (#80, 2026-09-28).** gdalcubes was archived on
+CRAN on 2026-09-16. drift lists `appelmar/gdalcubes` in `Remotes:` with no suffix,
+and upstream master (0.7.5, `ed68331`) has merged the `filter_geom` fix (their
+PR #111), so the `NewGraphEnvironment/gdalcubes@newgraph` fork is no longer needed.
+Do not install the fork over 0.7.5.
+
 - **`gdalcubes::filter_geom()` is not worth using — now for measured reasons, not
   because it crashes (#47).** The original defect was a segfault in the compute
   worker (`gc_exec_worker`, `address 0x120`) or, intermittently, a silent all-NA
