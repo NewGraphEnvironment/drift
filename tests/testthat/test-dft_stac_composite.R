@@ -217,9 +217,12 @@ test_that("dft_stac_composite returns a cached, cloud-masked true-colour COG", {
   expect_lt(stats::median(v, na.rm = TRUE), 0.3)
   expect_gt(stats::median(v, na.rm = TRUE), 0)
 
-  f <- list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
-                  pattern = "^composite_.*\\.tif$", full.names = TRUE)
-  expect_length(f, 1)
+  # every file, not a .tif pattern: a sidecar beside the COG must show up here
+  all_files <- list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
+                          all.files = TRUE, no.. = TRUE)
+  expect_length(all_files, 1)
+  expect_match(all_files, "^composite_[0-9a-f]{16}\\.tif$")
+  f <- file.path(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"), all_files)
   # A COG by its layout, not by an exit status: GDAL reports the layout in the
   # image structure metadata only for a file written as a COG.
   info <- paste(sf::gdal_utils("info", f, quiet = TRUE), collapse = "\n")
@@ -269,7 +272,11 @@ test_that("a built composite leaves only its COG in the cache, no sidecar", {
     stac_cube_items = function(...) list(features = list(), is_pre = logical(0)),
     stac_cube_assemble = function(...) {
       r <- terra::rast(terra::ext(aoi_t), resolution = 50, crs = "EPSG:32609",
-                       nlyrs = 3, vals = 0.05)
+                       nlyrs = 3)
+      # distinct per band, so a build that renamed by position instead of
+      # reordering by name would put 0.02 in red (code-check round 3)
+      terra::values(r) <- matrix(rep(c(0.02, 0.05, 0.1), each = terra::ncell(r)),
+                                 ncol = 3)
       names(r) <- c("blue", "green", "red")   # alphabetical, as terra reads it
       # and with a time, as terra reads the gdalcubes NetCDF: a fixture without
       # one cannot reach the sidecar (code-check round 2)
@@ -284,5 +291,7 @@ test_that("a built composite leaves only its COG in the cache, no sidecar", {
   expect_length(files, 1L)
   expect_match(files, "^composite_[0-9a-f]{16}\\.tif$")
   expect_equal(names(out[[1]]), c("red", "green", "blue"))
+  expect_equal(unname(unlist(terra::global(out[[1]], "max"))), c(0.1, 0.05, 0.02),
+               tolerance = 1e-6)
   expect_equal(terra::time(out[[1]])[1], as.Date("2023-06-01"))
 })

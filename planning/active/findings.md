@@ -45,6 +45,14 @@ Probe scripts are `hls_probe.R`, `hls_read*.R` and `hls_query*.R` in the session
 - **Masking.** `Fmask` is a **bit** mask (1 cloud, 2 adjacent cloud, 3 cloud shadow, 4 snow/ice, 5 water; 6-7 aerosol), not SCL class values. `gdalcubes::image_mask()` has `bits =` (args: band, min, max, values, bits, invert), so it is expressible. The source config needs a mask-bits field beside `mask_values`.
 - **Scale.** HLS v2.0 reflectance is scale 1e-4 with no offset, so there is no baseline split.
 
+## Per-chip cost (measured 2026-09-28, BULK, 2023 Jul-Aug)
+
+- The chips benchmark is about 52 s per chip. Three chips were split by stage while that benchmark was also streaming, so the times are contended:
+  - `stac_cube_items()` takes 1.4-2.5 s and returns 16 items;
+  - the full composite takes 39-95 s.
+- The query is not the cost; the COG reads are: 16 scenes × 4 assets (B04/B03/B02/SCL), about 64 remote opens and block reads for a 600 m chip. Sharing one STAC query across chips would save about 2 s of about 50.
+- What would help is running chips **concurrently**. That means PSOCK workers, not forks: `mclapply` over a remote raster aborts every fork on macOS (`code-check-spatial.md`). Left as a follow-up; a floodplains#93 pilot of ~180 points × 2-3 windows is several hours serially.
+
 ## Errors Encountered
 
 | Error | Resolution |
