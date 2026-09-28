@@ -74,6 +74,17 @@ breaks <- dft_rast_break(cube, start = c(2022, 1))   # abrupt change, dated (BFA
 trend  <- dft_rast_trend(cube)                        # gradual change (Theil-Sen slope + Mann-Kendall)
 ```
 
+Dated reference imagery (#79): per-year median reflectance composites on the same read path as
+the cube. They are cached as COGs and drawn beneath the land cover with one stretch shared across years:
+
+```r
+tc <- dft_stac_composite(aoi, years = c(2017, 2023), months = 6:7)   # true colour; bands = roles
+dft_map_interactive(classified, aoi = aoi, rgb = tc)                 # or rgb = COG URLs via titiler
+# sample points: ONE CALL PER BUFFERED POINT (small, separately cached chips).
+# All points in one aoi spans the floodplain bbox under one cache key.
+chips <- lapply(seq_len(nrow(buf)), \(i) dft_stac_composite(buf[i, ], years = 2023))
+```
+
 ## Key Patterns
 
 - **Dual-mode maps:** `dft_map_interactive()` uses `addRasterImage()` for local SpatRasters, `addTiles()` via titiler for remote COGs
