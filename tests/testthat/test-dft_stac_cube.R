@@ -691,3 +691,23 @@ test_that("dft_stac_cube computes its cache key from its own arguments (call sit
                                         cache_dir = cache))
   expect_equal(terra::nlyr(out), 2)
 })
+
+test_that("cache_write_atomic moves a terra .aux.json sidecar with the raster", {
+  # A COG written from a raster that carries a time (or units, metags...) gets a
+  # terra .aux.json; only .aux.xml used to be moved, so the json was stranded
+  # under the temp name on every write (#79).
+  dir <- tempfile("drift_sidecar_")
+  dir.create(dir)
+  r <- terra::rast(nrows = 4, ncols = 4, nlyrs = 2, vals = 1,
+                   crs = "EPSG:32609", extent = c(0, 40, 0, 40))
+  terra::time(r) <- as.Date(c("2023-06-01", "2023-07-01"))
+  path <- file.path(dir, "entry.tif")
+  drift:::cache_write_atomic(path, function(out) {
+    terra::writeRaster(r, out, filetype = "COG")
+  })
+  files <- sort(list.files(dir, all.files = TRUE, no.. = TRUE))
+  expect_false(any(grepl("tmp", files)))
+  expect_true("entry.tif" %in% files)
+  # the sidecar, when the driver writes one, sits under the canonical name
+  expect_true(all(files %in% c("entry.tif", "entry.tif.aux.json", "entry.tif.aux.xml")))
+})

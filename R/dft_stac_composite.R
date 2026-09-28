@@ -217,11 +217,13 @@ dft_stac_composite <- function(aoi,
       stk <- composite_layers_order(stk, bands, label, w)
       if (isTRUE(clip)) stk <- stac_cube_clip(stk, aoi_target)
       cube_check_nonempty(stk, cfg$collection, w$datetime, cached = FALSE)
-      # Names only, NOT time, before the write: a raster carrying a time makes
-      # terra's COG writer emit a `.aux.json` sidecar, which cache_write_atomic()
-      # does not move, so it would be stranded under the temp name on every build.
-      # The time is stamped on the re-read below, as it is on a cache hit.
+      # Names, and NO time, before the write. The stack arrives carrying a time
+      # read from the gdalcubes NetCDF, and a raster with a time makes terra's
+      # COG writer emit a `.aux.json` sidecar: an extra file beside a COG that is
+      # meant to be publishable on its own. The time is stamped on the re-read
+      # below, as it is on a cache hit.
       names(stk) <- bands
+      terra::time(stk) <- NULL
       cache_write_atomic(cache_file, function(path) {
         terra::writeRaster(
           stk, path, filetype = "COG", datatype = "FLT4S", overwrite = TRUE,

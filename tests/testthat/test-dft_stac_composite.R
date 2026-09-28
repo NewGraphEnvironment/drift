@@ -271,6 +271,9 @@ test_that("a built composite leaves only its COG in the cache, no sidecar", {
       r <- terra::rast(terra::ext(aoi_t), resolution = 50, crs = "EPSG:32609",
                        nlyrs = 3, vals = 0.05)
       names(r) <- c("blue", "green", "red")   # alphabetical, as terra reads it
+      # and with a time, as terra reads the gdalcubes NetCDF: a fixture without
+      # one cannot reach the sidecar (code-check round 2)
+      terra::time(r) <- rep(as.Date("1970-01-01"), 3)
       r
     }
   )
