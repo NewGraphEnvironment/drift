@@ -29,25 +29,25 @@ Plan-gate decisions (2026-09-28):
 
 ## Phase 3: `dft_stac_composite()`
 
-- [ ] `R/dft_stac_composite.R` with this signature: `aoi, years, months = 6:7, bands = c("red","green","blue"), source = "sentinel-2-l2a", res = 10, crs = NULL, aggregation = "median", resampling = "bilinear", clip = TRUE, cloud_cover_max = 20, mask_values = NULL, tile_size = NULL, parallel = NULL, cache_dir = NULL, force = FALSE, sign_fn = rstac::sign_planetary_computer()`. `bands` takes any roles and any number of them. The map needs exactly 3.
-- [ ] Each year gets one window: `t0` = 1st of `min(months)`, `t1` = end of `max(months)`, `dt = P{span}M`. Items are filtered to `months`. The result is one time step: a median, cloud-masked **reflectance** stack (scale/offset per band via `scale_token()`) with layers named by role.
-- [ ] Return a named list labelled like `"2017 Jun–Jul"`. A single year returns a length-1 list.
-- [ ] The cache is `<source>/composite_<key>.tif`, **written as a COG** (`filetype = "COG"`) so the cached file can go to S3 and titiler unchanged. It is written through `cache_write_atomic()`, and read back only after `cache_hit_ok()` and the non-empty check pass. `stac_composite_cache_key()` covers geometry, res, crs, bands (resolved assets, order-sensitive), months (sorted), year window, cloud_cover_max, mask_values, scale/offset, clip and tile_size.
-- [ ] **Per-point chips.** A documented example and a test show the chip path: `aoi` = sample points buffered to polygons, `tile_size` set. Through `tile_grid()` only tiles that intersect the points stream. An offline test on the grid confirms scattered buffered points select a small share of tiles.
-- [ ] Validation: an unknown band role errors with the available roles; empty `years`/`months` or months outside 1–12 abort; a non-cube source aborts.
-- [ ] Tests (offline): key determinism and sensitivity; labels (range, single month, non-contiguous); window derivation, including February's end in a leap year; validation; the pixel expression. One network e2e on the packaged AOI: 3 bands, plausible reflectance, a valid COG (`gdalinfo` layout, not an exit code), cached on the second call.
-- [ ] Roxygen with true-colour and false-colour (`c("nir","red","green")`) examples. Run `devtools::document()` and `pkgdown::check_pkgdown()`.
+- [x] `R/dft_stac_composite.R` with this signature: `aoi, years, months = 6:7, bands = c("red","green","blue"), source = "sentinel-2-l2a", res = 10, crs = NULL, aggregation = "median", resampling = "bilinear", clip = TRUE, cloud_cover_max = 20, mask_values = NULL, tile_size = NULL, parallel = NULL, cache_dir = NULL, force = FALSE, sign_fn = rstac::sign_planetary_computer()`. `bands` takes any roles and any number of them. The map needs exactly 3.
+- [x] Each year gets one window: `t0` = 1st of `min(months)`, `t1` = end of `max(months)`, `dt = P{span}M`. Items are filtered to `months`. The result is one time step: a median, cloud-masked **reflectance** stack (scale/offset per band via `scale_token()`) with layers named by role.
+- [x] Return a named list labelled like `"2017 Jun–Jul"`. A single year returns a length-1 list.
+- [x] The cache is `<source>/composite_<key>.tif`, **written as a COG** (`filetype = "COG"`) so the cached file can go to S3 and titiler unchanged. It is written through `cache_write_atomic()`, and read back only after `cache_hit_ok()` and the non-empty check pass. `stac_composite_cache_key()` covers geometry, res, crs, bands (resolved assets, order-sensitive), months (sorted), year window, cloud_cover_max, mask_values, scale/offset, clip and tile_size.
+- [x] **Per-point chips.** *(Revised after the plan review, G1: one `aoi` of buffered points plus `tile_size` gives a floodplain-sized, mostly-NA mosaic under a single cache key. The chip contract is now one call per buffered point, so each chip is small and cached separately. It is documented in the roxygen chips section with an example. The tile-count test was dropped because the claim it tested no longer holds.)*
+- [x] Validation: an unknown band role errors with the available roles; empty `years`/`months` or months outside 1–12 abort; a non-cube source aborts.
+- [x] Tests (offline): key determinism and sensitivity; labels (range, single month, non-contiguous); window derivation, including February's end in a leap year; validation; the pixel expression. One network e2e on the packaged AOI: 3 bands, plausible reflectance, a valid COG (`gdalinfo` layout, not an exit code), cached on the second call.
+- [x] Roxygen with true-colour and false-colour (`c("nir","red","green")`) examples. Run `devtools::document()` and `pkgdown::check_pkgdown()`.
 
 ## Phase 4: RGB layers in `dft_map_interactive()`
 
-- [ ] New `rgb = NULL` argument: a named list of 3-band SpatRasters **or** a named character vector of COG URLs. That mirrors `x`'s dual mode.
+- [x] New `rgb = NULL` argument: a named list of 3-band SpatRasters **or** a named character vector of COG URLs. That mirrors `x`'s dual mode.
   - Local: `leafem::addRasterRGB()`. leafem is already in Suggests; call `check_installed()` only when it is used.
   - COG: a titiler URL with `bidx=1&bidx=2&bidx=3&rescale=…`, built by a sibling of `build_titiler_url()`.
-- [ ] Every RGB layer gets **one shared stretch**, so a brightness difference between years is real:
+- [x] Every RGB layer gets **one shared stretch**, so a brightness difference between years is real:
   - local mode uses a pooled 2–98% `domain` across all composites;
   - COG mode uses an `rgb_rescale` argument, defaulting to a documented reflectance range.
-- [ ] RGB groups are switchable overlays beneath the classified and transition layers. The first is visible when `x` is `NULL`, and they are hidden otherwise. `x` may be `NULL` when `rgb` is given. Centring and legends handle that case.
-- [ ] Tests: synthetic 3-band rasters; groups in the layer control; `x = NULL`; no land-cover legend without `x`; a non-3-band layer errors by name; the shared domain is applied; the COG URL has 3 `bidx` and the shared rescale, is percent-encoded, and errors without `titiler_url`.
+- [x] RGB groups are switchable overlays beneath the classified and transition layers. The first is visible when `x` is `NULL`, and they are hidden otherwise. `x` may be `NULL` when `rgb` is given. Centring and legends handle that case.
+- [x] Tests: synthetic 3-band rasters; groups in the layer control; `x = NULL`; no land-cover legend without `x`; a non-3-band layer errors by name; the shared domain is applied; the COG URL has 3 `bidx` and the shared rescale, is percent-encoded, and errors without `titiler_url`.
 - [ ] Live check: 2017 Jun–Jul and 2023 Aug–Sep on the packaged AOI over Esri/Google. Save the widget, view it in the browser, and run the cartography self-review on the screenshot.
 
 ## Phase 5: HLS spike → own issue; reconcile #79
