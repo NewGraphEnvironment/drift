@@ -715,9 +715,8 @@ test_that("cache_write_atomic moves a terra .aux.json sidecar with the raster", 
 test_that("stac_query_geometry sends the union below the vertex limit and a hull above", {
   # Planetary Computer returns HTTP 413 above ~1 MiB of POST body; BULK's
   # floodplain (104,584 vertices) could not be queried at all (#79).
-  aoi <- sf::st_transform(
-    sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
-                quiet = TRUE), 4326)
+  aoi_path <- system.file("extdata", "example_aoi.gpkg", package = "drift")
+  aoi <- sf::st_transform(sf::st_read(aoi_path, quiet = TRUE), 4326)
   u <- sf::st_geometry(sf::st_union(aoi))[[1]]
   n <- nrow(sf::st_coordinates(u))
   # below the limit: exactly the union, so existing queries are unchanged
@@ -733,8 +732,10 @@ test_that("stac_query_geometry sends the union below the vertex limit and a hull
 test_that("stac_features_resign re-signs features before a read, stubs pass through", {
   # Planetary Computer tokens last ~45 min and a tiled floodplain read outlives
   # one (#79: 15 of 30 BULK tiles failed). Re-signing per extent refreshes them.
-  feat <- function(sig) list(type = "Feature", id = "a",
-                             assets = list(B04 = list(href = paste0("https://x/a.tif?sig=", sig))))
+  feat <- function(sig) {
+    href <- paste0("https://x/a.tif?sig=", sig)
+    list(type = "Feature", id = "a", assets = list(B04 = list(href = href)))
+  }
   items <- structure(list(type = "FeatureCollection", features = list(feat("old"))),
                      class = c("doc_items", "rstac_doc", "list"))
   calls <- 0L
