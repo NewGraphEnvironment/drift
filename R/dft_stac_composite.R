@@ -225,7 +225,10 @@ dft_stac_composite <- function(aoi,
                    "OVERVIEW_RESAMPLING=AVERAGE")
         )
       })
-      stk
+      # Return what was cached, not the in-memory double stack: the file is
+      # Float32, so returning `stk` would make the first call differ from every
+      # later cache hit in the eighth significant figure.
+      composite_finish(terra::rast(cache_file), bands, w$t0)
     }
     # An empty or fully clouded year is a result, not a failure: warn and drop
     # it, keeping the years already built (and cached) before it.
