@@ -20,11 +20,11 @@ Plan-gate decisions (2026-09-28):
 
 ## Phase 2: extract shared cube internals (refactor, no behaviour change)
 
-- [ ] Move out of `R/dft_stac_cube.R`:
+- [x] Move out of `R/dft_stac_cube.R`:
   - GDAL/gdalcubes session setup and restore;
   - STAC query, `months` filter and offset split (`stac_cube_items()`);
   - extent → cube_view → pre/post `cover` → tiling/mosaic (`stac_cube_assemble()`), taking a pixel function.
-- [ ] `dft_stac_cube()` calls these helpers and passes a `dft_index_expr()` closure as its pixel function.
+- [x] `dft_stac_cube()` calls these helpers and passes a `dft_index_expr()` closure as its pixel function.
 - [ ] Guard: the frozen legacy key and every offline cube test pass unchanged. Run the network e2e (untiled + tiled) before and after, and record both.
 
 ## Phase 3: `dft_stac_composite()`
