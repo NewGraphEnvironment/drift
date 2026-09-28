@@ -25,7 +25,7 @@ Plan-gate decisions (2026-09-28):
   - STAC query, `months` filter and offset split (`stac_cube_items()`);
   - extent → cube_view → pre/post `cover` → tiling/mosaic (`stac_cube_assemble()`), taking a pixel function.
 - [x] `dft_stac_cube()` calls these helpers and passes a `dft_index_expr()` closure as its pixel function.
-- [ ] Guard: the frozen legacy key and every offline cube test pass unchanged. Run the network e2e (untiled + tiled) before and after, and record both.
+- [x] Guard: the frozen legacy key and every offline cube test pass unchanged. Run the network e2e (untiled + tiled) before and after, and record both.
 
 ## Phase 3: `dft_stac_composite()`
 
@@ -68,13 +68,13 @@ Plan-gate decisions (2026-09-28):
   - `dft_stac_composite()` on `bulk_co_ff04`, one year, `tile_size` set;
   - a chip run over ~100 scattered buffered points.
   Also note what `dft_map_interactive(rgb=)` does with a floodplain-size local raster (maxBytes), to confirm the doc points to the COG path.
-- [ ] Update NEWS.md, the CLAUDE.md Core Pipeline (CLAUDE.md done, 2c30c3c) (the composite call and the chip pattern), and the gotchas note if anything turns up.
-- [ ] Bump the version (minor) as the final commit.
+- [x] Update NEWS.md (c528f00), the CLAUDE.md Core Pipeline (2c30c3c) (the composite call and the chip pattern), and the gotchas note (505218d).
+- [ ] Bump the version (minor) as the final commit. *(Lands after this archive, as the branch's last commit.)*
 
 ## Validation
 
-- [ ] Tests pass (`devtools::test()`, plus `DRIFT_TEST_NETWORK=true` e2e for cube and composite)
-- [ ] `lintr::lint_package()` clean; `pkgdown::check_pkgdown()` passes
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion
+- [x] Tests pass (`devtools::test()`, plus `DRIFT_TEST_NETWORK=true` e2e for cube and composite)
+- [x] `lintr::lint_package()`: 0 lints on changed lines (193 pre-existing elsewhere, untouched); `pkgdown::check_pkgdown()` passes
+- [x] `/code-check`: three rounds on the branch diff (not per commit), ended by R3's enumeration
+- [x] PWF checkboxes match landed work
+- [x] `/planning-archive` on completion
