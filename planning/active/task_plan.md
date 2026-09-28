@@ -14,9 +14,9 @@ Plan-gate decisions (2026-09-28):
 
 ## Phase 1: NDWI and MNDWI (independent, lowest risk)
 
-- [ ] Add `green = "B03"` and `blue = "B02"` to the `sentinel-2-l2a` roles (`R/dft_stac_config.R`), and update its roxygen.
-- [ ] Add `ndwi` `(green - nir) / (green + nir)` (McFeeters) and `mndwi` `(green - swir16) / (green + swir16)` (Xu) to `inst/indices/indices.csv`.
-- [ ] Tests (`test-dft_index_expr.R`): both rows ship. Each resolved expression, evaluated in R over known band values, gives the hand value. Examples: green 0.1 / nir 0.3 → −0.5, including through S2 scale/offset tokens. `mndwi` resolves `swir16` → `B11`. Existing cube cache keys are unchanged, and the frozen-key test stays green.
+- [x] Add `green = "B03"` and `blue = "B02"` to the `sentinel-2-l2a` roles (`R/dft_stac_config.R`), and update its roxygen.
+- [x] Add `ndwi` `(green - nir) / (green + nir)` (McFeeters) and `mndwi` `(green - swir16) / (green + swir16)` (Xu) to `inst/indices/indices.csv`.
+- [x] Tests (`test-dft_index_expr.R`): both rows ship. Each resolved expression, evaluated in R over known band values, gives the hand value. Examples: green 0.1 / nir 0.3 → −0.5, including through S2 scale/offset tokens. `mndwi` resolves `swir16` → `B11`. Existing cube cache keys are unchanged, and the frozen-key test stays green.
 
 ## Phase 2: extract shared cube internals (refactor, no behaviour change)
 
