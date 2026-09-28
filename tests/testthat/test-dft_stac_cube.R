@@ -660,3 +660,34 @@ test_that("an empty cached cube still ABORTS rather than re-fetching", {
     "no data on any layer"
   )
 })
+
+test_that("dft_stac_cube computes its cache key from its own arguments (call site pinned)", {
+  # The frozen-key test calls stac_cube_cache_key() directly and the gate tests
+  # mock it, so neither would notice the call site passing arguments in a new
+  # order. Seed a healthy cube at the key computed from explicit arguments and
+  # require dft_stac_cube() to serve it without reaching the network.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cfg <- dft_stac_config("sentinel-2-l2a")
+  crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", crs)))
+  key <- drift:::stac_cube_cache_key(
+    aoi_t, 10, crs, "P1M", "median", "bilinear", cfg$stac_url, cfg$collection,
+    c("B08", "B04"), "2020-06-01/2020-07-31", "ndvi", 60, cfg$mask_values,
+    cfg$scale, cfg$offset, NULL, cfg$offset_before, TRUE
+  )
+  cache <- tempfile("drift_cube_callsite_")
+  dir <- drift:::cache_scheme_dir(cache, "sentinel-2-l2a")
+  dir.create(dir, recursive = TRUE)
+  r <- terra::rast(terra::ext(aoi_t), resolution = 10, crs = crs, nlyrs = 2,
+                   vals = 0.5)
+  terra::writeRaster(r, file.path(dir, paste0("cube_", key, ".tif")))
+  testthat::local_mocked_bindings(
+    stac = function(...) stop("fell through to a re-fetch"), .package = "rstac"
+  )
+  out <- suppressMessages(dft_stac_cube(aoi, index = "ndvi",
+                                        datetime = "2020-06-01/2020-07-31",
+                                        cache_dir = cache))
+  expect_equal(terra::nlyr(out), 2)
+})

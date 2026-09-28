@@ -358,7 +358,8 @@ stac_cube_session <- function(parallel) {
 #' An all-`NA` cache still ABORTS (via cube_check_nonempty()); only an unclean
 #' read returns `NULL`, which the caller treats as a miss and re-fetches.
 #' @noRd
-stac_cube_cache_read <- function(cache_file, collection, datetime) {
+stac_cube_cache_read <- function(cache_file, collection, datetime,
+                                 label = "cube") {
   r <- terra::rast(cache_file)
   read_dirty <- FALSE
   withCallingHandlers(
@@ -370,7 +371,7 @@ stac_cube_cache_read <- function(cache_file, collection, datetime) {
   )
   if (!read_dirty) return(r)
   cli::cli_warn(c(
-    "The cached cube's pixel data could not be read cleanly; re-fetching.",
+    "The cached {label}'s pixel data could not be read cleanly; re-fetching.",
     "i" = "{.file {cache_file}}"
   ))
   NULL
@@ -419,7 +420,12 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
 
   n_items <- length(items$features)
   message("  ", n_items, " items returned")
-  if (n_items == 0) stop("No STAC items found for ", cfg$collection)
+  if (n_items == 0) {
+    # Classed so a multi-year caller can skip an empty year; the message is the
+    # one this has always raised.
+    rlang::abort(paste0("No STAC items found for ", cfg$collection),
+                 class = "drift_no_items")
+  }
 
   # Baseline-conditional offset: split items at the boundary so each side is
   # corrected with its own offset. The split is by item date, so it is the same
@@ -552,7 +558,7 @@ stac_cube_assemble <- function(fetched, cfg, aoi_target, target_crs, t0, t1,
 #' @noRd
 cube_check_nonempty <- function(stk, collection, datetime, cached) {
   if (sum(terra::global(stk, "notNA")$notNA) > 0) return(invisible(stk))
-  cli::cli_abort(c(
+  cli::cli_abort(class = "drift_empty_cube", c(
     "The {if (cached) 'cached' else 'assembled'} cube has no data on any layer.",
     "i" = "Every cell is {.val NA} on all {terra::nlyr(stk)} layers. This is \\
            either the gdalcubes all-{.val NA} failure mode, or the AOI does \\
