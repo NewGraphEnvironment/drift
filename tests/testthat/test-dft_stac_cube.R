@@ -729,3 +729,27 @@ test_that("stac_query_geometry sends the union below the vertex limit and a hull
   expect_true(isTRUE(sf::st_covers(sf::st_sfc(h, crs = 4326),
                                    sf::st_sfc(u, crs = 4326), sparse = FALSE)[1, 1]))
 })
+
+test_that("stac_features_resign re-signs features before a read, stubs pass through", {
+  # Planetary Computer tokens last ~45 min and a tiled floodplain read outlives
+  # one (#79: 15 of 30 BULK tiles failed). Re-signing per extent refreshes them.
+  feat <- function(sig) list(type = "Feature", id = "a",
+                             assets = list(B04 = list(href = paste0("https://x/a.tif?sig=", sig))))
+  items <- structure(list(type = "FeatureCollection", features = list(feat("old"))),
+                     class = c("doc_items", "rstac_doc", "list"))
+  calls <- 0L
+  signer <- function(item, ...) {
+    calls <<- calls + 1L
+    item$assets$B04$href <- sub("sig=[^&]*", "sig=fresh", item$assets$B04$href)
+    item
+  }
+  fetched <- list(features = items$features, is_pre = FALSE, items = items,
+                  sign_fn = signer)
+  out <- drift:::stac_features_resign(fetched, list(feat("expired")))
+  expect_equal(out[[1]]$assets$B04$href, "https://x/a.tif?sig=fresh")
+  expect_equal(calls, 1L)
+  # a stub without items/sign_fn, and an empty subset, pass through untouched
+  expect_identical(drift:::stac_features_resign(list(features = list()), list(feat("x"))),
+                   list(feat("x")))
+  expect_identical(drift:::stac_features_resign(fetched, list()), list())
+})

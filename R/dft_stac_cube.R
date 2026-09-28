@@ -387,8 +387,10 @@ stac_cube_cache_read <- function(cache_file, collection, datetime,
 #' box; and a scene-level `eo:cloud_cover` pre-filter shrinks the collection
 #' before any pixel is read.
 #'
-#' @return A list with `features` (the signed, month-filtered STAC features) and
-#'   `is_pre` (logical, one per feature: acquired before `cfg$offset_boundary`).
+#' @return A list with `features` (the signed, month-filtered STAC features),
+#'   `is_pre` (logical, one per feature: acquired before `cfg$offset_boundary`),
+#'   and `items` and `sign_fn`, which stac_cube_assemble() uses to re-sign the
+#'   features before each read extent (see there).
 #' @noRd
 stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
                             sign_fn) {
@@ -443,8 +445,34 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
     message("  offset split at ", cfg$offset_boundary, ": ",
             sum(is_pre), " pre / ", sum(!is_pre), " post")
   }
-  list(features = items$features, is_pre = is_pre)
+  list(features = items$features, is_pre = is_pre, items = items,
+       sign_fn = sign_fn)
 }
+
+
+#' Re-sign STAC features just before they are read
+#'
+#' Planetary Computer SAS tokens last about 45 minutes (measured 2026-09-28:
+#' a token issued at 17:16:55Z expired at 18:01:55Z), and signing happens once,
+#' at query time. A tiled read over a floodplain outlasts that: on BULK (#79)
+#' 15 of 30 tiles came back with every chunk failed. rstac's signer refreshes an
+#' expired token and replaces the `sig` parameter of an already-signed href, so
+#' re-signing before each extent keeps every read inside a live token (verified
+#' live: features with a corrupted `sig` read 102,364 cells after re-signing, 0
+#' without). A single extent whose read outlives one token is still exposed, and
+#' gdalcubes reports a failed chunk only on the worker's stderr, which R cannot
+#' reliably capture (#87). A `fetched` without `sign_fn` (a test stub) passes
+#' through unchanged.
+#' @noRd
+stac_features_resign <- function(fetched, feats) {
+  if (is.null(fetched$sign_fn) || is.null(fetched$items) || !length(feats)) {
+    return(feats)
+  }
+  it <- fetched$items
+  it$features <- feats
+  rstac::items_sign(it, sign_fn = fetched$sign_fn)$features
+}
+
 
 
 #' The geometry sent as a STAC `intersects` query: the AOI union, or its hull
@@ -536,13 +564,15 @@ stac_cube_assemble <- function(fetched, cfg, aoi_target, target_crs, t0, t1,
       dx = res, dy = res, dt = dt,
       aggregation = aggregation, resampling = resampling
     )
+    # re-sign here, per extent, so no read outlives its token
+    feats <- stac_features_resign(fetched, features)
     if (any(is_pre) && !all(is_pre)) {
       terra::cover(
-        build_stack(features[is_pre], offset_before, v),
-        build_stack(features[!is_pre], offset, v)
+        build_stack(feats[is_pre], offset_before, v),
+        build_stack(feats[!is_pre], offset, v)
       )
     } else {
-      build_stack(features, if (all(is_pre)) offset_before else offset, v)
+      build_stack(feats, if (all(is_pre)) offset_before else offset, v)
     }
   }
 
