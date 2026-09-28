@@ -48,19 +48,19 @@ Plan-gate decisions (2026-09-28):
   - COG mode uses an `rgb_rescale` argument, defaulting to a documented reflectance range.
 - [x] RGB groups are switchable overlays beneath the classified and transition layers. The first is visible when `x` is `NULL`, and they are hidden otherwise. `x` may be `NULL` when `rgb` is given. Centring and legends handle that case.
 - [x] Tests: synthetic 3-band rasters; groups in the layer control; `x = NULL`; no land-cover legend without `x`; a non-3-band layer errors by name; the shared domain is applied; the COG URL has 3 `bidx` and the shared rescale, is percent-encoded, and errors without `titiler_url`.
-- [ ] Live check: 2017 Jun–Jul and 2023 Aug–Sep on the packaged AOI over Esri/Google. Save the widget, view it in the browser, and run the cartography self-review on the screenshot.
+- [x] Live check: 2017 Jun–Jul and 2023 Aug–Sep on the packaged AOI over Esri/Google. Save the widget, view it in the browser, and run the cartography self-review on the screenshot.
 
 ## Phase 5: HLS spike → own issue; reconcile #79
 
-- [ ] Re-read #79, since scope may have been edited again.
-- [ ] Probe live:
+- [x] Re-read #79, since scope may have been edited again.
+- [x] Probe live:
   - `earthdatalogin` netrc / GDAL config;
   - a CMR-STAC `LPCLOUD` `HLSS30.v2.0` / `HLSL30.v2.0` search via rstac;
   - one COG read through gdalcubes;
   - S30 vs L30 band names (NIR `B8A` vs `B05`, and so on);
   - the Fmask **bit** mask against SCL classes (`image_mask(bits=)`?).
   Record the results in `findings.md`.
-- [ ] File the HLS issue with the worked auth path and source-config shape. Edit the #79 body: point item 4 at it, and add the scale pivot (chips and COG) and the #80 dependency.
+- [x] File the HLS issue with the worked auth path and source-config shape. Edit the #79 body: point item 4 at it, and add the scale pivot (chips and COG) and the #80 dependency.
 
 ## Phase 6: scale test, docs, release
 

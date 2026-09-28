@@ -25,3 +25,11 @@
   - wrap-year windows are documented.
 - Probed A2 live: a date-only STAC end bound drops the last day (22 of 23 items). The composite queries with `T00:00:00Z/T23:59:59Z`. The cube has the same issue, pre-existing, and goes to a follow-up issue because fixing it changes what existing cache keys hold.
 - Phases 3 and 4 are implemented. Mutation checks: band order, 4326 projection, key call site, offset split, per-image stretch and empty-year skip each turn a test red. The offline suite passes 1089, fails 0, skips 15.
+- Live network e2e in the worktree:
+  - The cube passes 110, including the tiled-vs-untiled test, so the refactor's tiled path is verified live.
+  - The composite e2e first failed on the layer-order guard. terra reads gdalcubes' multi-variable NetCDF alphabetically (blue, green, red), which the guard caught. Fixed by selecting by name (cf230bc) and re-running.
+- Live map check (Phase 4):
+  - Built 2017 Jun-Jul and 2023 Aug-Sep composites on the packaged AOI in 140.3 s; the second call was a cache hit.
+  - Served the widgets on localhost and inspected them in Chrome. Both layers render opaque and register with the Esri basemap. 2023 Aug-Sep reads darker and hazier than 2017 Jun-Jul under the shared stretch. Medians (red, green, blue): 2017 0.030, 0.050, 0.022; 2023 0.036, 0.050, 0.030. One scene seam is visible in 2017.
+  - Pre-existing and unrelated: the default "Light" basemap (CartoDB.Positron) now serves "API KEY REQUIRED" tiles.
+- Phase 5 done: re-read #79 (unchanged since the gate), ran the HLS spike (findings.md), filed #82, filed #83 (pre-existing cube-query defects), and edited the #79 body (HLS -> #82, scale pivot, #80 dependency).
