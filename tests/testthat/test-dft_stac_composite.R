@@ -250,3 +250,9 @@ test_that("false colour keeps band order: NIR is brightest over summer vegetatio
   expect_equal(names(med), c("nir", "red", "green"))
   expect_gt(med[["nir"]], 2 * med[["red"]])
 })
+
+test_that("a missing gdalcubes names the GitHub install (#80)", {
+  testthat::local_mocked_bindings(gdalcubes_available = function() FALSE)
+  expect_error(dft_stac_composite(aoi_pkg(), years = 2023),
+               "appelmar/gdalcubes", fixed = TRUE)
+})

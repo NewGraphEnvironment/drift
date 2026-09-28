@@ -141,7 +141,7 @@ dft_stac_composite <- function(aoi,
                                cache_dir = NULL,
                                force = FALSE,
                                sign_fn = rstac::sign_planetary_computer()) {
-  rlang::check_installed("gdalcubes", reason = "to fetch STAC composites")
+  check_gdalcubes("to fetch STAC composites")
 
   cfg <- dft_stac_config(source)
   if (!isTRUE(cfg$cube)) {
