@@ -75,10 +75,30 @@ if (stage == "chips") {
 }
 
 if (stage == "floodplain") {
-  tick("wall", {
-    fp <- dft_stac_composite(aoi, years = 2023, months = 7:8, clip = TRUE,
-                             tile_size = 20000, cache_dir = cache)
-  })
+  # On failure, inventory R's temp files BEFORE the session deletes them: run 4
+  # (2026-09-28) read all 30 tiles, then terra::mask() could not read the merged
+  # mosaic's spat_*.tif, and the evidence went with the tempdir (#88).
+  # tick() returns the seconds, so the composite is assigned inside the block
+  withCallingHandlers(
+    tick("wall", {
+      fp <- dft_stac_composite(aoi, years = 2023, months = 7:8, clip = TRUE,
+                               tile_size = 20000, cache_dir = cache)
+    }),
+    error = function(e) {
+      message("FAILED: ", conditionMessage(e))
+      tmp <- list.files(tempdir(), full.names = TRUE)
+      info <- file.info(tmp)
+      message("tempdir: ", tempdir(), " (", length(tmp), " files, ",
+              round(sum(info$size, na.rm = TRUE) / 2^30, 2), " GiB)")
+      for (f in tmp[grepl("^spat_", basename(tmp))]) {
+        message("--- ", basename(f), " ", info[f, "size"], " bytes, mtime ",
+                format(info[f, "mtime"]))
+        message(paste(tryCatch(system2("gdalinfo", c("-checksum", f), stdout = TRUE,
+                                        stderr = TRUE), error = function(x) "gdalinfo failed"),
+                      collapse = "\n"))
+      }
+    }
+  )
   r <- fp[[1]]
   f <- list.files(cache, pattern = "^composite_.*\\.tif$", recursive = TRUE,
                   full.names = TRUE)
