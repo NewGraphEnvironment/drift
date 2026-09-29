@@ -6,7 +6,7 @@ Read-only reviewer, so its findings came back as reply text; I transcribed them 
 |---|---|---|
 | B1 | `terra::freq()` returns labels on factor strata while `readValues()` returns codes; `freq()` also rounds floats. Count and resolve steps could not join | **Confirmed by probe** (`Water -> Water` vs `1001`). Two passes on one chunked reader; `stratum_label` from `levels()` |
 | B2 | Sizing through `ua` assumes strata = map classes; #93 needs per-stratum SD for an area target | Primary form takes `s_h` from the estimator's `$stratum`; `ua` kept as a convenience |
-| B3 | FPC undecided; `n_h > N_h` refusal breaks on tiny strata (the tile has 2- and 3-cell strata) | `fpc = TRUE` by default, and the Olofsson pin runs with `fpc = FALSE`; a stratum with `n_h ≥ N_h` becomes a census, with a message |
+| B3 | FPC undecided; `n_h > N_h` refusal breaks on tiny strata (the tile has 2- and 3-cell strata) | A stratum with `n_h ≥ N_h` becomes a census, with a message. FPC is now fixed on by `mapaccuracy`, so there is no `fpc` argument (superseded 2026-09-28) |
 | G1 | The sampler does not emit `map_class` | `map =` argument, extracted at each cell |
 | G2 | One `blocks()` chunk on the tile, so the carry logic is untested | Explicit row chunks, capped at about 1e7 cells; chunk-invariance test |
 | G3 | RNG save/restore under-specified (L'Ecuyer, absent seed) | Pin all three kinds; restore, or remove; three tests |

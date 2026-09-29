@@ -14,7 +14,7 @@ A new `dft_accuracy_*` family, one function per file:
 | function | input → output |
 |---|---|
 | `dft_accuracy_sample(strata, n, seed, map = NULL)` | strata SpatRaster → `list(points = sf, strata = tibble, design = list)` |
-| `dft_accuracy_estimate(labels, strata, level = 0.95, fpc = TRUE)` | label table + `$strata` → `list(matrix, accuracy, area, stratum)` |
+| `dft_accuracy_estimate(labels, strata, level = 0.95)` | label table + `$strata` → `list(matrix, accuracy, area, stratum)` |
 | `dft_accuracy_size(weights, s_h, se_target, allocation, n_min)` | stratum weights + per-stratum SD + target SE → total n and allocation |
 | `dft_accuracy_labels(labels, strata)` | validates the label contract; returns it invisibly or errors naming the fault |
 
@@ -47,13 +47,15 @@ Its roxygen states that filtering by `confidence` changes the design. For change
 
 **Train/test.** `use == "training"` rows are refused with their count. Including them is the harm: points that trained a classifier cannot measure it. Reusing a non-random subset of accuracy points for training biases the estimate too. The documented-split option in the issue is not provided. That meets "at minimum a flag"; an `n_train` split at draw time is a possible follow-up.
 
-**Estimators** (Stehman 2014 general form: stratified means of indicator variables, weighted by `N_h`):
-- The error matrix is long format over the union of map and reference classes, with estimated proportions. When strata ≠ map classes, the row totals are **estimated**, not the known `W_i`; the roxygen says so.
-- OA, UA and PA with SEs. UA and PA are ratio estimators; PA is NA where `p̂_·j = 0`.
-- Adjusted area per reference class = `A_total · p̂_·j`, with SE and a Wald CI, `z = qnorm(1 − (1 − level)/2)`. The interval is not truncated at 0, and the roxygen says so.
-- `fpc = TRUE` applies `(1 − n_h/N_h)`, so a census stratum contributes zero variance. With `fpc = FALSE` the estimator is algebraically Olofsson eq. 2–11; the Olofsson pin runs that way.
-- `$stratum` reports per-stratum `n_h`, `N_h`, agreement mean and SE, and the SD of the OA indicator and of each reference-class indicator. The sizer consumes it.
-- A stratum with `n_h = 1` is refused (its variance is undefined), unless it is a census and `fpc = TRUE`.
+**Estimators: wrap `mapaccuracy::stehman2014()`** (decided 2026-09-28, after a soul session surfaced the package; see findings). `mapaccuracy` is on CRAN, MIT-licensed, imports only `stats`, and is checked against the published Olofsson 2013/2014 and Stehman 2014 examples. It becomes an Import. `dft_accuracy_estimate()` owns only what the package does not:
+- the label contract, and refusing training rows (via `dft_accuracy_labels()`)
+- passing `stratum` as character codes, because `stehman2014()` matches stratum names by **regex** (`grep(paste0("^", nm, "$"))`), so a label such as `"Trees -> Water"` or one with `.`/`+`/`(` is unsafe
+- area in hectares = `A_total · area`, with SE, and a Wald CI with `z = qnorm(1 − (1 − level)/2)`, not truncated at 0
+- a tidy long-format error matrix. The package returns zero cells as NA; they become 0, and the conversion is documented
+- a `$stratum` table (`n_h`, `N_h`, agreement mean and SE, and the SD of the OA indicator and of each reference-class indicator), which `mapaccuracy` does not return and the sizer needs
+- a refusal for a stratum with `n_h = 1` unless it is a census. The package only warns
+
+The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contributes zero variance and there is no `fpc` argument. Olofsson 2014 omits the FPC; at its pixel-scale `N_h` the difference falls below the published precision, and the test asserts that. When strata ≠ map classes, the matrix row totals are estimated, not the known `W_i`; the roxygen says so. Any upstream defect found is filed on its tracker and shown to the user, not worked around (karpathy §8).
 
 **Sizing.** The primary form is `n = (Σ W_h S_h)² / SE_target²`, with `S_h` per **stratum** taken from a pilot's `$stratum` for a named quantity: OA or a class's area proportion. `ua =` is a convenience that holds only when strata = map classes, where `S_i = sqrt(U_i(1−U_i))` (Olofsson eq. 13). There are two allocations: `"equal"`, and `"proportional_min"` (Olofsson §5.1.1).
 
@@ -63,13 +65,15 @@ Its roxygen states that filtering by `confidence` changes the design. For change
 - [ ] `findings.md`: the estimator equations with numbers, and a check of the Olofsson example by hand arithmetic (deforestation 21,158 ha is reproducible from the row counts; confirm against the PDF)
 
 ### Phase 2: Estimator (tests first)
-- [ ] `test-dft_accuracy_estimate.R`, published: the Olofsson example (error matrix, UA/PA/OA with SEs, adjusted areas with CIs), run with `fpc = FALSE` and **absolute** tolerance at the published precision; the Stehman 2014 example (strata ≠ map classes). The fixture expands counts to per-point rows with base `rep()`
+- [ ] `mapaccuracy` in Imports (DESCRIPTION)
+- [ ] `test-dft_accuracy_estimate.R`, published: Olofsson 2014 Tables 8–9 through `dft_accuracy_estimate()`, with **absolute** tolerance at the published precision. The forest-gain and stable-non-forest PA CIs pin the Eq. 7 values (±0.254, ±0.018), not the printed ±0.23 / ±0.01, and cite the discrepancy (findings). Add the Stehman 2014 example once its PDF is in hand. The fixture expands counts to per-point rows with base `rep()`
 - [ ] Must-fail: run the **estimator** with equal `n_cells` on the Olofsson counts and assert it differs from the published values
 - [ ] Census oracle (independent truth, no PDF needed): map = 2017 and "reference" = 2023 on the bundled tile, with the true error matrix and areas from `terra::crosstab`. Run about 500 stratified draws under map-class strata and under a changed/stable split; check bias ≈ 0, empirical SD ≈ mean SE, and CI coverage ≈ level. Skippable if slow
 - [ ] Perfect labels (`ref = map`) give UA = PA = OA = 1, SE = 0, and adjusted area equal to mapped area. Recoding to a 2-class union gives an SE that is not the sum of the SEs
 - [ ] Contract refusals: training rows, NA `ref_class`, duplicate ids, an unknown stratum, a stratum with no labels, `n_h = 1`. A reference-only class appears in the matrix, and PA is NA at `p̂_·j = 0`
+- [ ] Measure `stehman2014()` runtime at #93 scale (about 1,000 points × about 80 transition classes; it builds `classes²` indicator columns). File upstream and report if it is impractical
 - [ ] `R/dft_accuracy_estimate.R` + `R/dft_accuracy_labels.R`. Freeze the `$strata` and `$stratum` shapes here
-- [ ] Restore-the-bug check: remove the weights from the estimator and confirm the published-value tests go red
+- [ ] Restore-the-bug check: pass unweighted `N_h` inside the wrapper and confirm the published-value tests go red
 
 ### Phase 3: Sampler (tests first)
 - [ ] `test-dft_accuracy_sample.R`:
