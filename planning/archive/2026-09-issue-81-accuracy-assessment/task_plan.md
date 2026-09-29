@@ -71,7 +71,7 @@ The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contri
 - [x] Census oracle (independent truth, no PDF needed): map = 2017 and "reference" = 2023 on the bundled tile, with the true error matrix and areas from `terra::crosstab`. Run about 500 stratified draws under map-class strata and under a changed/stable split; check bias ≈ 0, empirical SD ≈ mean SE, and CI coverage ≈ level. Skippable if slow
 - [x] Perfect labels (`ref = map`) give UA = PA = OA = 1, SE = 0, and adjusted area equal to mapped area. Recoding to a 2-class union gives an SE that is not the sum of the SEs
 - [x] Contract refusals: training rows, NA `ref_class`, duplicate ids, an unknown stratum, a stratum with no labels, `n_h = 1`. A reference-only class appears in the matrix, and PA is NA at `p̂_·j = 0`
-- [x] Measure `stehman2014()` runtime at #93 scale (about 1,000 points × about 80 transition classes; it builds `classes²` indicator columns). File upstream and report if it is impractical
+- [x] Measure `stehman2014()` runtime at floodplains#93 scale (about 1,000 points × about 80 transition classes; it builds `classes²` indicator columns). File upstream and report if it is impractical
 - [x] `R/dft_accuracy_estimate.R` + `R/dft_accuracy_labels.R`. Freeze the `$strata` and `$stratum` shapes here
 - [x] Restore-the-bug check: pass unweighted `N_h` inside the wrapper and confirm the published-value tests go red
 
@@ -90,7 +90,7 @@ The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contri
   - `map =` extraction, including a grid-mismatch refusal
 - [x] `R/dft_accuracy_sample.R`
 - [x] Sampler → estimator integration: draw, fake labels from a reference raster, estimate (covered by the census oracle once both exist)
-- [x] Scale test on BULK: `classified_2017.tif` and its `dft_rast_transition()` factor output (the #93 input), with an RSS sampler. Record pass-1 and pass-2 time and peak RSS in the PR body
+- [x] Scale test on BULK: `classified_2017.tif` and its `dft_rast_transition()` factor output (the floodplains#93 input), with an RSS sampler. Record pass-1 and pass-2 time and peak RSS in the PR body
 
 ### Phase 4: Sizing
 - [x] `test-dft_accuracy_size.R`: reproduce Olofsson §5.1.1's sample-size example (n and allocation); the `s_h` form from a pilot `$stratum` agrees with the `ua` form when strata = map classes; edge cases (UA = 1, a zero weight)
