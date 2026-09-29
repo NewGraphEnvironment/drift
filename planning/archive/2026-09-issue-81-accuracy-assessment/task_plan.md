@@ -99,7 +99,7 @@ The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contri
 ### Phase 5: Docs and release
 - [x] A runnable `@examples` block on every function (the estimator example uses Olofsson's published counts; the sampler uses the bundled tile with a satisfiable allocation)
 - [x] `devtools::document()`, `lintr::lint_package()`, `pkgdown::check_pkgdown()`. `_pkgdown.yml` has no `reference:` index, so the check cannot catch an omission; it stays that way (out of scope)
-- [ ] NEWS.md, then version 0.19.0 as the final commit
+- [x] NEWS.md, then version 0.19.0 as the final commit
 - [x] CLAUDE.md Core Pipeline: add the accuracy block, and correct the bundled tile's size (314 x 326, not 600 x 600)
 - [x] Update the floodplains#93 body's "What lives where" table: the `map =` argument, the `ref_class` composition recipe, the pilot-extension rule, and per-stratum sizing
 
