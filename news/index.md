@@ -1,5 +1,31 @@
 # Changelog
 
+## drift 0.17.1
+
+- **gdalcubes installs from GitHub
+  ([\#80](https://github.com/NewGraphEnvironment/drift/issues/80)).**
+  gdalcubes was archived on CRAN on 2026-09-16. That broke the pkgdown
+  workflow’s dependency resolve, which had failed on every push since
+  2026-09-26, and it left new users unable to install what
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  and
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  need. `appelmar/gdalcubes` is now in `Remotes:` with no suffix, and
+  the README says to install it with `pak::pak("appelmar/gdalcubes")`.
+  So does the prompt
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md),
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  and
+  [`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md)
+  raise when it is missing. rlang’s own install offer means CRAN and
+  would fail. Upstream master (0.7.5) has merged the `filter_geom`
+  segfault fix from `NewGraphEnvironment/gdalcubes@newgraph`, so the
+  fork is no longer needed. On 0.7.5 the offline suite passes (1007
+  tests), and so does the opt-in network end-to-end for the cube and
+  fetch paths (109 and 165). That run also surfaced five network
+  assertions that had listed the pre-#48 cache path since that change,
+  so they failed on every opt-in run. They now use `cache_scheme_dir()`.
+
 ## drift 0.17.0
 
 - **The article gains patch shape and location, and the corridor

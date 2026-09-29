@@ -22,6 +22,17 @@ on the analysis.
 pak::pak("NewGraphEnvironment/drift")
 ```
 
+The STAC fetch and cube functions
+([`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md),
+[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md))
+also need [gdalcubes](https://github.com/appelmar/gdalcubes), which was
+archived on CRAN on 2026-09-16. Install it from GitHub until it is back:
+
+``` r
+
+pak::pak("appelmar/gdalcubes")
+```
+
 ## Quick start
 
 ``` r

@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.17.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.17.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,11 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.17.1" id="drift-0171">drift 0.17.1<a class="anchor" aria-label="anchor" href="#drift-0171"></a></h2>
+<ul><li>
+<strong>gdalcubes installs from GitHub (<a href="https://github.com/NewGraphEnvironment/drift/issues/80" class="external-link">#80</a>).</strong> gdalcubes was archived on CRAN on 2026-09-16. That broke the pkgdown workflow’s dependency resolve, which had failed on every push since 2026-09-26, and it left new users unable to install what <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> and <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> need. <code>appelmar/gdalcubes</code> is now in <code>Remotes:</code> with no suffix, and the README says to install it with <code>pak::pak("appelmar/gdalcubes")</code>. So does the prompt <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code>, <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> and <code><a href="../reference/dft_index_expr.html">dft_index_expr()</a></code> raise when it is missing. rlang’s own install offer means CRAN and would fail. Upstream master (0.7.5) has merged the <code>filter_geom</code> segfault fix from <code>NewGraphEnvironment/gdalcubes@newgraph</code>, so the fork is no longer needed. On 0.7.5 the offline suite passes (1007 tests), and so does the opt-in network end-to-end for the cube and fetch paths (109 and 165). That run also surfaced five network assertions that had listed the pre-#48 cache path since that change, so they failed on every opt-in run. They now use <code>cache_scheme_dir()</code>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.17.0" id="drift-0170">drift 0.17.0<a class="anchor" aria-label="anchor" href="#drift-0170"></a></h2>
 <ul><li>
