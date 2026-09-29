@@ -709,6 +709,9 @@ When a test mocks a downloader's reader and supplies fixture files, also mock th
 ### testthat 3e `expect_message()` returns the condition, not the expression's value
 Assign inside the call, `expect_message(h <- f(x), "msg")`, never `h <- expect_message(f(x), "msg")`.
 
+### `c()` dispatches on its first argument, so `c(NULL, <Date>)` is a plain number
+Put a Date first when `c()` combines an optional piece with Dates: `c(NULL, <Date>)` takes the default method and returns a bare day count.
+
 # Code Check — Shell
 Tool-level traps in bash, sed, git and `gh`, and in the host toolchain those commands depend on.
 
@@ -1027,6 +1030,12 @@ Select layers by name after `terra::rast()` of a `gdalcubes::write_ncdf()` outpu
 
 ### terra's COG writer emits a `.aux.json` sidecar when the raster carries a time
 Strip `time` (and `units`, `varnames`, `longnames`, `metags`, `scoff`) before `writeRaster(filetype = "COG")`, or have the publisher move `<file>.aux.json` with the raster.
+
+### `sf::st_read()` promotes a mixed POLYGON/MULTIPOLYGON layer to all-MULTIPOLYGON
+Read with `promote_to_multi = FALSE` whenever a layer will be written back.
+
+### `sf::st_make_valid()` rewrites geometry that was already valid
+Run it on the invalid rows only (`!st_is_valid(x)`), or keep the original geometry and use the made-valid copy just for the computation.
 
 # Code Check Conventions
 Structured checklist for reviewing diffs before commit.
