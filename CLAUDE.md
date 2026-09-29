@@ -85,6 +85,21 @@ dft_map_interactive(classified, aoi = aoi, rgb = tc)                 # or rgb = 
 chips <- lapply(seq_len(nrow(buf)), \(i) dft_stac_composite(buf[i, ], years = 2023))
 ```
 
+Accuracy and error-adjusted area (#81; Olofsson et al. 2014, Stehman 2014). Mapped area is
+biased wherever the map is wrong. These correct it from reference labels at stratified random points:
+
+```r
+s    <- dft_accuracy_sample(strata, n = 30, seed = 81, map = transition)  # strata need not be map classes
+# ... reviewer adds ref_class per point (drift stores no labels; contract: dft_accuracy_labels())
+est  <- dft_accuracy_estimate(labels, s$strata)   # wraps mapaccuracy::stehman2014(); $area in ha with CIs
+plan <- dft_accuracy_size(weights, se_target = 0.01, s_h = pilot_sd)  # size the full sample from a pilot
+```
+
+Same seed + larger `n` **extends** the draw (per-stratum streams), so pilot labels carry over. For
+change maps `ref_class = ref_from * 1000 + ref_to`. Union targets (all tree loss) are recode-then-estimate:
+the SE of a union is not the sum of SEs. Wald CIs run narrow for a rare class hiding in a big stratum
+at small n (measured on the tile, see the estimator docs), so do not starve the stable strata.
+
 ## Key Patterns
 
 - **Dual-mode maps:** `dft_map_interactive()` uses `addRasterImage()` for local SpatRasters, `addTiles()` via titiler for remote COGs
@@ -118,7 +133,7 @@ devtools::install()    # needed before rendering vignettes
 
 ### Scale-test raster functions on the BULK floodplain before the PR
 
-The bundled Neexdzii Kwa tile is 600 x 600 cells and cannot reach memory or runtime failure modes. A real floodplain-scale pair is two downloads away — the BULK watershed group item on stac-floodplains-bc, already clipped to the floodplain, ~1.2 MB each:
+The bundled Neexdzii Kwa tile is 314 x 326 cells and cannot reach memory or runtime failure modes. A real floodplain-scale pair is two downloads away — the BULK watershed group item on stac-floodplains-bc, already clipped to the floodplain, ~1.2 MB each:
 
 - `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2017.tif`
 - `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2023.tif`
