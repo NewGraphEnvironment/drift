@@ -65,18 +65,18 @@ The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contri
 - [x] `findings.md`: the estimator equations with numbers, and a check of the Olofsson example by hand arithmetic (deforestation 21,158 ha is reproducible from the row counts; confirm against the PDF)
 
 ### Phase 2: Estimator (tests first)
-- [ ] `mapaccuracy` in Imports (DESCRIPTION)
-- [ ] `test-dft_accuracy_estimate.R`, published: Olofsson 2014 Tables 8–9 through `dft_accuracy_estimate()`, with **absolute** tolerance at the published precision. The forest-gain and stable-non-forest PA CIs pin the Eq. 7 values (±0.254, ±0.018), not the printed ±0.23 / ±0.01, and cite the discrepancy (findings). Add the Stehman 2014 example once its PDF is in hand. The fixture expands counts to per-point rows with base `rep()`
-- [ ] Must-fail: run the **estimator** with equal `n_cells` on the Olofsson counts and assert it differs from the published values
-- [ ] Census oracle (independent truth, no PDF needed): map = 2017 and "reference" = 2023 on the bundled tile, with the true error matrix and areas from `terra::crosstab`. Run about 500 stratified draws under map-class strata and under a changed/stable split; check bias ≈ 0, empirical SD ≈ mean SE, and CI coverage ≈ level. Skippable if slow
-- [ ] Perfect labels (`ref = map`) give UA = PA = OA = 1, SE = 0, and adjusted area equal to mapped area. Recoding to a 2-class union gives an SE that is not the sum of the SEs
-- [ ] Contract refusals: training rows, NA `ref_class`, duplicate ids, an unknown stratum, a stratum with no labels, `n_h = 1`. A reference-only class appears in the matrix, and PA is NA at `p̂_·j = 0`
-- [ ] Measure `stehman2014()` runtime at #93 scale (about 1,000 points × about 80 transition classes; it builds `classes²` indicator columns). File upstream and report if it is impractical
-- [ ] `R/dft_accuracy_estimate.R` + `R/dft_accuracy_labels.R`. Freeze the `$strata` and `$stratum` shapes here
-- [ ] Restore-the-bug check: pass unweighted `N_h` inside the wrapper and confirm the published-value tests go red
+- [x] `mapaccuracy` in Imports (DESCRIPTION)
+- [x] `test-dft_accuracy_estimate.R`, published: Olofsson 2014 Tables 8–9 through `dft_accuracy_estimate()`, with **absolute** tolerance at the published precision. The forest-gain and stable-non-forest PA CIs pin the Eq. 7 values (±0.254, ±0.018), not the printed ±0.23 / ±0.01, and cite the discrepancy (findings). Add the Stehman 2014 example once its PDF is in hand. The fixture expands counts to per-point rows with base `rep()`
+- [x] Must-fail: run the **estimator** with equal `n_cells` on the Olofsson counts and assert it differs from the published values
+- [x] Census oracle (independent truth, no PDF needed): map = 2017 and "reference" = 2023 on the bundled tile, with the true error matrix and areas from `terra::crosstab`. Run about 500 stratified draws under map-class strata and under a changed/stable split; check bias ≈ 0, empirical SD ≈ mean SE, and CI coverage ≈ level. Skippable if slow
+- [x] Perfect labels (`ref = map`) give UA = PA = OA = 1, SE = 0, and adjusted area equal to mapped area. Recoding to a 2-class union gives an SE that is not the sum of the SEs
+- [x] Contract refusals: training rows, NA `ref_class`, duplicate ids, an unknown stratum, a stratum with no labels, `n_h = 1`. A reference-only class appears in the matrix, and PA is NA at `p̂_·j = 0`
+- [x] Measure `stehman2014()` runtime at #93 scale (about 1,000 points × about 80 transition classes; it builds `classes²` indicator columns). File upstream and report if it is impractical
+- [x] `R/dft_accuracy_estimate.R` + `R/dft_accuracy_labels.R`. Freeze the `$strata` and `$stratum` shapes here
+- [x] Restore-the-bug check: pass unweighted `N_h` inside the wrapper and confirm the published-value tests go red
 
 ### Phase 3: Sampler (tests first)
-- [ ] `test-dft_accuracy_sample.R`:
+- [x] `test-dft_accuracy_sample.R`:
   - golden `point_id`s and cells for a seeded draw on `example_2017.tif`, with an allocation the tile can satisfy (classes 4 and 9 have 2 cells)
   - chunk invariance: identical results at row chunks 1, 7, 50 and full, matching brute-force `which()`
   - pilot extension: the first 30 per stratum at n = 30 are identical at n = 50, and adding a stratum leaves the others unchanged
@@ -88,13 +88,13 @@ The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contri
   - refusals: lonlat, non-integer, multi-layer, and a named allocation that omits a stratum
   - NA cells are never drawn
   - `map =` extraction, including a grid-mismatch refusal
-- [ ] `R/dft_accuracy_sample.R`
-- [ ] Sampler → estimator integration: draw, fake labels from a reference raster, estimate (covered by the census oracle once both exist)
-- [ ] Scale test on BULK: `classified_2017.tif` and its `dft_rast_transition()` factor output (the #93 input), with an RSS sampler. Record pass-1 and pass-2 time and peak RSS in the PR body
+- [x] `R/dft_accuracy_sample.R`
+- [x] Sampler → estimator integration: draw, fake labels from a reference raster, estimate (covered by the census oracle once both exist)
+- [x] Scale test on BULK: `classified_2017.tif` and its `dft_rast_transition()` factor output (the #93 input), with an RSS sampler. Record pass-1 and pass-2 time and peak RSS in the PR body
 
 ### Phase 4: Sizing
-- [ ] `test-dft_accuracy_size.R`: reproduce Olofsson §5.1.1's sample-size example (n and allocation); the `s_h` form from a pilot `$stratum` agrees with the `ua` form when strata = map classes; edge cases (UA = 1, a zero weight)
-- [ ] `R/dft_accuracy_size.R`
+- [x] `test-dft_accuracy_size.R`: reproduce Olofsson §5.1.1's sample-size example (n and allocation); the `s_h` form from a pilot `$stratum` agrees with the `ua` form when strata = map classes; edge cases (UA = 1, a zero weight)
+- [x] `R/dft_accuracy_size.R`
 
 ### Phase 5: Docs and release
 - [ ] A runnable `@examples` block on every function (the estimator example uses Olofsson's published counts; the sampler uses the bundled tile with a satisfiable allocation)
@@ -108,6 +108,6 @@ No vignette. One made with fabricated labels would illustrate a number nobody me
 ## Validation
 
 - [ ] Tests pass
-- [ ] `/code-check` clean on each commit
+- [x] `/code-check` clean on each commit
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion

@@ -25,6 +25,7 @@ Imports:
     cli,
     digest,
     dplyr,
+    mapaccuracy,
     parallel,
     rappdirs,
     rlang,

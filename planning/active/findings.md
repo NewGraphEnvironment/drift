@@ -77,7 +77,35 @@ The values are transcribed into `tests/testthat/helper-accuracy.R` with page and
 - It only *warns* on a stratum with one observation.
 - It applies the FPC in eq. 25 and eq. 28.
 
+## Phase 2 measurements (2026-09-29)
+
+- **Restore-the-bug:** passing `rep(mean(N_h))` as `Nh_strata` inside the wrapper turns 9 of the 50 estimator assertions red (areas, half-widths, Table 9, PA, OA, the union test). Restored.
+- **`stehman2014()` runtime** at 1,000 points and 8 strata: 20 classes 0.33 s, 40 classes 2.0 s, 80 classes 13.0 s. That is about k^2.5, from its `classes²` indicator columns and two `aggregate()` calls. It is workable for a one-off estimate, so nothing was filed upstream. The roxygen notes it.
+- **testthat 3e ignores `scale =`**, so `tolerance` was relative. The pins use an `expect_within()` absolute helper.
+
+## Phase 3: sampler measurements (2026-09-29)
+
+**BULK scale** (`classified_2017.tif`, 14651 × 11552 = 169,248,352 cells, 4,108,972 non-NA; 64 GB machine; RSS sampled every 1–2 s):
+
+| step | time | peak RSS |
+|---|---|---|
+| one chunked pass (count) | 1.7 s | |
+| `dft_accuracy_sample(r17, n = 100)` (2 passes + draw) | 3.3 s | 0.95 GiB (baseline after load 0.27 GiB) |
+| classify 2017+2023 → `dft_rast_transition()` → sample the factor transition map (63 strata, n = 30, 10 censuses) | 1.5 + 3.4 + 3.0 s | 4.63 GiB, dominated by the in-memory transition raster |
+| `dft_accuracy_estimate()` on those 1,677 points, 63 classes (perfect labels) | 10.8 s | |
+
+Logs: scratchpad `bulk/bulk_run{2,3}.log`, `bulk/rss*.log` (not committed).
+
+**Census oracle (bundled tiles, 300 draws).** Map-class strata at n = 25: the estimate is unbiased (|bias z| < 1), but Water's 95% CI covered 61% (SE ratio 0.76). 98 of the 7,127 map-Trees cells (1.4%) are reference Water, so most draws see none, and that stratum's variance is estimated as 0. Coverage was 83% at n = 75 and 89% at n = 150 (SE ratio 1.04). This is the Wald interval's small-sample weakness, not an estimator bug, and it is documented on `dft_accuracy_estimate()`. With changed/stable strata (not the map classes) at n = 60: |bias z| ≤ 0.83, SE ratio 1.00–1.07, coverage 0.91–0.96.
+
+**`sample.int(useHash = TRUE)` refuses size > n/2**, so the sampler pins `useHash = FALSE`. The golden draw did not move, because the two paths gave identical draws at the tested sizes.
+
+**Found on the way:** `dft_rast_classify()` mutates its input raster in place (`set.cats()`), so a test that later stacked the raw tile saw `class_name` layers. Filed as #89; not fixed here.
+
 ## Errors Encountered
 
 | Error | Resolution |
 |-------|------------|
+| `sample.int(useHash = TRUE)`: "This algorithm is for size <= n/2" | Pin `useHash = FALSE` (a partial shuffle that keeps its prefix) |
+| RSS sampler watched a subshell and wrote `rss.log` into the repo: `cd X && prog &` backgrounds the whole list | `cd` first, then `nohup prog &` alone, with the log at an absolute path |
+| `expect_equal(..., tolerance, scale = 1)` warned "Unused arguments (scale = 1)" and compared relatively | `expect_within()` helper with an absolute bound |

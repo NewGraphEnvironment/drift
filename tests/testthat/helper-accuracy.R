@@ -14,10 +14,10 @@ olofsson_classes <- c("deforestation", "forest_gain", "stable_forest",
 
 # Table 8 (p. 55): sample counts n_ij, rows = map (= stratum), cols = reference
 olofsson_counts <- matrix(
-  c(66,  0,   5,   4,
-     0, 55,   8,  12,
-     1,  0, 153,  11,
-     2,  1,   9, 313),
+  c(66, 0, 5, 4,
+    0, 55, 8, 12,
+    1, 0, 153, 11,
+    2, 1, 9, 313),
   nrow = 4, byrow = TRUE, dimnames = list(olofsson_classes, olofsson_classes)
 )
 
@@ -91,4 +91,19 @@ olofsson_strata <- function(n_cells = olofsson_pixels) {
     area    = unname(n_cells) * 0.09,
     weight  = unname(n_cells) / sum(n_cells)
   )
+}
+
+# testthat's `tolerance` is RELATIVE (and 3e ignores `scale`): `tolerance = 1`
+# on a 21,158 ha area accepts anything within 100%, while the default demands
+# agreement a published figure rounded to the ha can never give. The
+# published values need an absolute bound at their printed precision.
+expect_within <- function(object, expected, tol) {
+  act <- testthat::quasi_label(rlang::enquo(object), arg = "object")
+  d <- abs(as.numeric(act$val) - as.numeric(expected))
+  testthat::expect(
+    length(act$val) == length(expected) && !anyNA(d) && all(d <= tol),
+    sprintf("%s differs from the expected values by up to %g (> %g).",
+            act$lab, suppressWarnings(max(d, na.rm = TRUE)), tol)
+  )
+  invisible(act$val)
 }
