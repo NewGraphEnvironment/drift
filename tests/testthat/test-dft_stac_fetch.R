@@ -19,6 +19,22 @@ test_that("auto_utm_epsg handles prime meridian", {
   expect_equal(epsg, "EPSG:32631")
 })
 
+test_that("a missing gdalcubes names the GitHub install, not only CRAN", {
+  # gdalcubes is archived on CRAN (#80), so a bare install offer fails; the
+  # message has to say where it lives now. The tests below skip whenever
+  # gdalcubes is installed, so this simulates its absence through the seam.
+  testthat::local_mocked_bindings(gdalcubes_available = function() FALSE)
+  expect_error(drift:::check_gdalcubes("to fetch STAC rasters"),
+               "appelmar/gdalcubes", fixed = TRUE)
+  expect_error(drift:::check_gdalcubes("to fetch STAC rasters"),
+               "to fetch STAC rasters", fixed = TRUE)
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  expect_error(dft_stac_fetch(aoi, source = "io-lulc", years = 2020),
+               "appelmar/gdalcubes", fixed = TRUE)
+  expect_error(dft_stac_cube(aoi), "appelmar/gdalcubes", fixed = TRUE)
+})
+
 test_that("dft_stac_fetch requires gdalcubes", {
   skip_if(requireNamespace("gdalcubes", quietly = TRUE),
           "gdalcubes is installed, can't test missing-package path")
@@ -616,7 +632,7 @@ test_that("dft_stac_fetch tiled result matches untiled over the AOI", {
       cfg$stac_url, cfg$collection, cfg$asset, tile_size = NULL
     )
   )
-  expect_length(list.files(file.path(cache, "io-lulc"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "io-lulc"),
                            pattern = paste0("^2020_", attr(untiled_list, "cache_key"),
                                             "\\.nc$")), 1)
   # small tile_size relative to the AOI bbox → several tiles, most bbox-only
@@ -629,9 +645,9 @@ test_that("dft_stac_fetch tiled result matches untiled over the AOI", {
   expect_s4_class(tiled, "SpatRaster")
   expect_equal(terra::nlyr(tiled), 1L)
   # extension routing: untiled caches a gdalcubes .nc, tiled a terra .tif
-  expect_length(list.files(file.path(cache, "io-lulc"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "io-lulc"),
                            pattern = "^2020_.*\\.nc$"), 1)
-  expect_length(list.files(file.path(cache, "io-lulc"),
+  expect_length(list.files(drift:::cache_scheme_dir(cache, "io-lulc"),
                            pattern = "^2020_.*\\.tif$"), 1)
   # tiled == untiled over their common in-AOI cells: tiling changes only which
   # bbox pixels are streamed, not the classification. Put the tiled mosaic onto

@@ -98,7 +98,7 @@ dft_stac_fetch <- function(aoi,
                            cache_dir = NULL,
                            force = FALSE,
                            sign_fn = rstac::sign_planetary_computer()) {
-  rlang::check_installed("gdalcubes", reason = "to fetch STAC rasters")
+  check_gdalcubes("to fetch STAC rasters")
 
   # Normalize tile_size ONCE so the path gate (is.null) and the cache key derive
   # from the same snapped scalar. When tiling, tune GDAL for the many extra
@@ -862,6 +862,26 @@ cache_hit_ok <- function(cache_file, label) {
   FALSE
 }
 
+
+#' Require gdalcubes, naming where to get it
+#'
+#' gdalcubes was archived on CRAN on 2026-09-16 (#80). `rlang::check_installed()`
+#' offers to install a missing package by bare name, which now means CRAN and
+#' fails, and it never reads drift's `Remotes:`. So this aborts with the GitHub
+#' install instead, for anyone who meets it before the README.
+#' @noRd
+check_gdalcubes <- function(reason) {
+  if (gdalcubes_available()) return(invisible(TRUE))
+  cli::cli_abort(c(
+    "The {.pkg gdalcubes} package is required {reason}.",
+    "i" = "It was archived on CRAN on 2026-09-16. Install it from GitHub:",
+    " " = "{.code pak::pak(\"appelmar/gdalcubes\")}"
+  ))
+}
+
+#' Whether gdalcubes can be loaded (a seam, so tests can simulate its absence)
+#' @noRd
+gdalcubes_available <- function() requireNamespace("gdalcubes", quietly = TRUE)
 
 #' Auto-detect UTM EPSG code from sf geometry
 #' @noRd

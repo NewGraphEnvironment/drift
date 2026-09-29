@@ -50,7 +50,7 @@ dft_index_expr <- function(cube,
                            roles = NULL,
                            scale = NULL,
                            offset = NULL) {
-  rlang::check_installed("gdalcubes", reason = "to apply an index to a cube")
+  check_gdalcubes("to apply an index to a cube")
   cfg <- dft_stac_config(source)
   roles <- roles %||% cfg$roles
   scale <- scale %||% cfg$scale %||% 1
