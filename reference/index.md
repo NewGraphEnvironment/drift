@@ -2,6 +2,15 @@
 
 ## All functions
 
+- [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
+  : Accuracy and error-adjusted area from a stratified reference sample
+- [`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md)
+  : Check a reference-label table against the accuracy-assessment
+  contract
+- [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)
+  : Draw a stratified random sample of points for accuracy assessment
+- [`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md)
+  : Size and allocate a stratified accuracy sample
 - [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
   : Temporal category of every row of a break-class summary
 - [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)

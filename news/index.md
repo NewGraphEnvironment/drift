@@ -1,5 +1,71 @@
 # Changelog
 
+## drift 0.19.0
+
+- **Accuracy and error-adjusted area
+  ([\#81](https://github.com/NewGraphEnvironment/drift/issues/81)).**
+  drift reported mapped area only. Mapped area is biased wherever the
+  map is wrong, and badly biased for change maps, because a single wrong
+  label on either date manufactures a transition. Four new functions
+  implement the standard remedy (Olofsson et al. 2014): a stratified
+  random sample of points, reference labels, and estimators that weight
+  the labels back to the population.
+  - [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)
+    draws the points from any strata raster: the map classes, a
+    transition map, or strata such as “change attributed / unattributed
+    / stable”. It records each stratum’s size (the weights) and, through
+    `map =`, the map’s class at every point.
+  - [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
+    returns the error matrix in proportions of area, overall / user’s /
+    producer’s accuracy, and error-adjusted area in hectares with
+    confidence intervals. It wraps
+    [mapaccuracy](https://cran.r-project.org/package=mapaccuracy)’s
+    implementation of Stehman (2014), which holds whether or not the
+    strata are the map classes.
+  - [`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md)
+    is the contract a reference-label table must meet, so any review
+    tool can feed the estimator. drift stores no labels.
+  - [`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md)
+    sizes and allocates a sample for a target standard error (Olofsson
+    Eq. 13). It takes per-stratum SDs from a pilot, so it works for
+    strata that are not the map classes.
+- **It reproduces the paper, and the paper has typos.** Olofsson et
+  al. 2014’s worked example (Tables 8–9) comes back to its printed
+  precision: deforestation 21,158 ± 6,157 ha against the mapped 18,000
+  ha. Three printed values contradict the paper’s own equations: two
+  producer’s-accuracy half-widths (forest gain ±0.23, where Eq. 7 gives
+  ±0.254; stable non-forest ±0.01, where it gives ±0.018) and the SE of
+  deforestation area (34,097 px, where its own margin implies 34,907).
+  The tests pin the equation values. A must-fail test runs the same
+  labels with equal stratum weights, which is what an unweighted
+  confusion matrix assumes: deforestation comes out at 200,748 ha
+  instead of 21,158.
+- **An independent check against a census.** The bundled tiles are small
+  enough to know the truth, with 2017 as the map and 2023 as the
+  reference. Over 300 draws the estimates are unbiased, with strata
+  equal to and different from the map classes. The intervals cover close
+  to 95%, except in one case the docs now warn about: a rare class
+  hiding in a large stratum makes the interval too narrow at small
+  samples. Water inside the Trees stratum covered 61% at 25 points per
+  stratum, 83% at 75 and 89% at 150.
+- **Draws are reproducible and extend from a pilot.** Each stratum draws
+  from its own seeded stream with pinned RNG kinds, not
+  [`terra::spatSample()`](https://rspatial.github.io/terra/reference/sample.html),
+  whose output terra does not promise to keep stable. The same seed with
+  a larger `n` returns the pilot’s points first, so pilot labels carry
+  into the full sample. Changing one stratum’s allocation leaves the
+  others’ points alone. A golden draw is pinned in the tests. A stratum
+  no larger than its allocation is taken whole.
+- **Floodplain scale.** The raster is read in chunks of about ten
+  million cells, twice. On BULK (169M cells, 4.1M of them data) a draw
+  takes 3.3 s and peaks at 0.95 GiB. Estimating 63 transition classes
+  from 1,677 points takes 11 s: the estimator’s run time grows with
+  roughly the 2.5th power of the class count.
+- **Found on the way:**
+  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+  modifies the raster it is given
+  ([\#89](https://github.com/NewGraphEnvironment/drift/issues/89)).
+
 ## drift 0.18.0
 
 - **Dated reference imagery
