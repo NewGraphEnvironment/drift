@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.17.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.18.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,39 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.18.0" id="drift-0180">drift 0.18.0<a class="anchor" aria-label="anchor" href="#drift-0180"></a></h2>
+<ul><li>
+<strong>Dated reference imagery (<a href="https://github.com/NewGraphEnvironment/drift/issues/79" class="external-link">#79</a>).</strong> The Esri and Google basemaps say what a place is but not when it changed. New <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> returns a cloud-masked median composite of any Sentinel-2 band roles for each year’s run of calendar months, for example true colour for June–July in 2017 and in 2023. Values are surface reflectance, not display bytes, so a composite is data and can later be classifier input. It shares its read path with <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code>. The cache entry is written as a Cloud Optimized GeoTIFF, so it can be served through titiler unchanged. floodplains#93 is the first consumer: a stratified accuracy assessment of IO LULC, reviewed at sample points across whole floodplains.</li>
+<li>
+<strong>Chips, one per point.</strong> To review sample points, call <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> once per buffered point. Each chip is small and cached on its own, so adding a point fetches one chip. The obvious alternative, all the points as one AOI with read tiling, was the plan until review: it returns a raster the size of the floodplain under one cache key. On the BULK floodplain, 100 chips (300 m, 2023 Jul–Aug) took 84.1 min: median 40.2 s per chip, peak RSS 0.48 GiB. Almost all of that is remote COG reads (the STAC query is about 2 s), so running chips concurrently is <a href="https://github.com/NewGraphEnvironment/drift/issues/85" class="external-link">#85</a>.</li>
+<li>
+<strong><code>dft_map_interactive(rgb =)</code>.</strong> Composites go on the map as switchable layers beneath the land cover, as rasters (leafem) or as COG URLs (titiler). Every composite gets the same per-band stretch, pooled across years, so a brightness difference between two years is in the data, not an artefact of stretching each image to its own histogram. <code>x</code> may be <code>NULL</code> for an imagery-only map.</li>
+<li>
+<strong>NDWI and MNDWI</strong> join <code><a href="../reference/dft_index_table.html">dft_index_table()</a></code>, with the <code>green</code> and <code>blue</code> Sentinel-2 roles they need. The tests evaluate the resolved expressions on known reflectance and on post-2022 DN through the offset, not only their strings.</li>
+<li>
+<strong>Floodplain scale, two defects fixed and one open.</strong> Both are in the read path the cube shares, so <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> had them too.
+<ul><li>Planetary Computer returns HTTP 413 once a search body passes about 1 MiB. BULK’s floodplain is 104,584 vertices (4.2 MB of GeoJSON), so it could not be queried at all. Above 20,000 vertices the query now uses the AOI’s convex hull; below that it is unchanged.</li>
+<li>Signed URLs expire in about 45 minutes and were signed once, so a 54-minute tiled read lost 15 of 30 tiles, silently. Features are now re-signed before each tile. A full BULK read then got all 30 tiles in 3 h 16 min with no failures. gdalcubes reports a failed chunk only on stderr, which R cannot reliably capture, so detection is <a href="https://github.com/NewGraphEnvironment/drift/issues/87" class="external-link">#87</a>.</li>
+<li>
+<strong>Open (<a href="https://github.com/NewGraphEnvironment/drift/issues/88" class="external-link">#88</a>):</strong> after that full read, clipping the merged mosaic failed (“cannot read from” terra’s temp file). It did not reproduce offline. A floodplain-wide composite over an AOI the size of BULK does not complete yet; chips, and reach-scale composites, do.</li>
+</ul></li>
+<li>
+<strong>Four defects found on the way, three of them silent.</strong>
+<ul><li>terra reads a multi-variable gdalcubes NetCDF alphabetically. A true-colour request came back blue, green, red, and renaming layers by position would have swapped red and blue. The live end-to-end caught it through the layer-order guard.</li>
+<li>Classified and transition layers were projected to EPSG:4326 and handed to leaflet with <code>project = FALSE</code>, which assumes Web Mercator pixels. At reach scale the misregistration was invisible; beneath imagery at floodplain scale it is not.</li>
+<li>A date-only STAC end bound excludes that day’s scenes, 22 of 23 in one measured window. The composite queries with explicit times; <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> has the same defect (<a href="https://github.com/NewGraphEnvironment/drift/issues/83" class="external-link">#83</a>).</li>
+<li>Five network end-to-end assertions had listed a pre-#48 cache path since that change, so they failed on every opt-in run.</li>
+</ul></li>
+<li>
+<strong>What a composite refuses.</strong> A window with Sentinel-2 scenes on both sides of the 2022-01-25 offset change has no single median, because gdalcubes aggregates before the offset is applied. It is refused rather than returned as a pre-side cover. The monthly cube’s January 2022 layer has that bias today (<a href="https://github.com/NewGraphEnvironment/drift/issues/83" class="external-link">#83</a>). A year with no usable scenes is dropped with a warning, and the other years are kept.</li>
+<li>
+<strong><code>cache_write_atomic()</code> moves a <code>.aux.json</code> sidecar as well as <code>.aux.xml</code>.</strong> A COG written from a raster carrying a time (or units, varnames, longnames, metags or scoff) gets one from terra. Before this, it was stranded under the temp name on every write. The composite also strips the time the gdalcubes NetCDF gives it before writing, so the cached COG stands alone. The first fix for this was incomplete, and code review caught it: the fixture had no time and could not reach the failure.</li>
+<li>
+<strong>Refactor, measured.</strong> The STAC query, offset split and tiled assembly moved out of <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> into helpers shared with the composite. A live untiled NDVI cube from main and from the refactor are identical cell for cell (max difference 0), and a new test pins how <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> calls its cache key. Both matter because the frozen-key test cannot see the call site.</li>
+<li>
+<strong>HLS is <a href="https://github.com/NewGraphEnvironment/drift/issues/82" class="external-link">#82</a>.</strong> A live spike found that CMR-STAC rejects <code>intersects</code> and ignores the CQL2 cloud filter, that reading needs a real Earthdata Login (<code>earthdatalogin</code>’s default credentials now return 401), and that S30 and L30 name NIR and SWIR differently. <a href="https://github.com/NewGraphEnvironment/drift/issues/82" class="external-link">#82</a> records these and the source shape they imply.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.17.1" id="drift-0171">drift 0.17.1<a class="anchor" aria-label="anchor" href="#drift-0171"></a></h2>
 <ul><li>

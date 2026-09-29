@@ -11,7 +11,7 @@ dft_rast_transition(). Includes layer control, legend, and fullscreen."><meta pr
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.17.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.18.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,9 +51,11 @@ URLs served via titiler. Optionally overlay land cover transitions from
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dft_map_interactive</span><span class="op">(</span></span>
-<span>  <span class="va">x</span>,</span>
+<span>  x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  aoi <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  transition <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  rgb <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  rgb_rescale <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  class_table <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  source <span class="op">=</span> <span class="st">"io-lulc"</span>,</span>
 <span>  titiler_url <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"drift.titiler_url"</span><span class="op">)</span>,</span>
@@ -73,7 +75,8 @@ URLs served via titiler. Optionally overlay land cover transitions from
 <dd><p>A named list of classified <a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a>s (e.g. from
 <code><a href="dft_rast_classify.html">dft_rast_classify()</a></code>) <strong>or</strong> a named character vector of COG URLs.
 A single <code>SpatRaster</code> or URL string is auto-wrapped into a length-1
-list/vector. Names become the layer toggle labels (years, seasons, etc.).</p></dd>
+list/vector. Names become the layer toggle labels (years, seasons, etc.).
+May be <code>NULL</code> when <code>rgb</code> is supplied, for an imagery-only map.</p></dd>
 
 
 <dt id="arg-aoi">aoi<a class="anchor" aria-label="anchor" href="#arg-aoi"></a></dt>
@@ -86,6 +89,25 @@ omits the AOI layer.</p></dd>
 <code>raster</code> (factor <code>SpatRaster</code>) and <code>summary</code> (tibble). Each transition
 type becomes a toggleable overlay. Stable transitions (same from/to class)
 are excluded by default. <code>NULL</code> (default) omits transition overlays.</p></dd>
+
+
+<dt id="arg-rgb">rgb<a class="anchor" aria-label="anchor" href="#arg-rgb"></a></dt>
+<dd><p>Dated reference imagery: a named list of three-band
+<a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a>s in red, green, blue order (the output of
+<code><a href="dft_stac_composite.html">dft_stac_composite()</a></code> with its default <code>bands</code>), <strong>or</strong> a named character
+vector of three-band COG URLs served through <code>titiler_url</code>. Names become
+the layer labels, e.g. <code>"2017 Jun–Jul"</code>. Local rasters are drawn with
+<code><a href="https://r-spatial.github.io/leafem/reference/addRasterRGB.html" class="external-link">leafem::addRasterRGB()</a></code>, which reads every cell into memory; for a
+floodplain-sized composite, publish the cached COG and pass its URL
+instead. <code>NULL</code> (default) adds no imagery.</p></dd>
+
+
+<dt id="arg-rgb-rescale">rgb_rescale<a class="anchor" aria-label="anchor" href="#arg-rgb-rescale"></a></dt>
+<dd><p>Numeric length-2 reflectance range stretched to the full
+display range, the same for every band of every <code>rgb</code> layer. When <code>NULL</code>,
+local rasters stretch each band from its 2nd to 98th percentile across all
+composites pooled, and COG URLs use <code>c(0, 0.3)</code>, a range that suits
+vegetated land in surface reflectance.</p></dd>
 
 
 <dt id="arg-class-table">class_table<a class="anchor" aria-label="anchor" href="#arg-class-table"></a></dt>
@@ -124,7 +146,8 @@ Set to <code>NULL</code> to suppress the legend.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <a href="https://rstudio.github.io/leaflet/reference/leaflet.html" class="external-link">leaflet::leaflet</a> htmlwidget. The first layer in <code>x</code> is visible
 by default; other layers are hidden but toggleable. Transition overlays
-are visible by default when supplied.</p>
+are visible by default when supplied. <code>rgb</code> layers are hidden when <code>x</code> is
+supplied (toggle them on beneath it); without <code>x</code> the first is shown.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -132,6 +155,13 @@ are visible by default when supplied.</p>
 (one visible at a time). When <code>transition</code> is also supplied, each transition
 type (e.g. Trees -&gt; Rangeland) is added as a checkbox overlay that can be
 shown simultaneously on top of any classified layer.</p>
+<p>When <code>rgb</code> is supplied, each composite (e.g. from <code><a href="dft_stac_composite.html">dft_stac_composite()</a></code>) is
+added as a switchable overlay beneath the classified and transition layers,
+so dated imagery can be toggled under a land-cover label to check it. Every
+composite gets <strong>the same stretch</strong>: each band's display range is set once,
+from all the composites pooled, so a brightness or colour difference between
+two years is in the data and not an artefact of stretching each image to its
+own histogram.</p>
     </div>
 
     <div class="section level2">
@@ -168,6 +198,10 @@ shown simultaneously on top of any classified layer.</p>
 <span class="r-in"><span><span class="va">cogs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2017"</span> <span class="op">=</span> <span class="st">"https://bucket.s3.amazonaws.com/lulc_2017.tif"</span>,</span></span>
 <span class="r-in"><span>          <span class="st">"2023"</span> <span class="op">=</span> <span class="st">"https://bucket.s3.amazonaws.com/lulc_2023.tif"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">dft_map_interactive</span><span class="op">(</span><span class="va">cogs</span>, source <span class="op">=</span> <span class="st">"io-lulc"</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Dated true-colour composites beneath the land cover (network + gdalcubes)</span></span></span>
+<span class="r-in"><span><span class="va">tc</span> <span class="op">&lt;-</span> <span class="fu"><a href="dft_stac_composite.html">dft_stac_composite</a></span><span class="op">(</span><span class="va">aoi</span>, years <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2017</span>, <span class="fl">2023</span><span class="op">)</span>, months <span class="op">=</span> <span class="fl">6</span><span class="op">:</span><span class="fl">7</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">dft_map_interactive</span><span class="op">(</span><span class="va">classified</span>, aoi <span class="op">=</span> <span class="va">aoi</span>, rgb <span class="op">=</span> <span class="va">tc</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

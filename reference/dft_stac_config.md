@@ -26,12 +26,12 @@ dft_stac_config(source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a"))
 
 A list. Categorical sources have elements `stac_url`, `collection`,
 `asset`, `available_years`. Cube sources have `stac_url`, `collection`,
-`cube = TRUE`, `roles` (a named list mapping `red`/`nir`/`swir16`/`mask`
-to asset names), `mask_values` (integer mask classes to exclude),
-`scale`/`offset` (DN → reflectance affine transform), and
-`available_datetime` (an ISO 8601 interval string). The `cube` field is
-absent (not `FALSE`) for categorical sources; test with
-`isTRUE(cfg$cube)`.
+`cube = TRUE`, `roles` (a named list mapping
+`red`/`green`/`blue`/`nir`/`swir16`/`mask` to asset names),
+`mask_values` (integer mask classes to exclude), `scale`/`offset` (DN →
+reflectance affine transform), and `available_datetime` (an ISO 8601
+interval string). The `cube` field is absent (not `FALSE`) for
+categorical sources; test with `isTRUE(cfg$cube)`.
 
 ## Details
 
@@ -41,8 +41,8 @@ Sources are of two kinds. **Categorical** sources (`"io-lulc"`,
 [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md).
 **Cube** sources (`"sentinel-2-l2a"`) host multi-band reflectance
 imagery and instead carry a role-based band map
-(`red`/`nir`/`swir16`/`mask`), mask values, and reflectance scale/offset
-for
+(`red`/`green`/`blue`/`nir`/`swir16`/`mask`), mask values, and
+reflectance scale/offset for
 [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md);
 they are marked with `cube = TRUE`. The role-based schema means a new
 reflectance source (e.g. Landsat C2 L2) drops in with no API change —
@@ -90,6 +90,12 @@ dft_stac_config("sentinel-2-l2a")
 #> $roles
 #> $roles$red
 #> [1] "B04"
+#> 
+#> $roles$green
+#> [1] "B03"
+#> 
+#> $roles$blue
+#> [1] "B02"
 #> 
 #> $roles$nir
 #> [1] "B08"

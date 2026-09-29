@@ -38,6 +38,8 @@
   : Per-pixel index trend over time
 - [`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md)
   : Extract class table from STAC item metadata
+- [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  : Fetch dated, cloud-masked reflectance composites from a STAC catalog
 - [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
   : Get STAC configuration for a known source
 - [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)

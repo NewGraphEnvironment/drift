@@ -10,9 +10,11 @@ Includes layer control, legend, and fullscreen.
 
 ``` r
 dft_map_interactive(
-  x,
+  x = NULL,
   aoi = NULL,
   transition = NULL,
+  rgb = NULL,
+  rgb_rescale = NULL,
   class_table = NULL,
   source = "io-lulc",
   titiler_url = getOption("drift.titiler_url"),
@@ -34,7 +36,8 @@ dft_map_interactive(
   [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md))
   **or** a named character vector of COG URLs. A single `SpatRaster` or
   URL string is auto-wrapped into a length-1 list/vector. Names become
-  the layer toggle labels (years, seasons, etc.).
+  the layer toggle labels (years, seasons, etc.). May be `NULL` when
+  `rgb` is supplied, for an imagery-only map.
 
 - aoi:
 
@@ -49,6 +52,28 @@ dft_map_interactive(
   (tibble). Each transition type becomes a toggleable overlay. Stable
   transitions (same from/to class) are excluded by default. `NULL`
   (default) omits transition overlays.
+
+- rgb:
+
+  Dated reference imagery: a named list of three-band
+  [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)s
+  in red, green, blue order (the output of
+  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  with its default `bands`), **or** a named character vector of
+  three-band COG URLs served through `titiler_url`. Names become the
+  layer labels, e.g. `"2017 Jun–Jul"`. Local rasters are drawn with
+  [`leafem::addRasterRGB()`](https://r-spatial.github.io/leafem/reference/addRasterRGB.html),
+  which reads every cell into memory; for a floodplain-sized composite,
+  publish the cached COG and pass its URL instead. `NULL` (default) adds
+  no imagery.
+
+- rgb_rescale:
+
+  Numeric length-2 reflectance range stretched to the full display
+  range, the same for every band of every `rgb` layer. When `NULL`,
+  local rasters stretch each band from its 2nd to 98th percentile across
+  all composites pooled, and COG URLs use `c(0, 0.3)`, a range that
+  suits vegetated land in surface reflectance.
 
 - class_table:
 
@@ -91,7 +116,8 @@ A
 [leaflet::leaflet](https://rstudio.github.io/leaflet/reference/leaflet.html)
 htmlwidget. The first layer in `x` is visible by default; other layers
 are hidden but toggleable. Transition overlays are visible by default
-when supplied.
+when supplied. `rgb` layers are hidden when `x` is supplied (toggle them
+on beneath it); without `x` the first is shown.
 
 ## Details
 
@@ -99,6 +125,15 @@ When only `x` is supplied, classified layers appear as radio-toggle
 overlays (one visible at a time). When `transition` is also supplied,
 each transition type (e.g. Trees -\> Rangeland) is added as a checkbox
 overlay that can be shown simultaneously on top of any classified layer.
+
+When `rgb` is supplied, each composite (e.g. from
+[`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md))
+is added as a switchable overlay beneath the classified and transition
+layers, so dated imagery can be toggled under a land-cover label to
+check it. Every composite gets **the same stretch**: each band's display
+range is set once, from all the composites pooled, so a brightness or
+colour difference between two years is in the data and not an artefact
+of stretching each image to its own histogram.
 
 ## Examples
 
@@ -135,5 +170,9 @@ if (FALSE) { # \dontrun{
 cogs <- c("2017" = "https://bucket.s3.amazonaws.com/lulc_2017.tif",
           "2023" = "https://bucket.s3.amazonaws.com/lulc_2023.tif")
 dft_map_interactive(cogs, source = "io-lulc")
+
+# Dated true-colour composites beneath the land cover (network + gdalcubes)
+tc <- dft_stac_composite(aoi, years = c(2017, 2023), months = 6:7)
+dft_map_interactive(classified, aoi = aoi, rgb = tc)
 } # }
 ```

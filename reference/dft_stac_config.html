@@ -13,7 +13,7 @@ users don't need to remember STAC URLs, collection IDs, and band names."><meta p
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.17.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.18.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,7 +70,8 @@ L2A surface reflectance, a cube source).</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list. Categorical sources have elements <code>stac_url</code>, <code>collection</code>,
 <code>asset</code>, <code>available_years</code>. Cube sources have <code>stac_url</code>, <code>collection</code>,
-<code>cube = TRUE</code>, <code>roles</code> (a named list mapping <code>red</code>/<code>nir</code>/<code>swir16</code>/<code>mask</code>
+<code>cube = TRUE</code>, <code>roles</code> (a named list mapping
+<code>red</code>/<code>green</code>/<code>blue</code>/<code>nir</code>/<code>swir16</code>/<code>mask</code>
 to asset names), <code>mask_values</code> (integer mask classes to exclude),
 <code>scale</code>/<code>offset</code> (DN → reflectance affine transform), and
 <code>available_datetime</code> (an ISO 8601 interval string). The <code>cube</code> field is
@@ -82,7 +83,7 @@ absent (not <code>FALSE</code>) for categorical sources; test with <code>isTRUE(
 <code>"esa-worldcover"</code>) host single-band classified rasters and carry a flat
 <code>asset</code> name for <code><a href="dft_stac_fetch.html">dft_stac_fetch()</a></code>. <strong>Cube</strong> sources (<code>"sentinel-2-l2a"</code>)
 host multi-band reflectance imagery and instead carry a role-based band map
-(<code>red</code>/<code>nir</code>/<code>swir16</code>/<code>mask</code>), mask values, and reflectance scale/offset for
+(<code>red</code>/<code>green</code>/<code>blue</code>/<code>nir</code>/<code>swir16</code>/<code>mask</code>), mask values, and reflectance scale/offset for
 <code><a href="dft_stac_cube.html">dft_stac_cube()</a></code>; they are marked with <code>cube = TRUE</code>. The role-based schema
 means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 change — only the role→asset map and scale/offset differ.</p>
@@ -129,6 +130,12 @@ change — only the role→asset map and scale/offset differ.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $roles</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $roles$red</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "B04"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $roles$green</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "B03"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $roles$blue</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "B02"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $roles$nir</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "B08"</span>
