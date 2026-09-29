@@ -39,6 +39,22 @@ Relates: floodplains#93, drift#79
 - The estimator takes the general Stehman 2014 form (strata may differ from map classes), because floodplains#93 strata are not map classes.
 - No existing implementation in the org: swept the exports of 19 NGE packages plus `gh search code org:NewGraphEnvironment olofsson`. `mapaccuracy`, `survey` and `sampling` are not installed and not needed.
 
+## Existing implementations (reported by a soul session, 2026-09-28)
+
+My org-only sweep missed these. Both are outside NewGraphEnvironment.
+
+- **`mapaccuracy`** (CRAN 0.1.2, 2024-04-03, Hugo Costa, MIT). Imports only `stats`. It implements Olofsson 2014 and Stehman 2014 (`olofsson()`, `stehman2014()`), and its docs check it against published examples from Olofsson 2013 (two), Olofsson 2014 and Stehman 2014. Its docs record a confirmed typo in Olofsson 2013 (a CI lower bound).
+- **`mapac`** (Dirk Pflugmacher, HU Berlin GitLab, v0.31, 91 commits 2020–2026). Not on CRAN. It covers stratified and Stehman-2014 estimators, allocation, and report tables. Its tests are thin: one file, which checks only Stehman 2014.
+
+**The Olofsson 2014 PDF is in the NGE Zotero group** as `olofsson_etal2014Goodpractices`; its md5 was verified against the published PDF. Run through `mapac`, Tables 8–9 match on:
+- all four areas with their CIs (deforestation 21,158 ± 6,158 ha)
+- all four user's accuracies
+- OA 0.947 ± 0.018, which the paper prints rounded as 0.95 ± 0.02
+
+**Two producer's-accuracy CIs in the paper look like typos.** Forest gain is printed ±0.23 but Eq. 7 gives ±0.254; stable non-forest is printed ±0.01 but Eq. 7 gives ±0.018. The soul session recomputed both independently of `mapac`, and no erratum is registered. So those two pins take the Eq. 7 value, cite the discrepancy, and do not assert the printed figure.
+
+Stehman 2014 and Olofsson 2013 are paywalled and not yet saved.
+
 ## Errors Encountered
 
 | Error | Resolution |
