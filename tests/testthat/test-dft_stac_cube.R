@@ -660,3 +660,97 @@ test_that("an empty cached cube still ABORTS rather than re-fetching", {
     "no data on any layer"
   )
 })
+
+test_that("dft_stac_cube computes its cache key from its own arguments (call site pinned)", {
+  # The frozen-key test calls stac_cube_cache_key() directly and the gate tests
+  # mock it, so neither would notice the call site passing arguments in a new
+  # order. Seed a healthy cube at the key computed from explicit arguments and
+  # require dft_stac_cube() to serve it without reaching the network.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cfg <- dft_stac_config("sentinel-2-l2a")
+  crs <- drift:::auto_utm_epsg(aoi)
+  aoi_t <- sf::st_transform(aoi, as.integer(gsub("EPSG:", "", crs)))
+  key <- drift:::stac_cube_cache_key(
+    aoi_t, 10, crs, "P1M", "median", "bilinear", cfg$stac_url, cfg$collection,
+    c("B08", "B04"), "2020-06-01/2020-07-31", "ndvi", 60, cfg$mask_values,
+    cfg$scale, cfg$offset, NULL, cfg$offset_before, TRUE
+  )
+  cache <- tempfile("drift_cube_callsite_")
+  dir <- drift:::cache_scheme_dir(cache, "sentinel-2-l2a")
+  dir.create(dir, recursive = TRUE)
+  r <- terra::rast(terra::ext(aoi_t), resolution = 10, crs = crs, nlyrs = 2,
+                   vals = 0.5)
+  terra::writeRaster(r, file.path(dir, paste0("cube_", key, ".tif")))
+  testthat::local_mocked_bindings(
+    stac = function(...) stop("fell through to a re-fetch"), .package = "rstac"
+  )
+  out <- suppressMessages(dft_stac_cube(aoi, index = "ndvi",
+                                        datetime = "2020-06-01/2020-07-31",
+                                        cache_dir = cache))
+  expect_equal(terra::nlyr(out), 2)
+})
+
+test_that("cache_write_atomic moves a terra .aux.json sidecar with the raster", {
+  # A COG written from a raster that carries a time (or units, metags...) gets a
+  # terra .aux.json; only .aux.xml used to be moved, so the json was stranded
+  # under the temp name on every write (#79).
+  dir <- tempfile("drift_sidecar_")
+  dir.create(dir)
+  r <- terra::rast(nrows = 4, ncols = 4, nlyrs = 2, vals = 1,
+                   crs = "EPSG:32609", extent = c(0, 40, 0, 40))
+  terra::time(r) <- as.Date(c("2023-06-01", "2023-07-01"))
+  path <- file.path(dir, "entry.tif")
+  drift:::cache_write_atomic(path, function(out) {
+    terra::writeRaster(r, out, filetype = "COG")
+  })
+  files <- sort(list.files(dir, all.files = TRUE, no.. = TRUE))
+  expect_false(any(grepl("tmp", files)))
+  expect_true("entry.tif" %in% files)
+  # the sidecar, when the driver writes one, sits under the canonical name
+  expect_true(all(files %in% c("entry.tif", "entry.tif.aux.json", "entry.tif.aux.xml")))
+})
+
+test_that("stac_query_geometry sends the union below the vertex limit and a hull above", {
+  # Planetary Computer returns HTTP 413 above ~1 MiB of POST body; BULK's
+  # floodplain (104,584 vertices) could not be queried at all (#79).
+  aoi_path <- system.file("extdata", "example_aoi.gpkg", package = "drift")
+  aoi <- sf::st_transform(sf::st_read(aoi_path, quiet = TRUE), 4326)
+  u <- sf::st_geometry(sf::st_union(aoi))[[1]]
+  n <- nrow(sf::st_coordinates(u))
+  # below the limit: exactly the union, so existing queries are unchanged
+  expect_identical(drift:::stac_query_geometry(aoi, max_vertices = n), u)
+  # above it: a hull, far smaller, still covering the AOI
+  expect_message(h <- drift:::stac_query_geometry(aoi, max_vertices = n - 1L),
+                 "convex hull")
+  expect_lt(nrow(sf::st_coordinates(h)), n / 10)
+  expect_true(isTRUE(sf::st_covers(sf::st_sfc(h, crs = 4326),
+                                   sf::st_sfc(u, crs = 4326), sparse = FALSE)[1, 1]))
+})
+
+test_that("stac_features_resign re-signs features before a read, stubs pass through", {
+  # Planetary Computer tokens last ~45 min and a tiled floodplain read outlives
+  # one (#79: 15 of 30 BULK tiles failed). Re-signing per extent refreshes them.
+  feat <- function(sig) {
+    href <- paste0("https://x/a.tif?sig=", sig)
+    list(type = "Feature", id = "a", assets = list(B04 = list(href = href)))
+  }
+  items <- structure(list(type = "FeatureCollection", features = list(feat("old"))),
+                     class = c("doc_items", "rstac_doc", "list"))
+  calls <- 0L
+  signer <- function(item, ...) {
+    calls <<- calls + 1L
+    item$assets$B04$href <- sub("sig=[^&]*", "sig=fresh", item$assets$B04$href)
+    item
+  }
+  fetched <- list(features = items$features, is_pre = FALSE, items = items,
+                  sign_fn = signer)
+  out <- drift:::stac_features_resign(fetched, list(feat("expired")))
+  expect_equal(out[[1]]$assets$B04$href, "https://x/a.tif?sig=fresh")
+  expect_equal(calls, 1L)
+  # a stub without items/sign_fn, and an empty subset, pass through untouched
+  expect_identical(drift:::stac_features_resign(list(features = list()), list(feat("x"))),
+                   list(feat("x")))
+  expect_identical(drift:::stac_features_resign(fetched, list()), list())
+})

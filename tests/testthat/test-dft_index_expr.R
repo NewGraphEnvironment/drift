@@ -1,5 +1,11 @@
 # S2 role map (Planetary Computer band names) used across the resolver tests
-s2_roles <- list(red = "B04", nir = "B08", swir16 = "B11", mask = "SCL")
+s2_roles <- list(red = "B04", green = "B03", blue = "B02", nir = "B08",
+                 swir16 = "B11", mask = "SCL")
+
+# Evaluate a resolved expression in R over named band values. The water indices
+# are plain arithmetic, so R and tinyexpr agree on them; this checks the NUMBER
+# the formula produces, not just its string.
+eval_expr <- function(expr, bands) eval(parse(text = expr), as.list(bands))
 
 test_that("dft_index_table ships ndvi, kndvi, ndmi with formulas over roles", {
   tbl <- dft_index_table()
@@ -58,4 +64,39 @@ test_that("an index needing an absent role errors", {
     drift:::index_resolve_expr("ndmi", list(red = "B04", nir = "B08")),
     "role"
   )
+})
+
+
+test_that("dft_index_table ships ndwi and mndwi over green", {
+  tbl <- dft_index_table()
+  expect_true(all(c("ndwi", "mndwi") %in% tbl$index))
+  expect_setequal(drift:::index_roles("ndwi"), c("green", "nir"))
+  expect_setequal(drift:::index_roles("mndwi"), c("green", "swir16"))
+})
+
+test_that("ndwi and mndwi give the hand-computed value on known reflectance", {
+  # Open water: green 0.10, nir 0.03, swir16 0.01 -> both strongly positive.
+  # Vegetation: green 0.10, nir 0.30, swir16 0.20 -> both negative.
+  water <- c(B03 = 0.10, B08 = 0.03, B11 = 0.01)
+  veg   <- c(B03 = 0.10, B08 = 0.30, B11 = 0.20)
+  ndwi  <- drift:::index_resolve_expr("ndwi", s2_roles, scale = 1, offset = 0)
+  mndwi <- drift:::index_resolve_expr("mndwi", s2_roles, scale = 1, offset = 0)
+  expect_equal(ndwi, "(B03 - B08) / (B03 + B08)")
+  expect_equal(mndwi, "(B03 - B11) / (B03 + B11)")
+  expect_equal(eval_expr(ndwi, water), (0.10 - 0.03) / (0.10 + 0.03))
+  expect_equal(eval_expr(ndwi, veg), -0.5)
+  expect_equal(eval_expr(mndwi, water), (0.10 - 0.01) / (0.10 + 0.01))
+  expect_equal(eval_expr(mndwi, veg), -1 / 3)
+})
+
+test_that("ndwi applies the S2 offset per band, so DN input gives reflectance output", {
+  # Post-2022 S2 DN = reflectance * 1e4 + 1000. Feeding those DNs through the
+  # scale/offset-folded expression must return the same value as the
+  # reflectance above; computing it on raw DN would not (the offset does not
+  # cancel in a ratio), which is the defect the affine folding exists to stop.
+  dn <- c(B03 = 0.10 * 1e4 + 1000, B08 = 0.30 * 1e4 + 1000)
+  expr <- drift:::index_resolve_expr("ndwi", s2_roles, scale = 1e-4, offset = -0.1)
+  expect_equal(eval_expr(expr, dn), -0.5)
+  raw <- drift:::index_resolve_expr("ndwi", s2_roles, scale = 1, offset = 0)
+  expect_false(isTRUE(all.equal(eval_expr(raw, dn), -0.5)))
 })

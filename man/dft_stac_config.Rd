@@ -14,7 +14,8 @@ L2A surface reflectance, a cube source).}
 \value{
 A list. Categorical sources have elements \code{stac_url}, \code{collection},
 \code{asset}, \code{available_years}. Cube sources have \code{stac_url}, \code{collection},
-\code{cube = TRUE}, \code{roles} (a named list mapping \code{red}/\code{nir}/\code{swir16}/\code{mask}
+\code{cube = TRUE}, \code{roles} (a named list mapping
+\code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}/\code{mask}
 to asset names), \code{mask_values} (integer mask classes to exclude),
 \code{scale}/\code{offset} (DN → reflectance affine transform), and
 \code{available_datetime} (an ISO 8601 interval string). The \code{cube} field is
@@ -31,7 +32,7 @@ Sources are of two kinds. \strong{Categorical} sources (\code{"io-lulc"},
 \code{"esa-worldcover"}) host single-band classified rasters and carry a flat
 \code{asset} name for \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}. \strong{Cube} sources (\code{"sentinel-2-l2a"})
 host multi-band reflectance imagery and instead carry a role-based band map
-(\code{red}/\code{nir}/\code{swir16}/\code{mask}), mask values, and reflectance scale/offset for
+(\code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}/\code{mask}), mask values, and reflectance scale/offset for
 \code{\link[=dft_stac_cube]{dft_stac_cube()}}; they are marked with \code{cube = TRUE}. The role-based schema
 means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 change — only the role→asset map and scale/offset differ.

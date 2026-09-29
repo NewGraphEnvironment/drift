@@ -9,7 +9,7 @@
 #' `"esa-worldcover"`) host single-band classified rasters and carry a flat
 #' `asset` name for [dft_stac_fetch()]. **Cube** sources (`"sentinel-2-l2a"`)
 #' host multi-band reflectance imagery and instead carry a role-based band map
-#' (`red`/`nir`/`swir16`/`mask`), mask values, and reflectance scale/offset for
+#' (`red`/`green`/`blue`/`nir`/`swir16`/`mask`), mask values, and reflectance scale/offset for
 #' [dft_stac_cube()]; they are marked with `cube = TRUE`. The role-based schema
 #' means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 #' change — only the role→asset map and scale/offset differ.
@@ -20,7 +20,8 @@
 #'
 #' @return A list. Categorical sources have elements `stac_url`, `collection`,
 #'   `asset`, `available_years`. Cube sources have `stac_url`, `collection`,
-#'   `cube = TRUE`, `roles` (a named list mapping `red`/`nir`/`swir16`/`mask`
+#'   `cube = TRUE`, `roles` (a named list mapping
+#'   `red`/`green`/`blue`/`nir`/`swir16`/`mask`
 #'   to asset names), `mask_values` (integer mask classes to exclude),
 #'   `scale`/`offset` (DN → reflectance affine transform), and
 #'   `available_datetime` (an ISO 8601 interval string). The `cube` field is
@@ -57,6 +58,8 @@ dft_stac_config <- function(source = c("io-lulc", "esa-worldcover",
       # Planetary Computer asset names (NOT the Element84/AWS red/nir/scl names)
       roles = list(
         red    = "B04",
+        green  = "B03",
+        blue   = "B02",
         nir    = "B08",
         swir16 = "B11",
         mask   = "SCL"

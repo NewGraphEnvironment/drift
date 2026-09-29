@@ -2,3 +2,5 @@ index,formula,roles,description
 ndvi,"(nir - red) / (nir + red)","nir,red",Normalized Difference Vegetation Index
 kndvi,"tanh(pow((nir - red) / (nir + red), 2))","nir,red",Kernel NDVI (tanh of NDVI squared)
 ndmi,"(nir - swir16) / (nir + swir16)","nir,swir16",Normalized Difference Moisture Index
+ndwi,"(green - nir) / (green + nir)","green,nir",Normalized Difference Water Index (McFeeters 1996)
+mndwi,"(green - swir16) / (green + swir16)","green,swir16",Modified NDWI (Xu 2006)

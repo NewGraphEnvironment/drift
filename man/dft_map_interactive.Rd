@@ -5,9 +5,11 @@
 \title{Interactive leaflet map for classified rasters and transitions}
 \usage{
 dft_map_interactive(
-  x,
+  x = NULL,
   aoi = NULL,
   transition = NULL,
+  rgb = NULL,
+  rgb_rescale = NULL,
   class_table = NULL,
   source = "io-lulc",
   titiler_url = getOption("drift.titiler_url"),
@@ -22,7 +24,8 @@ dft_map_interactive(
 \item{x}{A named list of classified \link[terra:SpatRaster-class]{terra::SpatRaster}s (e.g. from
 \code{\link[=dft_rast_classify]{dft_rast_classify()}}) \strong{or} a named character vector of COG URLs.
 A single \code{SpatRaster} or URL string is auto-wrapped into a length-1
-list/vector. Names become the layer toggle labels (years, seasons, etc.).}
+list/vector. Names become the layer toggle labels (years, seasons, etc.).
+May be \code{NULL} when \code{rgb} is supplied, for an imagery-only map.}
 
 \item{aoi}{An \code{sf} polygon for the area of interest outline. \code{NULL} (default)
 omits the AOI layer.}
@@ -31,6 +34,21 @@ omits the AOI layer.}
 \code{raster} (factor \code{SpatRaster}) and \code{summary} (tibble). Each transition
 type becomes a toggleable overlay. Stable transitions (same from/to class)
 are excluded by default. \code{NULL} (default) omits transition overlays.}
+
+\item{rgb}{Dated reference imagery: a named list of three-band
+\link[terra:SpatRaster-class]{terra::SpatRaster}s in red, green, blue order (the output of
+\code{\link[=dft_stac_composite]{dft_stac_composite()}} with its default \code{bands}), \strong{or} a named character
+vector of three-band COG URLs served through \code{titiler_url}. Names become
+the layer labels, e.g. \code{"2017 Jun–Jul"}. Local rasters are drawn with
+\code{\link[leafem:addRasterRGB]{leafem::addRasterRGB()}}, which reads every cell into memory; for a
+floodplain-sized composite, publish the cached COG and pass its URL
+instead. \code{NULL} (default) adds no imagery.}
+
+\item{rgb_rescale}{Numeric length-2 reflectance range stretched to the full
+display range, the same for every band of every \code{rgb} layer. When \code{NULL},
+local rasters stretch each band from its 2nd to 98th percentile across all
+composites pooled, and COG URLs use \code{c(0, 0.3)}, a range that suits
+vegetated land in surface reflectance.}
 
 \item{class_table}{A tibble with columns \code{code}, \code{class_name}, \code{color}
 (hex). When \code{NULL}, loaded via \code{\link[=dft_class_table]{dft_class_table()}} using \code{source}.}
@@ -55,7 +73,8 @@ Set to \code{NULL} to suppress the legend.}
 \value{
 A \link[leaflet:leaflet]{leaflet::leaflet} htmlwidget. The first layer in \code{x} is visible
 by default; other layers are hidden but toggleable. Transition overlays
-are visible by default when supplied.
+are visible by default when supplied. \code{rgb} layers are hidden when \code{x} is
+supplied (toggle them on beneath it); without \code{x} the first is shown.
 }
 \description{
 Build a toggleable leaflet map from classified \code{SpatRaster}s or remote COG
@@ -67,6 +86,14 @@ When only \code{x} is supplied, classified layers appear as radio-toggle overlay
 (one visible at a time). When \code{transition} is also supplied, each transition
 type (e.g. Trees -> Rangeland) is added as a checkbox overlay that can be
 shown simultaneously on top of any classified layer.
+
+When \code{rgb} is supplied, each composite (e.g. from \code{\link[=dft_stac_composite]{dft_stac_composite()}}) is
+added as a switchable overlay beneath the classified and transition layers,
+so dated imagery can be toggled under a land-cover label to check it. Every
+composite gets \strong{the same stretch}: each band's display range is set once,
+from all the composites pooled, so a brightness or colour difference between
+two years is in the data and not an artefact of stretching each image to its
+own histogram.
 }
 \examples{
 # Single classified raster — returns a leaflet widget
@@ -100,5 +127,9 @@ if (interactive()) map
 cogs <- c("2017" = "https://bucket.s3.amazonaws.com/lulc_2017.tif",
           "2023" = "https://bucket.s3.amazonaws.com/lulc_2023.tif")
 dft_map_interactive(cogs, source = "io-lulc")
+
+# Dated true-colour composites beneath the land cover (network + gdalcubes)
+tc <- dft_stac_composite(aoi, years = c(2017, 2023), months = 6:7)
+dft_map_interactive(classified, aoi = aoi, rgb = tc)
 }
 }

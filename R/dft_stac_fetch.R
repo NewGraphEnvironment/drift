@@ -678,12 +678,15 @@ cache_write_atomic <- function(path, write_fn) {
             basename(tempfile("")),
             tools::file_ext(path))
   )
-  # GDAL's PAM sidecar rides along with whatever the writer produced. Measured:
-  # terra::writeRaster() to `.nc` emits one, to `.tif` does not. Renaming only
-  # the raster would strand it under the dead temp name, leaving cache litter
-  # that dft_cache_info() then counts.
-  tmp_pam <- paste0(tmp, ".aux.xml")
-  on.exit(unlink(c(tmp, tmp_pam)), add = TRUE)
+  # Sidecars ride along with whatever the writer produced. Measured:
+  # terra::writeRaster() to `.nc` emits a GDAL PAM `.aux.xml`, to a plain `.tif`
+  # nothing, and to a COG a terra `.aux.json` whenever the raster carries a time,
+  # units, varnames, longnames, metags or scoff (#79, terra 1.9.50). Renaming
+  # only the raster would strand them under the dead temp name, leaving cache
+  # litter that dft_cache_info() then counts.
+  sidecars <- c(".aux.xml", ".aux.json")
+  tmp_side <- paste0(tmp, sidecars)
+  on.exit(unlink(c(tmp, tmp_side)), add = TRUE)
 
   write_fn(tmp)
 
@@ -706,12 +709,15 @@ cache_write_atomic <- function(path, write_fn) {
     ))
   }
 
-  # Sidecar first, raster second, so the canonical name never exists without it.
-  if (file.exists(tmp_pam) &&
-        !isTRUE(file.rename(tmp_pam, paste0(path, ".aux.xml")))) {
-    cli::cli_abort(
-      "The sidecar for {.file {basename(path)}} could not be moved into place."
-    )
+  # Sidecars first, raster second, so the canonical name never exists without
+  # them.
+  for (i in seq_along(sidecars)) {
+    if (file.exists(tmp_side[i]) &&
+          !isTRUE(file.rename(tmp_side[i], paste0(path, sidecars[i])))) {
+      cli::cli_abort(
+        "The sidecar for {.file {basename(path)}} could not be moved into place."
+      )
+    }
   }
   if (!isTRUE(file.rename(tmp, path))) {
     cli::cli_abort(c(

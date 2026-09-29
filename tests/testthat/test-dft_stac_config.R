@@ -36,8 +36,10 @@ test_that("dft_stac_config returns role-based cube config for sentinel-2-l2a", {
   expect_match(cfg$stac_url, "planetarycomputer")
 
   # role -> asset map uses Planetary Computer band names (B04/B08/B11/SCL)
-  expect_named(cfg$roles, c("red", "nir", "swir16", "mask"))
+  expect_named(cfg$roles, c("red", "green", "blue", "nir", "swir16", "mask"))
   expect_equal(cfg$roles$red, "B04")
+  expect_equal(cfg$roles$green, "B03")
+  expect_equal(cfg$roles$blue, "B02")
   expect_equal(cfg$roles$nir, "B08")
   expect_equal(cfg$roles$swir16, "B11")
   expect_equal(cfg$roles$mask, "SCL")

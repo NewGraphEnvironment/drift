@@ -194,3 +194,20 @@ Do not install the fork over 0.7.5.
 See `planning/archive/2026-07-issue-30-index-trajectory/findings.md` and
 `planning/archive/2026-07-issue-30-vignette-qa-map/findings.md` for the full
 empirical journey.
+
+## Floodplain scale and multi-band reads (#79, 2026-09-28)
+
+Measured on gdalcubes 0.7.5, rstac 1.0.1 and terra 1.9.50, with the BULK floodplain (`bulk_co_ff04`) and the packaged AOI. Scripts are `data-raw/benchmark_composite_bulk.R`; the numbers are in `planning/archive/2026-09-issue-79-dated-reference-imagery/`.
+
+- **Planetary Computer rejects a search body over about 1 MiB with HTTP 413.** It accepted 21,348 vertices (860 KB of GeoJSON) and rejected 26,508 (1.07 MB). BULK's floodplain is 104,584 vertices (4.2 MB), so an `intersects` query on it failed in 9 s. `stac_query_geometry()` switches to the convex hull above 20,000 vertices. The hull is a superset, and pixels over the AOI are unchanged.
+- **PC SAS tokens last about 45 minutes** (a token issued at 17:16:55Z expired at 18:01:55Z), and features were signed once, at query time. A 54-minute tiled read lost 15 of 30 tiles.
+  - `stac_features_resign()` re-signs before each extent. rstac's signer refreshes an expired token and replaces the `sig` parameter of an already-signed href.
+  - Verified live: corrupted tokens read 102,364 cells after re-signing, 0 without. With re-signing, a full 3 h 16 min BULK read had no failed tiles.
+- **gdalcubes reports failed chunks only on stderr**, as `[WARNING] n out of m chunks have repoprted errors / incompleteness`. It is not an R warning. The cube is written with those chunks NA and passes an any-data check.
+  - `capture.output(type = "message")` caught the line in 1 of 4 configurations, and never with `parallel > 1`, where workers write to the process's stderr directly.
+  - Do not build a guard on it. Detection is #87.
+- **terra reads a multi-variable gdalcubes NetCDF with its variables in ALPHABETICAL order.** A true-colour `apply_pixel(names = c("red","green","blue"))` reads back as `blue, green, red`, so select layers by name, never by position. The composite does this in `composite_layers_order()`.
+  - The layers also arrive carrying a time (step `yearmonths`).
+  - Writing that to a COG makes terra emit a `.aux.json` sidecar. So do units, varnames, longnames, metags and scoff; names alone do not.
+- **A date-only STAC end bound is read as 00:00Z**, so it drops that day's scenes, which in BC land around 19:00Z. A window ending on a scene day returned 22 of 23 items; the same window with `T23:59:59Z` returned 23. The composite uses explicit times. The cube still passes the user's string (#83).
+- **CMR-STAC (NASA LPCLOUD, for HLS) differs from PC.** It returns 500 on `intersects` (use `bbox`) and ignores the CQL2 `eo:cloud_cover` filter (filter client-side). Its assets need a real Earthdata Login; `earthdatalogin`'s defaults return 401. See #82.
