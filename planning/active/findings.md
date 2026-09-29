@@ -55,6 +55,28 @@ My org-only sweep missed these. Both are outside NewGraphEnvironment.
 
 Stehman 2014 and Olofsson 2013 are paywalled and not yet saved.
 
+## Olofsson 2014 reference values (read from the PDF, 2026-09-29)
+
+The values are transcribed into `tests/testthat/helper-accuracy.R` with page and table. From Tables 8–9 (p. 55) and §5.2 (p. 54), through `mapaccuracy::stehman2014()`:
+- Areas match to the hectare (21,157.8 / 11,686.2 / 285,769.9 / 581,386.2 against the printed 21,158 / 11,686 / 285,770 / 581,386).
+- The error matrix matches Table 9 to 4 dp. The package returns zero cells as NA.
+- UA, the two PA values that agree with the text, and OA (0.9465 ± 0.0185) all match at 2 dp.
+
+**The half-widths depend on two choices.** Stehman's FPC and `qnorm(.975)` versus the paper's no-FPC and 1.96 move the half-widths by up to 1.1 ha: stable non-forest is 16,280.9 against the printed 16,282, while no-FPC with 1.96 gives 16,281.7. So the area half-width pin uses an absolute tolerance of 1.5 ha, and the proportion pins use 0.005 (the half-step at 2 dp).
+
+**Three printed values contradict the paper's own equations:**
+- PA half-width, forest gain: printed 0.23, Eq. 7 gives 0.254.
+- PA half-width, stable non-forest: printed 0.01, Eq. 7 gives 0.018.
+- "S(Â₁) … = 34,097 pixels": 1.96 × 34,097 = 66,830, not the 68,418 printed next to it. 68,418 / 1.96 = 34,907.
+
+**Sample size:** Eq. 13 with Table 5's W and U and a target SE(O) of 0.01 gives (0.25312 / 0.01)² = 640.7, so n = 641. The Equal (160) and Prop (13 / 10 / 205 / 413, by rounding n·W) columns reproduce. **Alloc1–3 do not:** the stated rule (100 per change stratum, remainder proportional to the stable classes) gives 146 / 295, where the table has 149 / 292. They are not asserted.
+
+**`mapaccuracy` internals worth knowing:**
+- `stehman2014()` matches stratum names by regex (`grep(paste0("^", nm, "$"), ...)`). drift passes internal ids `s1..sH` to it.
+- Its `order =` default is `sort(union(r, m))` on character, so "10" sorts before "2". drift passes the order explicitly.
+- It only *warns* on a stratum with one observation.
+- It applies the FPC in eq. 25 and eq. 28.
+
 ## Errors Encountered
 
 | Error | Resolution |

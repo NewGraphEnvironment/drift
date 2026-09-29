@@ -60,9 +60,9 @@ The package always applies the FPC `(1 − n_h/N_h)`, so a census stratum contri
 **Sizing.** The primary form is `n = (Σ W_h S_h)² / SE_target²`, with `S_h` per **stratum** taken from a pilot's `$stratum` for a named quantity: OA or a class's area proportion. `ua =` is a convenience that holds only when strata = map classes, where `S_i = sqrt(U_i(1−U_i))` (Olofsson eq. 13). There are two allocations: `"equal"`, and `"proportional_min"` (Olofsson §5.1.1).
 
 ### Phase 1: Reference values in hand
-- [ ] User adds the Olofsson 2014 and Stehman 2014 PDFs (decided at the plan gate). Until then, Phases 2–4 code and non-published tests proceed, and the published-value pins wait.
-- [ ] Transcribe the worked examples into `tests/testthat/helper-accuracy.R`, each value cited to its page and table number, with the equation numbers verified against the PDF and both papers checked for errata
-- [ ] `findings.md`: the estimator equations with numbers, and a check of the Olofsson example by hand arithmetic (deforestation 21,158 ha is reproducible from the row counts; confirm against the PDF)
+- [x] User adds the Olofsson 2014 and Stehman 2014 PDFs (decided at the plan gate). Until then, Phases 2–4 code and non-published tests proceed, and the published-value pins wait.
+- [x] Transcribe the worked examples into `tests/testthat/helper-accuracy.R`, each value cited to its page and table number, with the equation numbers verified against the PDF and both papers checked for errata
+- [x] `findings.md`: the estimator equations with numbers, and a check of the Olofsson example by hand arithmetic (deforestation 21,158 ha is reproducible from the row counts; confirm against the PDF)
 
 ### Phase 2: Estimator (tests first)
 - [ ] `mapaccuracy` in Imports (DESCRIPTION)
