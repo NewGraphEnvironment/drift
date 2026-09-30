@@ -59,7 +59,48 @@ by the new test, which goes red if terra ever makes it in place.
 `dft_transition_artifact.R:308` (explicit `deepcopy`), `dft_stac_cube.R:287` (`names<-` on its own
 `stk`).
 
+## BULK scale check (2026-09-29, Phase 3)
+
+`bulk_co_ff04/classified_2017.tif` (14651 x 11552, 169,248,352 cells), terra 1.9.50, 64 GB machine.
+Each variant a fresh `R -f` process under `/usr/bin/time -l` (kernel max RSS), two reps each, identical
+to 0.01 GiB. "mem" is `r * 1L` (in memory, the shape `dft_stac_fetch()` returns when it fits). Script:
+scratchpad `bulk_classify2.R`; `main` is `git show origin/main:R/dft_rast_classify.R` sourced into
+the namespace; `deepcopy` is main's order with `x <- terra::deepcopy(x)` before it (the issue's fix).
+
+| variant | input | max RSS (GiB) | classify (s) | caller untouched |
+|---|---|---|---|---|
+| main | file-backed | 1.05 | 0.8 | no |
+| branch | file-backed | 1.05 | 0.8 | yes |
+| main | in memory | 4.21 | 0.8 | no |
+| branch | in memory | 4.21 | 0.9 | yes |
+| deepcopy | in memory | 5.46 | 1.2 | yes |
+
+The reorder costs nothing; `deepcopy()` costs +1.25 GiB, one 169M-cell double copy, per year classified.
+Branch and main outputs are `identical()` in `cats()` and `coltab()` in both modes.
+
+"Caller untouched" for file-backed is from a `cats()`/`coltab()`/`names()`/`is.factor()` snapshot
+compared before and after. The published raster is ALREADY a factor (RAT with `class_name`, palette),
+so a names-only check reads it as mutated whatever happens — the first run of the script did exactly
+that and briefly looked like the fix failing at scale.
+
+### Wrong turns (kept as evidence)
+
+- **RSS sampled on `Rscript`'s PID.** `Rscript` spawns `R` as a child, so `ps -p $!` measured the
+  wrapper: 0.26 GiB for a 169M-cell in-memory raster. Fixed by `R -f`, which execs in place.
+- **A 2 s `ps` sampler on a ~1 s run.** Even on the right PID it caught arbitrary instants (2.31 GiB
+  for main/branch, 0.25 GiB for deepcopy, which is lower than the in-memory input itself). Replaced by
+  `/usr/bin/time -l`, which reports the true peak. The CLAUDE.md "RSS every 2 s" recipe fits the
+  minutes-long pipeline functions it was written for, not a sub-second call.
+
+### Found on the way: factor input gives empty levels (drift#91)
+
+On the published (already-factor) raster the output had no levels and no colours on main and on the
+branch. `terra::unique(x)[, 1]` returns labels on a factor, so no code matches `class_table$code`.
+Pre-existing, out of scope for #89; filed as drift#91. Round-1 review found it independently.
+
 ## Errors Encountered
 
 | Error | Resolution |
 |-------|------------|
+| BULK RSS 0.26 GiB for an in-memory 169M-cell raster | `Rscript` forks `R`; sample `R -f`, and use `/usr/bin/time -l` for sub-second runs |
+| `cmd && V=... && R ... & PID=$!` lost `$PID` | `&` backgrounds the whole `&&` list; split setup and the backgrounded command |

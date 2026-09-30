@@ -32,7 +32,7 @@ CLAUDE.md's spatial conventions already name the trap: `set.cats()` "mutates wha
 
 ## Phase 3: Scale check on BULK (CLAUDE.md convention)
 
-- [ ] `bulk_co_ff04/classified_2017.tif` into the scratchpad; `dft_rast_classify()` on it both
+- [x] `bulk_co_ff04/classified_2017.tif` into the scratchpad; `dft_rast_classify()` on it both
   file-backed and in-memory (`r * 1L`, 169M cells), `origin/main` code vs branch code, RSS sampled
   every 2 s. Expect peak RSS unchanged (the copy count is the same) and caller unmutated at scale.
   Record numbers in `findings.md` and the PR body.
