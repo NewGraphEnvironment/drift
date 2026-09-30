@@ -98,7 +98,7 @@ Revised after the plan review (see findings.md, "Plan review" and "Count semanti
       Numbers go in the PR body and the archive README.
 
 ## Phase 5: Release notes
-- [ ] NEWS entry covering:
+- [x] NEWS entry covering:
   - the silent reflectance, and which callers now refuse what
   - the new count and its semantics
   - the orphaned 0.19.x `composite_*.tif` files written under `"count"`, which are never
@@ -108,7 +108,7 @@ Revised after the plan review (see findings.md, "Plan review" and "Count semanti
 
 ## Validation
 
-- [ ] Tests pass (`devtools::test()`), `lintr::lint_package()` clean
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass (`devtools::test()`), `lintr::lint_package()` clean
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion, then `/gh-pr-push` (PR body: `Relates to NewGraphEnvironment/sred-2025-2026#16`)
