@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,14 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.19.2" id="drift-0192">drift 0.19.2<a class="anchor" aria-label="anchor" href="#drift-0192"></a></h2>
+<ul><li>
+<strong><code><a href="../reference/dft_rast_classify.html">dft_rast_classify()</a></code> now classifies a raster that is already a factor (<a href="https://github.com/NewGraphEnvironment/drift/issues/91" class="external-link">#91</a>).</strong> Before, it returned zero levels and no colour table, with no error or warning. This affected the published floodplain rasters, which carry their own attribute table, and a raster re-classified after an earlier <code><a href="../reference/dft_rast_classify.html">dft_rast_classify()</a></code>. The cause was <code><a href="https://rspatial.github.io/terra/reference/unique.html" class="external-link">terra::unique()</a></code>, which returns a factor’s labels rather than its codes, so no code in <code>class_table</code> matched. A factor’s levels are now stripped on a copy before its codes are read. The output takes its levels and colours from <code>class_table</code>, and the caller’s raster keeps its own. A <code>remap =</code> that matched a class already worked, because <code><a href="https://rspatial.github.io/terra/reference/classify.html" class="external-link">terra::classify()</a></code> reads raw codes. A <code>remap =</code> that matched nothing had the bug, and now works.</li>
+<li>
+<strong>Cost at floodplain scale.</strong> On BULK’s published <code>classified_2017.tif</code> (169M cells, file-backed) the peak is 1.05 GiB, the same as 0.19.1, because both copies are metadata only. The extra copy costs something only for an in-memory factor with no matching remap: 5.47 GiB against 4.20 GiB. No terra call found reads a factor’s codes without one: <code>activeCat&lt;-</code> and <code>levels&lt;-</code> both copy.</li>
+<li>A multi-layer <code>SpatRaster</code> still classifies layer 1 only, as before. The new factor check reads layer 1 so that a stack does not error.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.19.1" id="drift-0191">drift 0.19.1<a class="anchor" aria-label="anchor" href="#drift-0191"></a></h2>
 <ul><li>

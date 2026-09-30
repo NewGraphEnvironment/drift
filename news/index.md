@@ -1,5 +1,33 @@
 # Changelog
 
+## drift 0.19.2
+
+- **[`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+  now classifies a raster that is already a factor
+  ([\#91](https://github.com/NewGraphEnvironment/drift/issues/91)).**
+  Before, it returned zero levels and no colour table, with no error or
+  warning. This affected the published floodplain rasters, which carry
+  their own attribute table, and a raster re-classified after an earlier
+  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md).
+  The cause was
+  [`terra::unique()`](https://rspatial.github.io/terra/reference/unique.html),
+  which returns a factor’s labels rather than its codes, so no code in
+  `class_table` matched. A factor’s levels are now stripped on a copy
+  before its codes are read. The output takes its levels and colours
+  from `class_table`, and the caller’s raster keeps its own. A `remap =`
+  that matched a class already worked, because
+  [`terra::classify()`](https://rspatial.github.io/terra/reference/classify.html)
+  reads raw codes. A `remap =` that matched nothing had the bug, and now
+  works.
+- **Cost at floodplain scale.** On BULK’s published
+  `classified_2017.tif` (169M cells, file-backed) the peak is 1.05 GiB,
+  the same as 0.19.1, because both copies are metadata only. The extra
+  copy costs something only for an in-memory factor with no matching
+  remap: 5.47 GiB against 4.20 GiB. No terra call found reads a factor’s
+  codes without one: `activeCat<-` and `levels<-` both copy.
+- A multi-layer `SpatRaster` still classifies layer 1 only, as before.
+  The new factor check reads layer 1 so that a stack does not error.
+
 ## drift 0.19.1
 
 - **[`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
