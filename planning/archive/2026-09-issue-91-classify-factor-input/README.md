@@ -18,4 +18,4 @@ one full extra copy, and no R-level terra call reads a factor's codes without on
 a matching remap 5.47 vs 5.47 GiB. That last number is why the strip was moved after the remap: the first
 placement, before the remap, would have charged a copy that `classify()` throws away. Tables in `findings.md`.
 
-Closed by: commit 618e805 / PR (see branch `91-dft-rast-classify-returns-empty-levels-w`)
+Closed by: commit 618e805 / PR #94
