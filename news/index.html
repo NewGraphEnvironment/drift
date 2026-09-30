@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,13 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.19.1" id="drift-0191">drift 0.19.1<a class="anchor" aria-label="anchor" href="#drift-0191"></a></h2>
+<ul><li>
+<strong><code><a href="../reference/dft_rast_classify.html">dft_rast_classify()</a></code> no longer modifies the raster it is given (<a href="https://github.com/NewGraphEnvironment/drift/issues/89" class="external-link">#89</a>).</strong> It called the in-place <code><a href="https://rspatial.github.io/terra/reference/inplace.html" class="external-link">terra::set.cats()</a></code> on the caller’s own object, so after classifying, the original was a factor named <code>class_name</code>. This affected file-backed, in-memory and list-element inputs alike; only a <code>remap =</code> that matched a class was spared, because that path already builds a new raster. The fix swaps the order of the two setters. <code>coltab&lt;-</code> runs first and makes a copy, and the levels are then set on that copy. The output is unchanged: <code><a href="https://rspatial.github.io/terra/reference/identical.html" class="external-link">identical()</a></code> <code><a href="https://rspatial.github.io/terra/reference/factors.html" class="external-link">cats()</a></code> and <code><a href="https://rspatial.github.io/terra/reference/colors.html" class="external-link">coltab()</a></code> against 0.19.0. The obvious alternative, <code><a href="https://rspatial.github.io/terra/reference/deepcopy.html" class="external-link">terra::deepcopy()</a></code> first, adds a second full copy. On BULK in memory (169M cells) the reorder peaks at 4.21 GiB, the same as 0.19.0, while <code><a href="https://rspatial.github.io/terra/reference/deepcopy.html" class="external-link">deepcopy()</a></code> peaks at 5.46 GiB. A test pins that the caller is unmodified, and it goes red if terra ever makes <code>coltab&lt;-</code> work in place.</li>
+<li>
+<strong>Found on the way:</strong> given a raster that is already a factor, such as the published floodplain rasters, <code><a href="../reference/dft_rast_classify.html">dft_rast_classify()</a></code> returns empty levels and no colours (<a href="https://github.com/NewGraphEnvironment/drift/issues/91" class="external-link">#91</a>). This is not new in 0.19.1.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.19.0" id="drift-0190">drift 0.19.0<a class="anchor" aria-label="anchor" href="#drift-0190"></a></h2>
 <ul><li>
