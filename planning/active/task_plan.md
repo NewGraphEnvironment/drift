@@ -15,7 +15,7 @@ CLAUDE.md's spatial conventions already name the trap: `set.cats()` "mutates wha
 
 ## Phase 1: Test first
 
-- [ ] Add `test_that("the caller's raster is not modified", ...)` to
+- [x] Add `test_that("the caller's raster is not modified", ...)` to
   `tests/testthat/test-dft_rast_classify.R`: file-backed single raster, an in-memory raster
   (`r * 1L`), and a named-list element — each keeps `names()` (`"data"` / its own), stays
   `!is.factor()`, `has.colors()` unchanged; the returned raster is still a factor with the colour
@@ -23,11 +23,11 @@ CLAUDE.md's spatial conventions already name the trap: `set.cats()` "mutates wha
 
 ## Phase 2: Fix
 
-- [ ] In `R/dft_rast_classify.R`, set `coltab<-` before `set.cats()`, with a comment naming why the
+- [x] In `R/dft_rast_classify.R`, set `coltab<-` before `set.cats()`, with a comment naming why the
   order is load-bearing (the copy `coltab<-` makes is what `set.cats()` then mutates; see
   `strip_copy()`), and replace the stale "namespace issues" comment.
-- [ ] Restore-the-bug check: swap the order back, confirm the new test goes red, restore.
-- [ ] `devtools::test()` full suite, `lintr::lint_package()`, `devtools::document()` (no roxygen
+- [x] Restore-the-bug check: swap the order back, confirm the new test goes red, restore.
+- [x] `devtools::test()` full suite, `lintr::lint_package()`, `devtools::document()` (no roxygen
   change expected).
 
 ## Phase 3: Scale check on BULK (CLAUDE.md convention)

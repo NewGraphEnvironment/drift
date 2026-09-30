@@ -134,7 +134,6 @@ test_that("a stratum no larger than its allocation is taken whole, with a messag
 })
 
 test_that("a factor transition raster keeps codes as stratum and labels alongside", {
-  # fresh tiles: dft_rast_classify() mutates its input in place (#89)
   cl <- dft_rast_classify(list("2017" = tile(2017), "2023" = tile(2023)),
                           source = "io-lulc")
   tr <- dft_rast_transition(cl, from = "2017", to = "2023")$raster

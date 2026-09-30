@@ -44,13 +44,17 @@ dft_rast_classify <- function(x,
   present_codes <- terra::unique(x)[, 1]
   ct <- class_table[class_table$code %in% present_codes, ]
 
-  # Set factor levels (use set.cats to avoid namespace issues with levels<-)
-  lvl_df <- data.frame(id = ct$code, class_name = ct$class_name)
-  terra::set.cats(x, layer = 1, value = lvl_df)
-
-  # Set color table
+  # The order is load-bearing (#89). `x` is the caller's own raster, and
+  # set.cats() works in place, so it must only ever reach a copy. `coltab<-`
+  # deep-copies before setting (the fact strip_copy() in dft_rast_break_class.R
+  # also relies on), so colours first and levels on that copy: one copy, where
+  # an explicit deepcopy() before `coltab<-` would make two. Should terra make
+  # `coltab<-` in place, the caller-unmodified test goes red.
   coltab_df <- data.frame(value = ct$code, col = ct$color)
   terra::coltab(x) <- coltab_df
+
+  lvl_df <- data.frame(id = ct$code, class_name = ct$class_name)
+  terra::set.cats(x, layer = 1, value = lvl_df)
 
   x
 }

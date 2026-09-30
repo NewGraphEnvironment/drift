@@ -50,3 +50,33 @@ test_that("remap preserves unremapped classes", {
   lvls <- terra::levels(result)[[1]]
   expect_true("Water" %in% lvls$class_name)
 })
+
+test_that("the caller's raster is not modified (#89)", {
+  # set.cats() works in place, so it must only ever reach the copy that
+  # `coltab<-` makes. File-backed, in-memory and list-element inputs each hold
+  # the caller's own object, so each is checked.
+  f <- system.file("extdata", "example_2017.tif", package = "drift")
+  unchanged <- function(r, nm) {
+    expect_identical(names(r), nm)
+    expect_false(terra::is.factor(r))
+    expect_false(terra::has.colors(r))
+  }
+  classified <- function(r) {
+    expect_true(terra::is.factor(r))
+    expect_identical(names(r), "class_name")
+    expect_true(terra::has.colors(r))
+  }
+
+  r_file <- terra::rast(f)
+  classified(dft_rast_classify(r_file, source = "io-lulc"))
+  unchanged(r_file, "data")
+
+  r_mem <- terra::rast(f) * 1L
+  expect_true(terra::inMemory(r_mem))
+  classified(dft_rast_classify(r_mem, source = "io-lulc"))
+  unchanged(r_mem, "data")
+
+  x <- list("2017" = terra::rast(f))
+  classified(dft_rast_classify(x, source = "io-lulc")[["2017"]])
+  unchanged(x[["2017"]], "data")
+})
