@@ -40,29 +40,29 @@ The input's own RAT and palette are replaced by `class_table`. That is the exist
 and it is documented in `@param x`.
 
 ## Phase 1: Failing tests (`tests/testthat/test-dft_rast_classify.R`)
-- [ ] Reclassifying a classified raster returns the same `cats()` and `coltab()` as the first pass
-- [ ] A raster carrying its own RAT gets levels and colours from `class_table`. The raster is
+- [x] Reclassifying a classified raster returns the same `cats()` and `coltab()` as the first pass
+- [x] A raster carrying its own RAT gets levels and colours from `class_table`. The raster is
       written to a tempfile tif and read back, so it is file-backed. Its RAT labels differ from `class_table`.
-- [ ] Factor input with a matching `remap =` keeps working. Factor input with a non-matching `remap =`
+- [x] Factor input with a matching `remap =` keeps working. Factor input with a non-matching `remap =`
       gives a warning and still returns levels.
-- [ ] The caller's factor raster is not modified: its levels and colours are still its own after the call
-- [ ] Confirm that each new test fails on current code
+- [x] The caller's factor raster is not modified: its levels and colours are still its own after the call
+- [x] Confirm that each new test fails on current code
 
 ## Phase 2: Fix (`R/dft_rast_classify.R`)
-- [ ] Strip factor input with `strip_copy()` before remap; update the copy-count comment
-- [ ] Update `@param x` to say factor input is accepted and its RAT is replaced by `class_table`;
+- [x] Strip factor input with `strip_copy()` — after remap (plan review: `classify()` already reads raw codes), guarded `is.factor(x)[1]`; update the copy-count comment
+- [x] Update `@param x` to say factor input is accepted and its RAT is replaced by `class_table`;
       run `devtools::document()`
-- [ ] Full `devtools::test()` green; `lintr::lint_package()` clean
+- [x] Full `devtools::test()` green; `lintr::lint_package()` clean
 
 ## Phase 3: Scale check (BULK, per CLAUDE.md)
-- [ ] `/usr/bin/time -l` on `bulk_co_ff04/classified_2017.tif`, which is a file-backed factor with a RAT.
+- [x] `/usr/bin/time -l` on `bulk_co_ff04/classified_2017.tif`, which is a file-backed factor with a RAT.
       Compare `main` with the branch, checking peak RSS, wall time, and that the output has levels and colours.
-- [ ] The same for an in-memory factor input: the in-memory classified output fed back in.
+- [x] The same for an in-memory factor input: the in-memory classified output fed back in.
       Record the cost of the extra copy.
-- [ ] Put the numbers in `findings.md`; the script goes in scratchpad or `data-raw/` if worth keeping
+- [x] Put the numbers in `findings.md`; the script goes in scratchpad or `data-raw/` if worth keeping
 
 ## Phase 4: Release bookkeeping
-- [ ] NEWS.md `# drift 0.19.2` entry, with numbers derived from the scale run
+- [x] NEWS.md `# drift 0.19.2` entry, with numbers derived from the scale run
 - [ ] `/planning-archive`, then bump the version to 0.19.2 as the final commit, then `/gh-pr-push`.
       Tag the PR with `Relates to NewGraphEnvironment/sred-2025-2026#16`.
 

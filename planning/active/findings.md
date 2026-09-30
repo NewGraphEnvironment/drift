@@ -33,3 +33,34 @@ Related: #19, which concerns factor input to `dft_rast_transition()`.
 
 | Error | Resolution |
 |-------|------------|
+
+## Scale check — BULK `classified_2017.tif` (2026-09-29, `/usr/bin/time -l`, terra 1.9.50)
+
+Input: the published file, a factor with a RAT (`value`, `class_name`, rgba) and a palette, 14651 x 11552.
+`main` = `git archive main`, branch = working tree, both via `pkgload::load_all()`; script in session scratchpad (`scale91.R`).
+
+| input | src | classify() elapsed | peak RSS | levels out | colours |
+|---|---|---|---|---|---|
+| file-backed factor | main | 0.8 s | 1.05 GiB | 0 | FALSE |
+| file-backed factor | branch | 0.8 s | 1.05 GiB | 9 | TRUE |
+| in-memory factor | main | 1.1 s | 4.08 GiB | 0 | FALSE |
+| in-memory factor | branch | 2.0 s | 5.46 GiB | 9 | TRUE |
+| in-memory setup only | — | — | 2.94 GiB | — | — |
+
+- File-backed: `strip_copy()` and `coltab<-` copy metadata only; peak unchanged.
+- In memory: the strip is one extra full copy of the values, +1.39 GiB peak (5.46 vs 4.08). Paid only by
+  in-memory factor input, i.e. re-classifying a raster already classified in this session.
+- No R-level way to read a factor's raw codes without a copy was found: `activeCat<-` and `levels<-` both
+  `deepcopy()`; `unique()`/`freq()` return labels; mapping labels back through `cats()` breaks on duplicate
+  labels and on values absent from the RAT (plan review probe).
+
+### Re-run after moving the strip after remap (same script, 2026-09-29)
+
+| input | main peak | branch peak | branch levels / colours |
+|---|---|---|---|
+| file-backed factor | 1.05 GiB | 1.05 GiB | 9 / TRUE (main 0 / FALSE) |
+| in-memory factor | 4.20 GiB | 5.47 GiB | 9 / TRUE (main 0 / FALSE) |
+| in-memory factor + matching remap | 5.47 GiB | 5.47 GiB | 8 / TRUE (main 8 / TRUE) |
+
+The matching-remap path no longer pays for the strip. Only an unremapped in-memory factor does
+(+1.27 GiB in this run, +1.39 GiB in the first; run-to-run spread of ~0.1 GiB on the main baseline).

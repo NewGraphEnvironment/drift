@@ -8,7 +8,10 @@ dft_rast_classify(x, class_table = NULL, source = "io-lulc", remap = NULL)
 }
 \arguments{
 \item{x}{A \link[terra:SpatRaster-class]{terra::SpatRaster} or a named list of \code{SpatRaster}s (e.g. from
-\code{\link[=dft_stac_fetch]{dft_stac_fetch()}}).}
+\code{\link[=dft_stac_fetch]{dft_stac_fetch()}}). A raster that is already a factor, such as a
+published classified raster with its own attribute table, is accepted:
+its codes are read from the raw values, and its levels and colours are
+replaced by \code{class_table}'s.}
 
 \item{class_table}{A tibble with columns \code{code}, \code{class_name}, \code{color}
 (hex). When \code{NULL}, loaded via \code{\link[=dft_class_table]{dft_class_table()}} using \code{source}.}

@@ -4,7 +4,10 @@
 #' remapping (collapsing) classes into broader groups.
 #'
 #' @param x A [terra::SpatRaster] or a named list of `SpatRaster`s (e.g. from
-#'   [dft_stac_fetch()]).
+#'   [dft_stac_fetch()]). A raster that is already a factor, such as a
+#'   published classified raster with its own attribute table, is accepted:
+#'   its codes are read from the raw values, and its levels and colours are
+#'   replaced by `class_table`'s.
 #' @param class_table A tibble with columns `code`, `class_name`, `color`
 #'   (hex). When `NULL`, loaded via [dft_class_table()] using `source`.
 #' @param source Character. Used to load a shipped class table when
@@ -40,16 +43,27 @@ dft_rast_classify <- function(x,
     class_table <- remapped$class_table
   }
 
+  # terra::unique() returns a factor's labels, not its codes, so a factor
+  # would match no code in class_table (#91). strip_copy() drops the levels on
+  # a copy, and the caller's raster keeps its own. It runs after the remap
+  # because terra::classify() already reads raw codes and returns a plain
+  # raster, so only an unremapped factor (no remap, or no group matched) pays
+  # for it. Layer 1 only, as everywhere below.
+  if (terra::is.factor(x)[1]) {
+    x <- strip_copy(x)
+  }
+
   # Filter class_table to codes actually present in raster
   present_codes <- terra::unique(x)[, 1]
   ct <- class_table[class_table$code %in% present_codes, ]
 
-  # The order is load-bearing (#89). `x` is the caller's own raster, and
-  # set.cats() works in place, so it must only ever reach a copy. `coltab<-`
-  # deep-copies before setting (the fact strip_copy() in dft_rast_break_class.R
-  # also relies on), so colours first and levels on that copy: one copy, where
-  # an explicit deepcopy() before `coltab<-` would make two. Should terra make
-  # `coltab<-` in place, the caller-unmodified test goes red.
+  # The order is load-bearing (#89). Unless it was stripped or remapped above,
+  # `x` is the caller's own raster, and set.cats() works in place, so it must
+  # only ever reach a copy. `coltab<-` deep-copies before setting (the fact
+  # strip_copy() in dft_rast_break_class.R also relies on), so colours first
+  # and levels on that copy: one copy, where an explicit deepcopy() before
+  # `coltab<-` would make two (a stripped factor has already paid one more).
+  # Should terra make `coltab<-` in place, the caller-unmodified tests go red.
   coltab_df <- data.frame(value = ct$code, col = ct$color)
   terra::coltab(x) <- coltab_df
 
