@@ -309,3 +309,270 @@ test_that("dft_stac_composite refuses an aggregation gdalcubes would not honour 
   }
   expect_length(list.files(cache, recursive = TRUE), 0L)
 })
+
+# A local, dated Sentinel-2-shaped collection: one B04 and one SCL GeoTIFF per
+# item, on an n x n grid at 10 m in EPSG:32609. `items` is a list of
+# list(id, date, scl), `scl` a function of cell x/y returning SCL classes. Separate
+# files per band: two-band files with one_band_per_file = FALSE segfaulted a
+# gdalcubes 0.7.5 worker (#92).
+count_fixture <- function(items, n = 4) {
+  d <- withr::local_tempdir(.local_envir = parent.frame())
+  for (it in items) {
+    r <- terra::rast(nrows = n, ncols = n, xmin = 0, xmax = n * 10, ymin = 0,
+                     ymax = n * 10, crs = "EPSG:32609")
+    xy <- terra::xyFromCell(r, seq_len(terra::ncell(r)))
+    b <- r
+    terra::values(b) <- 500
+    s <- r
+    terra::values(s) <- it$scl(xy[, 1], xy[, 2])
+    stem <- file.path(d, paste0(format(as.Date(it$date), "%Y%m%d"), "_", it$id))
+    terra::writeRaster(b, paste0(stem, "_B04.tif"), datatype = "INT2U")
+    terra::writeRaster(s, paste0(stem, "_SCL.tif"), datatype = "INT1U")
+  }
+  # gdalcubes collection format, written literally (jsonlite is not a dependency)
+  fmt_file <- file.path(d, "format.json")
+  writeLines(c(
+    '{"description": "drift #92 fixture", "tags": ["test"],',
+    ' "pattern": ".*\\\\.tif",',
+    ' "images": {"pattern": ".*/([0-9]{8}_[a-z]+)_.*"},',
+    ' "datetime": {"pattern": ".*/([0-9]{8})_.*", "format": "%Y%m%d"},',
+    ' "bands": {"B04": {"pattern": ".*_B04\\\\.tif", "nodata": 0},',
+    '           "SCL": {"pattern": ".*_SCL\\\\.tif"}}}'
+  ), fmt_file)
+  col <- gdalcubes::create_image_collection(
+    list.files(d, pattern = "\\.tif$", full.names = TRUE), format = fmt_file,
+    out_file = file.path(d, "col.db")
+  )
+  list(col = col, n = n)
+}
+
+# Run the count path's reduction over a fixture: the same view settings and the
+# same helpers dft_stac_composite() uses for aggregation = "count".
+count_run <- function(fx, chunking = NULL, t0 = "2021-07-01",
+                      t1 = "2021-07-31", aggregation = "first") {
+  v <- gdalcubes::cube_view(
+    srs = "EPSG:32609",
+    extent = list(left = 0, right = fx$n * 10, bottom = 0, top = fx$n * 10,
+                  t0 = t0, t1 = t1),
+    dx = 10, dy = 10, dt = "P1D", aggregation = aggregation,
+    resampling = "near"
+  )
+  m <- gdalcubes::image_mask("SCL", values = c(3, 8, 9, 10, 11))
+  cube <- if (is.null(chunking)) {
+    gdalcubes::raster_cube(fx$col, v, mask = m)
+  } else {
+    gdalcubes::raster_cube(fx$col, v, mask = m, chunking = chunking)
+  }
+  tmp <- withr::local_tempfile(fileext = ".nc", .local_envir = parent.frame())
+  gdalcubes::write_ncdf(drift:::composite_count_cube(cube, "B04", "red"), tmp)
+  drift:::count_zero_na(terra::rast(tmp))
+}
+
+test_that("the count path counts clear DAYS, not items or reflectance (#92)", {
+  skip_if_not_installed("gdalcubes")
+  clear <- function(x, y) rep(4, length(x))
+  cloud <- function(x, y) rep(8, length(x))
+  left_clear <- function(x, y) ifelse(x < 20, 4, 9)
+  fx <- count_fixture(list(
+    # same day, two tiles, both clear: one acquisition, counted once
+    list(id = "a", date = "2021-07-03", scl = clear),
+    list(id = "b", date = "2021-07-03", scl = clear),
+    list(id = "a", date = "2021-07-08", scl = cloud),
+    list(id = "a", date = "2021-07-13", scl = left_clear),
+    # same day: tile a cloudy, tile b clear. Under the #92 "none" aggregation
+    # the masked item overwrote the clear one; the count must keep it.
+    list(id = "a", date = "2021-07-18", scl = cloud),
+    list(id = "b", date = "2021-07-18", scl = clear)
+  ))
+  r <- count_run(fx)
+  expect_equal(names(r), "red")
+  v <- terra::values(r)[, 1]
+  x <- terra::xyFromCell(r, seq_len(terra::ncell(r)))[, 1]
+  # left half clear on 07-03, 07-13, 07-18; right half on 07-03, 07-18
+  expect_equal(unique(v[x < 20]), 3)
+  expect_equal(unique(v[x > 20]), 2)
+  # whole numbers of days, not reflectance and not a scaled count
+  expect_true(all(v == round(v)))
+  # the day-level aggregation does not change the count: every one skips NaN
+  for (agg in c("max", "median")) {
+    expect_equal(terra::values(count_run(fx, aggregation = agg))[, 1], v)
+  }
+})
+
+test_that("a pixel with no clear day is NA at every chunking (#92)", {
+  skip_if_not_installed("gdalcubes")
+  # 128 x 128: clear only in a left strip, and in a corner on a second day.
+  # Raw gdalcubes gives a zero-clear pixel 0 or NaN depending on whether its
+  # chunk holds a clear pixel; count_zero_na() must make the two agree.
+  fx <- count_fixture(list(
+    list(id = "a", date = "2021-07-05", scl = function(x, y) ifelse(x < 300, 4, 8)),
+    list(id = "a", date = "2021-07-10",
+         scl = function(x, y) ifelse(x < 300 & y < 300, 4, 8)),
+    list(id = "a", date = "2021-07-15", scl = function(x, y) rep(8, length(x)))
+  ), n = 128)
+  coarse <- count_run(fx, chunking = c(16, 256, 256))
+  fine <- count_run(fx, chunking = c(16, 64, 64))
+  expect_equal(terra::values(fine), terra::values(coarse))
+  v <- terra::values(coarse)[, 1]
+  expect_false(any(v == 0, na.rm = TRUE))
+  expect_equal(sum(is.na(v)), 128^2 - 30 * 128)
+  expect_equal(sort(unique(stats::na.omit(v))), c(1, 2))
+})
+
+test_that("dft_stac_composite(aggregation = 'count') reads daily, unsplit, and caches integers (#92)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- aoi_pkg()
+  aoi_t <- sf::st_transform(aoi, 32609)
+  seen <- NULL
+  queried <- NULL
+  testthat::local_mocked_bindings(
+    # a straddling window: the composite would refuse it; a count must not
+    stac_cube_items = function(cfg, aoi_wgs84, datetime, cloud_cover_max,
+                               months, sign_fn) {
+      queried <<- list(datetime = datetime, cloud_cover_max = cloud_cover_max,
+                       months = months)
+      list(features = list(), is_pre = c(TRUE, FALSE, FALSE))
+    },
+    stac_cube_assemble = function(fetched, cfg, aoi_target, target_crs, t0, t1,
+                                  res, dt, aggregation, resampling, band_assets,
+                                  mask_values, offset, offset_before, pixel_fn,
+                                  ...) {
+      seen <<- list(is_pre = fetched$is_pre, dt = dt, aggregation = aggregation,
+                    t0 = t0, t1 = t1, band_assets = band_assets,
+                    pixel_fn = pixel_fn, offset = offset,
+                    resampling = resampling, mask_values = mask_values)
+      r <- terra::rast(terra::ext(aoi_t), resolution = 50, crs = "EPSG:32609")
+      terra::values(r) <- rep_len(c(0, 1, 2, 5), terra::ncell(r))
+      names(r) <- "red"
+      terra::time(r) <- as.Date("1970-01-01")
+      r
+    }
+  )
+  cache <- withr::local_tempdir()
+  # non-default mask, cloud cover and resampling: for a count the mask defines
+  # "clear", so what the caller passes must be what the read uses
+  out <- suppressMessages(dft_stac_composite(
+    aoi, years = 2022, months = 1, bands = "red", aggregation = "count",
+    mask_values = c(3L, 8L, 9L), cloud_cover_max = 55, resampling = "near",
+    cache_dir = cache
+  ))
+  expect_equal(queried$datetime, "2022-01-01T00:00:00Z/2022-01-31T23:59:59Z")
+  expect_equal(queried$months, 1L)
+  expect_equal(queried$cloud_cover_max, 55)
+  expect_equal(seen$mask_values, c(3L, 8L, 9L))
+  expect_equal(seen$resampling, "near")
+  expect_equal(seen$aggregation, "first")
+  expect_equal(seen$dt, "P1D")
+  expect_false(any(seen$is_pre))
+  expect_equal(c(seen$t0, seen$t1), c("2022-01-01", "2022-01-31"))
+  # the pixel function the build hands to gdalcubes is the day count, not the
+  # reflectance expression: run it on a fixture cube and read the result
+  expect_equal(seen$band_assets, "B04")
+  fx <- count_fixture(list(
+    list(id = "a", date = "2021-07-03", scl = function(x, y) rep(4, length(x))),
+    list(id = "a", date = "2021-07-09", scl = function(x, y) rep(4, length(x))),
+    list(id = "a", date = "2021-07-15", scl = function(x, y) rep(9, length(x)))
+  ))
+  v <- gdalcubes::cube_view(
+    srs = "EPSG:32609",
+    extent = list(left = 0, right = 40, bottom = 0, top = 40,
+                  t0 = "2021-07-01", t1 = "2021-07-31"),
+    dx = 10, dy = 10, dt = "P1D", aggregation = "first", resampling = "near"
+  )
+  cube <- gdalcubes::raster_cube(
+    fx$col, v, mask = gdalcubes::image_mask("SCL", values = c(3, 8, 9, 10, 11))
+  )
+  nc <- withr::local_tempfile(fileext = ".nc")
+  gdalcubes::write_ncdf(seen$pixel_fn(cube, seen$offset), nc)
+  pix <- terra::rast(nc)
+  expect_equal(names(pix), "red")
+  expect_equal(unique(terra::values(pix)[, 1]), 2)
+  dir <- drift:::cache_scheme_dir(cache, "sentinel-2-l2a")
+  files <- list.files(dir, all.files = TRUE, no.. = TRUE)
+  expect_length(files, 1L)
+  expect_match(files, "^count_[0-9a-f]{16}\\.tif$")
+  r <- out[[1]]
+  expect_equal(names(r), "red")
+  expect_equal(terra::datatype(terra::rast(file.path(dir, files))), "INT2U")
+  v <- terra::values(r)[, 1]
+  # zeros are NA; counts are the whole numbers written
+  expect_false(any(v == 0, na.rm = TRUE))
+  expect_setequal(stats::na.omit(v), c(1, 2, 5))
+  # served from the count cache on a second call, not rebuilt
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) stop("rebuilt instead of served")
+  )
+  again <- suppressMessages(dft_stac_composite(
+    aoi, years = 2022, months = 1, bands = "red", aggregation = "count",
+    mask_values = c(3L, 8L, 9L), cloud_cover_max = 55, resampling = "near",
+    cache_dir = cache
+  ))
+  expect_equal(terra::values(again[[1]]), terra::values(r))
+})
+
+test_that("a count COG takes its overviews by nearest cell, so they are still counts (#92)", {
+  skip_if_not_installed("gdalcubes")
+  # Wider than one 512 px block, so the COG writer builds overviews. A 1/5
+  # checkerboard averages to 3, which no cell holds; nearest keeps 1 or 5.
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) list(features = list(), is_pre = FALSE),
+    stac_cube_assemble = function(...) {
+      r <- terra::rast(nrows = 1100, ncols = 1100, xmin = 0, xmax = 11000,
+                       ymin = 0, ymax = 11000, crs = "EPSG:32609")
+      cells <- seq_len(terra::ncell(r))
+      terra::values(r) <- ifelse(
+        (terra::rowFromCell(r, cells) + terra::colFromCell(r, cells)) %% 2 == 0,
+        1, 5
+      )
+      names(r) <- "red"
+      r
+    }
+  )
+  cache <- withr::local_tempdir()
+  suppressMessages(dft_stac_composite(aoi_pkg(), years = 2021, bands = "red",
+                                      aggregation = "count", cache_dir = cache))
+  f <- list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
+                  full.names = TRUE)
+  ov <- terra::rast(f, opts = "OVERVIEW_LEVEL=0")
+  expect_lt(terra::ncol(ov), 1100)
+  expect_true(all(terra::values(ov)[, 1] %in% c(1, 5)))
+})
+
+test_that("a count with no clear day anywhere drops the year, never caches zeros (#92)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- aoi_pkg()
+  aoi_t <- sf::st_transform(aoi, 32609)
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) list(features = list(), is_pre = FALSE),
+    stac_cube_assemble = function(...) {
+      r <- terra::rast(terra::ext(aoi_t), resolution = 50, crs = "EPSG:32609",
+                       vals = 0)
+      names(r) <- "red"
+      r
+    }
+  )
+  cache <- withr::local_tempdir()
+  expect_error(
+    expect_warning(
+      suppressMessages(dft_stac_composite(aoi, years = 2021, bands = "red",
+                                          aggregation = "count",
+                                          cache_dir = cache)),
+      "no clear pixels"
+    ),
+    "No year produced"
+  )
+  expect_length(list.files(cache, pattern = "\\.tif$", recursive = TRUE), 0L)
+})
+
+test_that("the count keys apart from every composite, and composite keys are unchanged (#92)", {
+  # pinned before #92: the family argument must not move an existing key
+  expect_identical(ckey(), "03ee8ecc66b832a8")
+  count <- ckey(aggregation = "count", dt = "P1D", family = "count")
+  # 0.19.x wrote reflectance under this key for aggregation = "count"
+  expect_false(identical(count, "08e0c5510e8ae297"))
+  expect_false(identical(count, ckey(aggregation = "count")))
+  # the tag alone separates the families
+  expect_false(identical(ckey(family = "count"), ckey()))
+  expect_identical(count, ckey(aggregation = "count", dt = "P1D",
+                               family = "count"))
+})

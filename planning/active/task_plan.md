@@ -35,42 +35,42 @@ Decisions taken at the gate:
 
 Revised after the plan review (see findings.md, "Plan review" and "Count semantics").
 
-- [ ] The count path calls `stac_cube_assemble()` with `dt = "P1D"` and a day
+- [x] The count path calls `stac_cube_assemble()` with `dt = "P1D"` and a day
       aggregation of `"first"`, never `"count"`. `"count"` must never reach `cube_view`,
       because it maps to `AGG_NONE` (the #92 bug). As a last guard,
       `aggregation_check()` also runs inside `stac_cube_assemble()`.
-- [ ] Add a helper, `composite_count_cube(cube, band_assets, bands)`, that returns
+- [x] Add a helper, `composite_count_cube(cube, band_assets, bands)`, that returns
       `reduce_time(cube, paste0("count(", band_assets, ")"), names = bands)`. It
       applies no scale or offset, and `names = bands` satisfies `composite_layers_order()`.
-- [ ] **A pixel with zero clear days is NA, always** (`count_zero_na()`, `0 -> NA`).
+- [x] **A pixel with zero clear days is NA, always** (`count_zero_na()`, `0 -> NA`).
       gdalcubes returns 0 or NaN for it depending on chunk layout, and chunk size
       follows `parallel`. This rule is therefore what keeps `parallel` a cost-only
       knob. It fails toward NA because a failed chunk read cannot be told apart from
       "all cloudy". An all-NA result is caught by `cube_check_nonempty()` and the year
       is dropped (`drift_empty_cube`).
-- [ ] **No offset split for count.** Set `is_pre` to all FALSE and skip
+- [x] **No offset split for count.** Set `is_pre` to all FALSE and skip
       `composite_offset_check()`, because `terra::cover(pre, post)` would drop the post
       side. A window that straddles 2022-01-25 is valid for a count.
-- [ ] Give the count its own cache family: the `"count"` tag in
+- [x] Give the count its own cache family: the `"count"` tag in
       `stac_composite_cache_key()` (a family argument whose default is `"composite"`,
       so the median key is byte-identical, pinned to `03ee8ecc66b832a8`), the key
       hashing `dt = "P1D"`, and the file prefix `count_`. The count key must not
       equal the stale 0.19 key `08e0c5510e8ae297`. Write the file as INT2U with
       `OVERVIEW_RESAMPLING=NEAREST`, and use `"count"` as the label in the
       cache-read and hit messages.
-- [ ] Offline tests:
-  - [ ] Test `composite_count_cube()` on a local `create_image_collection()`
+- [x] Offline tests:
+  - [x] Test `composite_count_cube()` on a local `create_image_collection()`
         fixture of separate B04/SCL files. Cover: a clear same-day item not blanked
         by a masked one, a count of distinct days rather than items, integer output
         with no scale, and names equal to the roles.
-  - [ ] Test that the result is chunking-invariant after `count_zero_na()`
+  - [x] Test that the result is chunking-invariant after `count_zero_na()`
         (`chunking = c(16, 64, 64)` against `c(16, 256, 256)`).
-  - [ ] Build `dft_stac_composite(aggregation = "count")` offline with a mocked
+  - [x] Build `dft_stac_composite(aggregation = "count")` offline with a mocked
         `stac_cube_assemble` that captures its arguments. Assert `"first"` and `"P1D"`,
         that `is_pre` is all FALSE with no refusal for a straddling window, the
         `count_<key>.tif` name, INT2U, and that zeros become NA.
-  - [ ] Restore each defect and confirm the matching test goes red.
-- [ ] Add the `AGG_NONE` root cause and the chunk-dependent 0/NaN behaviour to
+  - [x] Restore each defect and confirm the matching test goes red.
+- [x] Add the `AGG_NONE` root cause and the chunk-dependent 0/NaN behaviour to
       `inst/notes/gdalcubes-pc-gotchas.md`.
 
 ## Phase 3: Docs

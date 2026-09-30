@@ -211,3 +211,16 @@ Measured on gdalcubes 0.7.5, rstac 1.0.1 and terra 1.9.50, with the BULK floodpl
   - Writing that to a COG makes terra emit a `.aux.json` sidecar. So do units, varnames, longnames, metags and scoff; names alone do not.
 - **A date-only STAC end bound is read as 00:00Z**, so it drops that day's scenes, which in BC land around 19:00Z. A window ending on a scene day returned 22 of 23 items; the same window with `T23:59:59Z` returned 23. The composite uses explicit times. The cube still passes the user's string (#83).
 - **CMR-STAC (NASA LPCLOUD, for HLS) differs from PC.** It returns 500 on `intersects` (use `bbox`) and ignores the CQL2 `eo:cloud_cover` filter (filter client-side). Its assets need a real Earthdata Login; `earthdatalogin`'s defaults return 401. See #82.
+
+## Silent fallbacks and counting clear observations (#92, 2026-09-30)
+
+- **`cube_view()` does not refuse an aggregation it does not know. It reads it as `"none"`.** The R wrapper checks only that the value is one string. The C++ side lower-cases it, and maps anything unrecognised to `AGG_NONE`, which copies every image in. That copy includes NaNs, so a masked item can blank a clear one. This is how `aggregation = "count"` came back as plausible reflectance.
+  - Measured by round-tripping values through `cube_view()$aggregation`. `min`, `max`, `mean`, `median`, `first` and `last` survive, and so do the undocumented `count_values` and `count_images`. `count`, `sum` and `""` become `none`.
+  - drift passes only the first six (`aggregation_check()`). `count_*` count **items**, so overlapping MGRS tiles double-count one acquisition, and every drift caller would scale the result as reflectance.
+  - `resampling` has the same fallback, to `near` (`bilinaer -> near`), in #96.
+- **Count clear days, not items: `dt = "P1D"`, then `reduce_time(cube, "count(B04)", names = ...)`.** Masked pixels are NaN before aggregation, and every aggregation tried (first, max, median) skips NaN within a day. So two same-day tiles give one clear day, and a cloudy tile does not blank a clear one. The string reducer is C++, so the R-callback closure trap above does not apply.
+  - `reduce_time()` passes a single-time-step cube through unchanged. A count over a one-day window is therefore the input, not a count.
+- **A zero-clear pixel is 0 or NaN depending on chunk layout.** An all-NaN chunk stays empty (NaN), while a pixel in a chunk that holds a clear value somewhere reads 0. Measured on a 128 x 128 fixture: 12,544 zeros at 256 px chunks, against 4,352 zeros plus 8,192 NaN at 64 px. Chunk size follows `gdalcubes_options(parallel =)`, so the raw output depends on a setting drift documents as cost-only.
+  - `count_zero_na()` maps 0 to NA, after which the chunkings agree.
+  - NA rather than 0, because a failed chunk read is NaN too.
+- **`create_image_collection(one_band_per_file = FALSE)` on two-band GeoTIFFs segfaulted a worker** (0.7.5). Separate files per band with a format JSON work. The #92 test fixture uses them.

@@ -567,6 +567,9 @@ stac_cube_assemble <- function(fetched, cfg, aoi_target, target_crs, t0, t1,
                                res, dt, aggregation, resampling, band_assets,
                                mask_values, offset, offset_before, pixel_fn,
                                tile_size = NULL) {
+  # the last point before cube_view(): an aggregation it does not honour is
+  # read as "none" and returns plausible pixels (#92)
+  aggregation_check(aggregation)
   mask_asset <- cfg$roles$mask
   features <- fetched$features
   is_pre <- fetched$is_pre
