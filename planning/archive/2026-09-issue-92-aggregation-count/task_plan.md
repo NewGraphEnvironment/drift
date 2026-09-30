@@ -111,4 +111,4 @@ Revised after the plan review (see findings.md, "Plan review" and "Count semanti
 - [x] Tests pass (`devtools::test()`), `lintr::lint_package()` clean
 - [x] `/code-check` clean on each commit
 - [x] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion, then `/gh-pr-push` (PR body: `Relates to NewGraphEnvironment/sred-2025-2026#16`)
+- [x] `/planning-archive` on completion, then `/gh-pr-push` (PR body: `Relates to NewGraphEnvironment/sred-2025-2026#16`)
