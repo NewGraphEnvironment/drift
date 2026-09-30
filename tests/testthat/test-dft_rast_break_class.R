@@ -400,3 +400,26 @@ test_that("bundled seven-year series: pinned numbers", {
   expect_equal(nrow(patches), 93L)
   expect_equal(sum(patches$area_ha), 34.03, tolerance = 1e-6)
 })
+
+# --- #19: the same label rule as dft_rast_transition() ------------------------
+
+test_that("raw integers with no class_table or source are an error (#19)", {
+  raw <- lapply(1:2, function(i) artifact_class_rast(matrix(c(1L, 2L, i, 2L), 2)))
+  names(raw) <- c(2017, 2023)
+  expect_error(dft_rast_break_class(raw), "dft_rast_classify")
+})
+
+test_that("a remapped series is labelled by its levels, as dft_rast_transition() is (#19)", {
+  r <- lapply(c(2017, 2020, 2023), function(yr) {
+    terra::rast(system.file("extdata", paste0("example_", yr, ".tif"), package = "drift"))
+  })
+  names(r) <- c(2017, 2020, 2023)
+  cl <- dft_rast_classify(r, source = "io-lulc",
+                          remap = list(Vegetation = c("Trees", "Rangeland")))
+  res <- dft_rast_break_class(cl)
+  ref <- dft_rast_transition(cl, from = "2017", to = "2023")
+  expect_true("Vegetation" %in% res$summary$from_class)
+  expect_equal(terra::cats(res$raster)[[1]][, c("id", "transition")],
+               terra::cats(ref$raster)[[1]][, c("id", "transition")],
+               ignore_attr = TRUE)
+})

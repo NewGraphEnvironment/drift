@@ -50,20 +50,20 @@ through the existing `* 1L` (for `dft_rast_transition()`) and `strip_copy()` / `
 `dft_rast_break_class()`).
 
 ## Phase 1: Failing tests
-- [ ] `tests/testthat/test-transition_class_table.R`: the precedence order (`class_table` > `source` >
+- [x] `tests/testthat/test-transition_class_table.R`: the precedence order (`class_table` > `source` >
       levels > error), the union across years, the conflicting-label error, the mixed factor/raw error,
       the code > 999 error, and the active category of a multi-column RAT
-- [ ] `test-dft_rast_transition.R`: raw integers with no `class_table`/`source` error, and the message
+- [x] `test-dft_rast_transition.R`: raw integers with no `class_table`/`source` error, and the message
       names `dft_rast_classify` and `set.cats`
-- [ ] `test-dft_rast_transition.R`: a factor with custom codes (100+) and no `class_table` takes its
+- [x] `test-dft_rast_transition.R`: a factor with custom codes (100+) and no `class_table` takes its
       labels from the levels, and `from_class`/`to_class` filter by level name
-- [ ] `test-dft_rast_transition.R`: a remap-classified pair reports `Vegetation -> …` (the probe above
+- [x] `test-dft_rast_transition.R`: a remap-classified pair reports `Vegetation -> …` (the probe above
       as a regression test)
-- [ ] `test-dft_rast_transition.R`: `class_table` and an explicit `source` each beat the levels;
+- [x] `test-dft_rast_transition.R`: `class_table` and an explicit `source` each beat the levels;
       caller rasters keep their levels after the call
-- [ ] `test-dft_rast_break_class.R`: the same no-label error; a remapped series gives the same
+- [x] `test-dft_rast_break_class.R`: the same no-label error; a remapped series gives the same
       `$raster` levels as `dft_rast_transition()` on its endpoints
-- [ ] Confirm these fail on the current code for the reason each one names
+- [x] Confirm these fail on the current code for the reason each one names
 
 ## Phase 2: Implementation
 - [ ] `R/transition_class_table.R`: the helper, with a roxygen `@noRd` block

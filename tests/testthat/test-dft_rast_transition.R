@@ -397,3 +397,69 @@ test_that("dft_rast_transition output is stable across the terra-native rewrite 
 
   expect_snapshot_value(digests, style = "serialize", tolerance = 1e-8)
 })
+
+# --- #19: labels come from class_table, source, or the rasters' own levels ----
+
+custom_factor <- function(m, ids, labs) {
+  r <- artifact_class_rast(m)
+  terra::set.cats(r, layer = 1, value = data.frame(id = ids, class_name = labs))
+  r
+}
+
+test_that("raw integers with no class_table or source are an error (#19)", {
+  x <- list(a = artifact_class_rast(matrix(c(1L, 2L, 1L, 2L), 2)),
+            b = artifact_class_rast(matrix(c(2L, 2L, 1L, 1L), 2)))
+  err <- expect_error(dft_rast_transition(x, from = "a", to = "b"))
+  expect_match(conditionMessage(err), "dft_rast_classify")
+  expect_match(conditionMessage(err), "set.cats")
+})
+
+test_that("raw integers with an explicit source still decode (#19)", {
+  x <- list(a = artifact_class_rast(matrix(c(1L, 2L, 1L, 2L), 2)),
+            b = artifact_class_rast(matrix(c(2L, 2L, 1L, 1L), 2)))
+  res <- dft_rast_transition(x, from = "a", to = "b", source = "io-lulc")
+  expect_setequal(res$summary$from_class, c("Water", "Trees"))
+})
+
+test_that("a factor with its own codes and labels needs no class_table (#19)", {
+  m_from <- matrix(c(101L, 101L, 102L, 103L), 2)
+  m_to   <- matrix(c(101L, 102L, 102L, 101L), 2)
+  ids <- 101:103
+  labs <- c("Bog", "Fen", "Marsh")
+  x <- list(a = custom_factor(m_from, ids, labs), b = custom_factor(m_to, ids, labs))
+  res <- dft_rast_transition(x, from = "a", to = "b")
+  expect_false(anyNA(res$summary$from_class))
+  expect_false(anyNA(res$summary$to_class))
+  expect_setequal(paste(res$summary$from_class, res$summary$to_class),
+                  c("Bog Bog", "Bog Fen", "Fen Fen", "Marsh Bog"))
+  expect_setequal(terra::cats(res$raster)[[1]]$transition,
+                  c("Bog -> Bog", "Bog -> Fen", "Fen -> Fen", "Marsh -> Bog"))
+  # filters take the level names
+  bog <- dft_rast_transition(x, from = "a", to = "b", from_class = "Bog", to_class = "Fen")
+  expect_equal(bog$summary$n_cells, 1L)
+})
+
+test_that("a remap-classified pair is labelled by its own levels (#19)", {
+  r17 <- terra::rast(system.file("extdata", "example_2017.tif", package = "drift"))
+  r23 <- terra::rast(system.file("extdata", "example_2023.tif", package = "drift"))
+  cl <- dft_rast_classify(list("2017" = r17, "2023" = r23), source = "io-lulc",
+                          remap = list(Vegetation = c("Trees", "Rangeland")))
+  res <- dft_rast_transition(cl, from = "2017", to = "2023")
+  expect_true("Vegetation" %in% res$summary$from_class)
+  expect_false(any(c("Trees", "Rangeland") %in% c(res$summary$from_class,
+                                                  res$summary$to_class)))
+  veg <- dft_rast_transition(cl, from = "2017", to = "2023", from_class = "Vegetation")
+  expect_gt(nrow(veg$summary), 0)
+})
+
+test_that("class_table and an explicit source each win over the levels (#19)", {
+  m <- matrix(c(1L, 2L, 1L, 2L), 2)
+  x <- list(a = custom_factor(m, 1:2, c("p", "q")), b = custom_factor(m, 1:2, c("p", "q")))
+  ct <- tibble::tibble(code = 1:2, class_name = c("One", "Two"), color = "#000000")
+  expect_setequal(dft_rast_transition(x, "a", "b", class_table = ct)$summary$from_class,
+                  c("One", "Two"))
+  expect_setequal(dft_rast_transition(x, "a", "b", source = "io-lulc")$summary$from_class,
+                  c("Water", "Trees"))
+  # and the caller's rasters keep their own levels
+  expect_equal(terra::levels(x$a)[[1]]$class_name, c("p", "q"))
+})
