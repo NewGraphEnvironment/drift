@@ -142,7 +142,7 @@ Shape: 14651 x 11552 at 10 m (EPSG:32609), 169M cells, 97.7% `NA` outside the fl
 
 **Why:** the first `dft_transition_artifact()` held one in-memory 169M-cell raster per class per intermediate and was killed for memory here at eight classes, with 125 unit assertions green (#44). Only a run at scale finds that class of bug.
 
-**How to apply:** run any new or changed raster-pipeline function on this pair with an RSS sampler (`ps -o rss= -p $PID` every 2 s) before opening the PR, and record the numbers in the PR body. Write terra intermediates with `filename =` (see `code-check-spatial.md`).
+**How to apply:** run any new or changed raster-pipeline function on this pair with an RSS sampler (`ps -o rss= -p $PID` every 2 s) before opening the PR, and record the numbers in the PR body. For a call shorter than about a minute, use `/usr/bin/time -l R -f script.R` instead. It reports the kernel's true peak, while a 2 s sampler lands on arbitrary instants: #89 read 0.26 to 2.31 GiB for a run that peaked at 4.21 GiB. Write terra intermediates with `filename =` (see `code-check-spatial.md`).
 
 ### SRED cross-reference
 
