@@ -89,10 +89,10 @@ Revised after the plan review (see findings.md, "Plan review" and "Count semanti
 - [x] Network test (`DRIFT_TEST_NETWORK`): on the packaged AOI, the count is an integer,
       ≥ 0, and ≤ the number of distinct item dates in the window. It must not look like
       reflectance, so its maximum must be ≥ 1 and must be a whole number.
-- [ ] Reproduce the issue's check on a small square: the old call gave continuous values
+- [x] Reproduce the issue's check on a small square: the old call gave continuous values
       around 0.03, and the new max must be ≤ the distinct dates (6 in the issue's July 2021
       square).
-- [ ] Scale: count chips on BULK (about 20 points, 300 m buffers, one month) under
+- [x] Scale: count chips on BULK (about 20 points, 300 m buffers, one month) under
       `/usr/bin/time -l`, recording peak RSS and wall clock, beside #79's 100-chip median
       run (0.48 GiB, 84.1 min). The floodplain-wide read is out of scope while #88 is open.
       Numbers go in the PR body and the archive README.
