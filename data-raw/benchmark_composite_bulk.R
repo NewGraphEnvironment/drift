@@ -9,9 +9,14 @@
 #               composited on its own: the floodplains#93 review path.
 #   floodplain  one floodplain-wide true-colour composite, tiled: the COG path
 #               for titiler browsing.
+#   chips-count the first 20 of the same chips, as clear-day counts
+#               (aggregation = "count", bands = "red", #92). A count reads one
+#               time step per day rather than one per window, so it is the path
+#               whose memory and time could differ from a median.
 #
 #   Rscript data-raw/benchmark_composite_bulk.R chips
 #   Rscript data-raw/benchmark_composite_bulk.R floodplain
+#   /usr/bin/time -l Rscript data-raw/benchmark_composite_bulk.R chips-count
 #
 # Run through data-raw/benchmark_composite_bulk-run.sh, which samples RSS every
 # 2 s from outside the process and records the wall clock.
@@ -20,7 +25,7 @@
 pkgload::load_all(quiet = TRUE)
 
 stage <- commandArgs(trailingOnly = TRUE)[1]
-stopifnot(stage %in% c("chips", "floodplain"))
+stopifnot(stage %in% c("chips", "floodplain", "chips-count"))
 
 out_dir <- file.path("data-raw", "logs", "benchmark_composite_bulk")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -72,6 +77,40 @@ if (stage == "chips") {
   message(sprintf("chips: %d, median %.1f s, max %.1f s, cells/chip %d, cache %.1f MB",
                   length(per_chip), stats::median(per_chip), max(per_chip),
                   as.integer(stats::median(cells)), cache_mb))
+}
+
+if (stage == "chips-count") {
+  # the same draw as `chips`, so chip i here is chip i there
+  set.seed(79)
+  pts <- sf::st_as_sf(sf::st_sample(sf::st_union(aoi), 100))
+  buf <- sf::st_buffer(pts, 300)[1:20, ]
+  per_chip <- numeric(nrow(buf))
+  cells <- numeric(nrow(buf))
+  count_max <- numeric(nrow(buf))
+  count_na <- numeric(nrow(buf))
+  tick("wall", {
+    for (i in seq_len(nrow(buf))) {
+      t0 <- Sys.time()
+      chip <- suppressMessages(
+        dft_stac_composite(buf[i, ], years = 2023, months = 7:8, bands = "red",
+                           aggregation = "count", cache_dir = cache)
+      )
+      per_chip[i] <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+      v <- terra::values(chip[[1]])[, 1]
+      cells[i] <- length(v)
+      count_max[i] <- max(v, na.rm = TRUE)
+      count_na[i] <- sum(is.na(v))
+    }
+  })
+  utils::write.csv(data.frame(chip = seq_along(per_chip), secs = per_chip,
+                              cells = cells, count_max = count_max,
+                              count_na = count_na),
+                   file.path(out_dir, "chips_count_per_chip.csv"),
+                   row.names = FALSE)
+  message(sprintf("count chips: %d, median %.1f s, max %.1f s, cells/chip %d, count max %d-%d, NA cells %d",
+                  length(per_chip), stats::median(per_chip), max(per_chip),
+                  as.integer(stats::median(cells)), as.integer(min(count_max)),
+                  as.integer(max(count_max)), as.integer(sum(count_na))))
 }
 
 if (stage == "floodplain") {

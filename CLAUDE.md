@@ -83,6 +83,8 @@ dft_map_interactive(classified, aoi = aoi, rgb = tc)                 # or rgb = 
 # sample points: ONE CALL PER BUFFERED POINT (small, separately cached chips).
 # All points in one aoi spans the floodplain bbox under one cache key.
 chips <- lapply(seq_len(nrow(buf)), \(i) dft_stac_composite(buf[i, ], years = 2023))
+# clear days per pixel, to choose a window (#92): integers, NA = no clear day, snow masked too
+n  <- dft_stac_composite(aoi, years = 2017:2023, months = 7, bands = "red", aggregation = "count")
 ```
 
 Accuracy and error-adjusted area (#81; Olofsson et al. 2014, Stehman 2014). Mapped area is

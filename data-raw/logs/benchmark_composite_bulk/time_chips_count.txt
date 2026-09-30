@@ -1,0 +1,4 @@
+# /usr/bin/time -l Rscript data-raw/benchmark_composite_bulk.R chips-count (2026-09-30, macOS, 64 GB)
+      577.48 real        44.54 user         8.04 sys
+           489013248  maximum resident set size
+           319064960  peak memory footprint

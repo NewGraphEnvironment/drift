@@ -21,9 +21,28 @@
 #' shared stretch to every composite it is given, so a brightness difference
 #' between years is a real one.
 #'
+#' @section Counting clear observations:
+#' `aggregation = "count"` returns, instead of reflectance, the number of
+#' **distinct clear days** per pixel in each window. That is the number a caller
+#' needs to choose composite windows. It is read one day per time step, so
+#' where adjacent MGRS tiles overlap, their two items of one acquisition count
+#' once, and a masked tile does not hide a clear one from the same day. "Clear"
+#' means not in `mask_values` (by default cloud, cloud shadow, cirrus **and
+#' snow**, so a spring or autumn count excludes snow cover as well as cloud), and
+#' only scenes passing `cloud_cover_max` are counted. The counts are whole
+#' numbers with no scale or offset applied, stored as integers, one layer per
+#' band. The mask is shared, so bands count alike and `bands = "red"` is enough.
+#' A pixel with no clear day is `NA`, never 0, because gdalcubes cannot tell a
+#' chunk it failed to read from one that was all cloud. For the same reason a
+#' day whose read failed for part of a chunk goes uncounted there, so where
+#' reads fail a count is a lower bound; gdalcubes reports such failures only on
+#' the console, as a composite's are. A count is not refused
+#' across the Sentinel-2 2022-01-25 offset change, which does not affect it.
+#'
 #' @section Caching:
 #' Each year's composite is written once under [dft_cache_path()] as
-#' `<source>/composite_<key>.tif`, a Cloud Optimized GeoTIFF. The key hashes the
+#' `<source>/composite_<key>.tif`, a Cloud Optimized GeoTIFF; a count is written
+#' as `<source>/count_<key>.tif` and keyed apart from every composite. The key hashes the
 #' AOI geometry and every parameter that changes the pixels: bands (in order),
 #' months, the year's window, resolution, CRS, aggregation, resampling, cloud
 #' cover, mask values, reflectance scale and offset, `clip` and `tile_size`.
@@ -68,7 +87,12 @@
 #' @param crs Character. Target CRS as an EPSG string. When `NULL`,
 #'   auto-detected from the AOI centroid's UTM zone.
 #' @param aggregation Character. How scenes within a window are reduced
-#'   (default `"median"`).
+#'   (default `"median"`): one of `"median"`, `"mean"`, `"min"`, `"max"`,
+#'   `"first"` or `"last"`, or `"count"` for the number of clear days per pixel
+#'   instead of reflectance (see the section on counting). Anything else is
+#'   refused. gdalcubes reads a value it does not know as no aggregation at all
+#'   and returns reflectance with no error, which is how `"count"` behaved in
+#'   drift 0.18.0 to 0.19.2, so drift passes it only values measured to work.
 #' @param resampling Character. Spatial resampling (default `"bilinear"`).
 #' @param clip Logical. Clip the output to the AOI polygon (default `FALSE`).
 #'   Reference imagery is read around a place, not only inside it, so the
@@ -78,7 +102,9 @@
 #'   (default 20, stricter than the cube's 60 because a composite of few clear
 #'   scenes looks better than one of many cloudy ones).
 #' @param mask_values Integer vector of mask-band classes to exclude. When
-#'   `NULL`, taken from [dft_stac_config()].
+#'   `NULL`, taken from [dft_stac_config()]; for Sentinel-2 that is the SCL
+#'   cloud, cloud-shadow, cirrus and **snow** classes, so snow cover is masked
+#'   as well as cloud.
 #' @param tile_size Numeric or `NULL` (default). Read-tiling edge length in CRS
 #'   units; only tiles intersecting the AOI are streamed. A memory knob, not a
 #'   speed one; see [dft_stac_cube()].
@@ -94,8 +120,10 @@
 #' @return A named list of [terra::SpatRaster]s, one per year, each with one
 #'   layer per band. Names label the window, e.g. `"2017 Jun–Jul"`, and
 #'   become layer labels in [dft_map_interactive()]. Each raster's
-#'   [terra::time()] is the window start. A year with no usable scenes is
-#'   dropped with a warning; if every year is empty, the call aborts.
+#'   [terra::time()] is the window start. With `aggregation = "count"` each layer
+#'   holds integer clear-day counts rather than reflectance. A year with no
+#'   usable scenes (or, for a count, no clear day anywhere) is dropped with a
+#'   warning; if every year is empty, the call aborts.
 #'
 #' @seealso [dft_map_interactive()] (`rgb =`) to display them,
 #'   [dft_stac_cube()] for index time series.
@@ -121,6 +149,11 @@
 #' })
 #'
 #' dft_map_interactive(rgb = c(tc, fc[1]), aoi = aoi)
+#'
+#' # How many clear days each July had, to choose a composite window
+#' n <- dft_stac_composite(aoi, years = 2017:2023, months = 7, bands = "red",
+#'                         aggregation = "count")
+#' sapply(n, function(r) terra::global(r, "max", na.rm = TRUE)[[1]])
 #' }
 #'
 #' @export
@@ -150,6 +183,13 @@ dft_stac_composite <- function(aoi,
       "i" = "Use {.fn dft_stac_fetch} for categorical rasters."
     ))
   }
+  aggregation <- aggregation_check(aggregation,
+                                   c(.cube_view_aggregations, "count"))
+  # matched without case, like every aggregation; the count family is new, so
+  # normalising it moves no existing key
+  is_count <- identical(tolower(aggregation), "count")
+  if (is_count) aggregation <- "count"
+  family <- if (is_count) "count" else "composite"
   years <- composite_years_check(years)
   months <- composite_months_check(months)
   band_assets <- composite_band_assets(bands, cfg$roles)
@@ -175,30 +215,39 @@ dft_stac_composite <- function(aoi,
 
   # Every band scaled to reflectance with the offset for the side of the
   # 2022-01-25 boundary the window's scenes fall on (a window straddling it is
-  # refused by composite_offset_check()).
-  pixel_fn <- function(cube, offset_use) {
-    exprs <- vapply(band_assets, scale_token, character(1),
-                    scale = scale, offset = offset_use, USE.NAMES = FALSE)
-    gdalcubes::apply_pixel(cube, exprs, names = bands)
+  # refused by composite_offset_check()). A count applies neither: it counts
+  # clear days, and the offset only moves values, not whether they are masked.
+  pixel_fn <- if (is_count) {
+    function(cube, offset_use) composite_count_cube(cube, band_assets, bands)
+  } else {
+    function(cube, offset_use) {
+      exprs <- vapply(band_assets, scale_token, character(1),
+                      scale = scale, offset = offset_use, USE.NAMES = FALSE)
+      gdalcubes::apply_pixel(cube, exprs, names = bands)
+    }
   }
 
   out <- lapply(years, function(year) {
     w <- composite_window(year, months)
     label <- composite_label(year, months)
+    # A count is read one day per time step (see composite_count_cube()), so
+    # that is the step it reads with and the step it keys on.
+    dt_read <- if (is_count) "P1D" else w$dt
     cache_key <- stac_composite_cache_key(
-      aoi_target, res, target_crs, w$datetime, w$dt, aggregation, resampling,
+      aoi_target, res, target_crs, w$datetime, dt_read, aggregation, resampling,
       cfg$stac_url, cfg$collection, band_assets, bands, cloud_cover_max,
-      mask_values, scale, offset, offset_before, months, clip, tile_size
+      mask_values, scale, offset, offset_before, months, clip, tile_size,
+      family = family
     )
     cache_file <- file.path(cache_source_dir,
-                            paste0("composite_", cache_key, ".tif"))
+                            paste0(family, "_", cache_key, ".tif"))
 
     if (!force && file.exists(cache_file) &&
-          cache_hit_ok(cache_file, "composite")) {
+          cache_hit_ok(cache_file, family)) {
       r <- stac_cube_cache_read(cache_file, cfg$collection, w$datetime,
-                                label = "composite")
+                                label = family)
       if (!is.null(r)) {
-        message("  composite ", label, ": cached")
+        message("  ", family, " ", label, ": cached")
         return(composite_finish(r, bands, w$t0))
       }
     }
@@ -206,15 +255,29 @@ dft_stac_composite <- function(aoi,
     build <- function() {
       fetched <- stac_cube_items(cfg, aoi_wgs84, w$query, cloud_cover_max,
                                  months, sign_fn)
-      composite_offset_check(fetched$is_pre, label, cfg$offset_boundary)
+      if (is_count) {
+        # No offset split. stac_cube_assemble() coalesces the two sides with
+        # terra::cover(pre, post), which keeps the pre-side count wherever it is
+        # not NA and so would drop every post-side day. The offset does not
+        # change which pixels are masked, so one pass counts the window whole.
+        fetched$is_pre[] <- FALSE
+      } else {
+        composite_offset_check(fetched$is_pre, label, cfg$offset_boundary)
+      }
       stk <- stac_cube_assemble(
         fetched, cfg, aoi_target, target_crs, t0 = w$t0, t1 = w$t1, res = res,
-        dt = w$dt, aggregation = aggregation, resampling = resampling,
+        dt = dt_read,
+        # "count" is not a cube_view aggregation: gdalcubes would read it as
+        # "none" and return reflectance (#92). Within a day, "first" skips
+        # masked (NaN) items, so a clear tile is not blanked by a cloudy one.
+        aggregation = if (is_count) "first" else aggregation,
+        resampling = resampling,
         band_assets = band_assets, mask_values = mask_values,
         offset = offset, offset_before = offset_before, pixel_fn = pixel_fn,
         tile_size = tile_size
       )
       stk <- composite_layers_order(stk, bands, label, w)
+      if (is_count) stk <- count_zero_na(stk)
       if (isTRUE(clip)) stk <- stac_cube_clip(stk, aoi_target)
       cube_check_nonempty(stk, cfg$collection, w$datetime, cached = FALSE)
       # Names, and NO time, before the write. The stack arrives carrying a time
@@ -224,11 +287,15 @@ dft_stac_composite <- function(aoi,
       # below, as it is on a cache hit.
       names(stk) <- bands
       terra::time(stk) <- NULL
+      # A count is a whole number of days, stored as one; its overviews take
+      # the nearest cell rather than an average, which would not be a count.
       cache_write_atomic(cache_file, function(path) {
         terra::writeRaster(
-          stk, path, filetype = "COG", datatype = "FLT4S", overwrite = TRUE,
+          stk, path, filetype = "COG",
+          datatype = if (is_count) "INT2U" else "FLT4S", overwrite = TRUE,
           gdal = c("COMPRESS=DEFLATE", "PREDICTOR=YES", "BLOCKSIZE=512",
-                   "OVERVIEW_RESAMPLING=AVERAGE")
+                   paste0("OVERVIEW_RESAMPLING=",
+                          if (is_count) "NEAREST" else "AVERAGE"))
         )
       })
       # Return what was cached, not the in-memory double stack: the file is
@@ -254,6 +321,38 @@ dft_stac_composite <- function(aoi,
     ))
   }
   out
+}
+
+
+#' Count the clear days per pixel in a daily masked cube, one layer per band
+#'
+#' `cube` is the masked `raster_cube()` over a window at `dt = "P1D"`, so each
+#' time step is one day and same-day items (overlapping MGRS tiles) have already
+#' been reduced to one value. `count()` counts the non-NaN, i.e. unmasked, days.
+#' The built-in string reducer runs in C++, so the reduce_time() closure trap in
+#' inst/notes/gdalcubes-pc-gotchas.md does not apply. `names = bands` gives the
+#' layers their role names, which composite_layers_order() requires. The window
+#' always spans more than one day, which matters: reduce_time() passes a
+#' single-step cube through unchanged.
+#' @noRd
+composite_count_cube <- function(cube, band_assets, bands) {
+  gdalcubes::reduce_time(cube, paste0("count(", band_assets, ")"),
+                         names = bands)
+}
+
+
+#' A pixel with no clear day is NA, never 0
+#'
+#' gdalcubes returns such a pixel as 0 when its chunk holds a clear pixel
+#' somewhere and as NaN when the whole chunk is empty, and the chunk size follows
+#' `parallel`. Measured on a 128 x 128 fixture: 12,544 zeros at 256 px chunks,
+#' 4,352 zeros and 8,192 NaN at 64 px. Mapping 0 to NA makes the output the same
+#' at every chunking, so `parallel` stays a cost-only setting. It is NA rather
+#' than 0 because a chunk that failed to read is NaN as well, and a failed read
+#' must not be published as a count of zero clear days.
+#' @noRd
+count_zero_na <- function(stk) {
+  terra::classify(stk, cbind(0, NA))
 }
 
 
@@ -418,20 +517,26 @@ composite_label <- function(year, months) {
 #' Cache key for one composite
 #'
 #' Its own function rather than a reuse of stac_cube_cache_key(), whose legacy
-#' shape is frozen. The leading `"composite"` tag keeps the two families apart
-#' even if their parameter lists ever coincide; the filename prefix already
-#' does, and this makes it true of the hash as well. Bands and their assets are
+#' shape is frozen. The leading tag keeps the families apart even if their
+#' parameter lists ever coincide; the filename prefix already does, and this
+#' makes it true of the hash as well. Bands and their assets are
 #' order-sensitive (they are the layer order); months and mask values are not.
+#'
+#' `family = "count"` is the clear-observation count (#92). It keys apart from
+#' every composite, and in particular from the 0.18.0-0.19.2 `composite_<key>.tif`
+#' files written under `aggregation = "count"`, which hold reflectance: the
+#' tag, and the `P1D` read step the caller passes, both change the hash. The
+#' default keeps every existing composite key unchanged.
 #' @noRd
 stac_composite_cache_key <- function(aoi_target, res, target_crs, datetime, dt,
                                      aggregation, resampling, stac_url,
                                      collection, band_assets, bands,
                                      cloud_cover_max, mask_values, scale,
                                      offset, offset_before, months, clip,
-                                     tile_size = NULL) {
+                                     tile_size = NULL, family = "composite") {
   geom_wkb <- sf::st_as_binary(sf::st_geometry(aoi_target), endian = "little")
   parts <- list(
-    "composite", geom_wkb, as.numeric(res), target_crs, datetime, dt,
+    family, geom_wkb, as.numeric(res), target_crs, datetime, dt,
     aggregation, resampling, stac_url, collection, band_assets, bands,
     as.numeric(cloud_cover_max), sort(as.numeric(mask_values)),
     as.numeric(scale), as.numeric(offset), as.numeric(offset_before),
