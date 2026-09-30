@@ -85,12 +85,16 @@ that and briefly looked like the fix failing at scale.
 
 ### Wrong turns (kept as evidence)
 
-- **RSS sampled on `Rscript`'s PID.** `Rscript` spawns `R` as a child, so `ps -p $!` measured the
-  wrapper: 0.26 GiB for a 169M-cell in-memory raster. Fixed by `R -f`, which execs in place.
-- **A 2 s `ps` sampler on a ~1 s run.** Even on the right PID it caught arbitrary instants (2.31 GiB
-  for main/branch, 0.25 GiB for deepcopy, which is lower than the in-memory input itself). Replaced by
-  `/usr/bin/time -l`, which reports the true peak. The CLAUDE.md "RSS every 2 s" recipe fits the
-  minutes-long pipeline functions it was written for, not a sub-second call.
+- **Diagnosed, then retracted: "`Rscript` forks `R`, so the sampler watched the wrapper."** A 2 s
+  `ps` sampler gave 0.26 GiB for a 169M-cell in-memory raster, and I blamed the PID. Wrong: measured
+  afterwards, `Rscript` execs in place. The backgrounded PID's `comm` is `.../bin/exec/R`, it has no
+  children, and it equals R's own `Sys.getpid()`. Switching to `R -f` changed nothing that mattered.
+- **The actual cause: a 2 s sampler on a ~1 s call.** Samples land at arbitrary instants, and the
+  classify peak lasts well under the interval. Readings for the same variant ranged from 0.26 to
+  2.31 GiB, and the deepcopy variant read 0.25 GiB, below the size of its own in-memory input.
+  `/usr/bin/time -l` reports the kernel's true peak and gave identical numbers across two reps. The
+  CLAUDE.md "RSS every 2 s" recipe fits the minutes-long pipeline functions it was written for, not
+  a sub-second call.
 
 ### Found on the way: factor input gives empty levels (drift#91)
 
@@ -102,5 +106,5 @@ Pre-existing, out of scope for #89; filed as drift#91. Round-1 review found it i
 
 | Error | Resolution |
 |-------|------------|
-| BULK RSS 0.26 GiB for an in-memory 169M-cell raster | `Rscript` forks `R`; sample `R -f`, and use `/usr/bin/time -l` for sub-second runs |
+| BULK RSS 0.26 GiB for an in-memory 169M-cell raster | Not the PID (`Rscript` execs in place, verified). A 2 s sampler misses a sub-second peak; use `/usr/bin/time -l` |
 | `cmd && V=... && R ... & PID=$!` lost `$PID` | `&` backgrounds the whole `&&` list; split setup and the backgrounded command |
