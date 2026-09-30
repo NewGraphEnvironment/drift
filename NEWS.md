@@ -1,3 +1,8 @@
+# drift 0.19.1
+
+- **`dft_rast_classify()` no longer modifies the raster it is given (#89).** It called the in-place `terra::set.cats()` on the caller's own object, so after classifying, the original was a factor named `class_name`. This affected file-backed, in-memory and list-element inputs alike; only a `remap =` that matched a class was spared, because that path already builds a new raster. The fix swaps the order of the two setters. `coltab<-` runs first and makes a copy, and the levels are then set on that copy. The output is unchanged: `identical()` `cats()` and `coltab()` against 0.19.0. The obvious alternative, `terra::deepcopy()` first, adds a second full copy. On BULK in memory (169M cells) the reorder peaks at 4.21 GiB, the same as 0.19.0, while `deepcopy()` peaks at 5.46 GiB. A test pins that the caller is unmodified, and it goes red if terra ever makes `coltab<-` work in place.
+- **Found on the way:** given a raster that is already a factor, such as the published floodplain rasters, `dft_rast_classify()` returns empty levels and no colours (#91). This is not new in 0.19.1.
+
 # drift 0.19.0
 
 - **Accuracy and error-adjusted area (#81).** drift reported mapped area only. Mapped area is biased wherever the map is wrong, and badly biased for change maps, because a single wrong label on either date manufactures a transition. Four new functions implement the standard remedy (Olofsson et al. 2014): a stratified random sample of points, reference labels, and estimators that weight the labels back to the population.

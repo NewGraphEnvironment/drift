@@ -39,13 +39,13 @@ CLAUDE.md's spatial conventions already name the trap: `set.cats()` "mutates wha
 
 ## Phase 4: Release
 
-- [ ] `NEWS.md` 0.19.1 entry (fix, the probe table in one line, why reorder not deepcopy);
+- [x] `NEWS.md` 0.19.1 entry (fix, the probe table in one line, why reorder not deepcopy);
   `DESCRIPTION` 0.19.0 → 0.19.1 as the final commit ("Release v0.19.1 (#89)"), matching the
   on-branch release commits of #79–#81.
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
+- [x] Tests pass
+- [x] `/code-check` clean on each commit
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
