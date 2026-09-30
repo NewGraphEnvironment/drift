@@ -46,7 +46,10 @@ When \code{NULL}, auto-detected from the AOI centroid's UTM zone.}
 (default \code{"P1Y"}).}
 
 \item{aggregation}{Character. Temporal aggregation method (default
-\code{"first"}). Use \code{"median"} for multi-scene composites.}
+\code{"first"}). Use \code{"median"} for multi-scene composites. One of \code{"first"},
+\code{"last"}, \code{"median"}, \code{"mean"}, \code{"min"} or \code{"max"}; anything else is
+refused: gdalcubes reads a value it does not know as no aggregation, with
+no error, so drift passes it only values measured to work.}
 
 \item{resampling}{Character. Spatial resampling method (default \code{"near"}
 for categorical data).}

@@ -36,7 +36,10 @@
 #'   (default `"P1M"`, monthly). The cadence [dft_rast_break()]'s `frequency`
 #'   must agree with.
 #' @param aggregation Character. Temporal aggregation for multiple scenes in one
-#'   `dt` window (default `"median"`).
+#'   `dt` window (default `"median"`): one of `"median"`, `"mean"`, `"min"`,
+#'   `"max"`, `"first"` or `"last"`. Anything else is refused: gdalcubes reads a
+#'   value it does not know as no aggregation, with no error, so drift passes it
+#'   only values measured to work.
 #' @param resampling Character. Spatial resampling (default `"bilinear"`).
 #' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
 #'   polygon with `terra::mask()`, so
@@ -302,8 +305,8 @@ dft_stac_cube <- function(aoi,
 # round-tripping each value through cube_view()$aggregation: the six below
 # survive. It also honours "count_values" and "count_images", which are held back
 # on purpose: they count items, so overlapping MGRS tiles double-count one
-# acquisition, and every caller here would then apply a reflectance scale or an
-# index expression to a count. "none" is the silent fallback itself.
+# acquisition, and every caller here would then read the count as reflectance,
+# an index or a class code. "none" is the silent fallback itself.
 .cube_view_aggregations <- c("min", "max", "mean", "median", "first", "last")
 
 #' Refuse an `aggregation` outside `allowed`, before any network call
@@ -311,8 +314,9 @@ dft_stac_cube <- function(aoi,
 #' Shared by [dft_stac_fetch()], [dft_stac_cube()] and [dft_stac_composite()],
 #' the three callers of `gdalcubes::cube_view()`. An unsupported value is not
 #' refused downstream, so it has to be refused here (#92). Matching ignores case,
-#' as gdalcubes does, and the value is returned lower-cased so `"Median"` and
-#' `"median"` share a cache key.
+#' as gdalcubes does, and the value is returned exactly as given: every caller
+#' hashes it into a cache key, and lower-casing it would move the key of any
+#' mixed-case caller, silently re-streaming a cube that is already cached.
 #' @noRd
 aggregation_check <- function(aggregation, allowed = .cube_view_aggregations) {
   if (!is.character(aggregation) || length(aggregation) != 1L ||
@@ -328,7 +332,7 @@ aggregation_check <- function(aggregation, allowed = .cube_view_aggregations) {
       }
     ), class = "drift_bad_aggregation")
   }
-  tolower(aggregation)
+  aggregation
 }
 
 

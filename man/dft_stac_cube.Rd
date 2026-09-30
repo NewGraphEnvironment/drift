@@ -47,7 +47,10 @@ from the AOI centroid's UTM zone.}
 must agree with.}
 
 \item{aggregation}{Character. Temporal aggregation for multiple scenes in one
-\code{dt} window (default \code{"median"}).}
+\code{dt} window (default \code{"median"}): one of \code{"median"}, \code{"mean"}, \code{"min"},
+\code{"max"}, \code{"first"} or \code{"last"}. Anything else is refused: gdalcubes reads a
+value it does not know as no aggregation, with no error, so drift passes it
+only values measured to work.}
 
 \item{resampling}{Character. Spatial resampling (default \code{"bilinear"}).}
 

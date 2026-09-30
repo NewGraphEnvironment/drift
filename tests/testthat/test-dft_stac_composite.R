@@ -296,7 +296,7 @@ test_that("a built composite leaves only its COG in the cache, no sidecar", {
   expect_equal(terra::time(out[[1]])[1], as.Date("2023-06-01"))
 })
 
-test_that("dft_stac_composite refuses an aggregation gdalcubes would not honour (#92)", {
+test_that("dft_stac_composite refuses an aggregation outside the set drift passes (#92)", {
   skip_if_not_installed("gdalcubes")
   testthat::local_mocked_bindings(
     stac_cube_items = function(...) stop("reached the network")
@@ -565,14 +565,83 @@ test_that("a count with no clear day anywhere drops the year, never caches zeros
 })
 
 test_that("the count keys apart from every composite, and composite keys are unchanged (#92)", {
-  # pinned before #92: the family argument must not move an existing key
+  # pinned against v0.19.2: the family argument must not move an existing key.
+  # (That callers hand the key function the caller's case is tested in
+  # test-dft_stac_cube.R, through the exported functions.)
   expect_identical(ckey(), "03ee8ecc66b832a8")
+  expect_identical(ckey(aggregation = "Median"), "150c8ca5003bbe78")
   count <- ckey(aggregation = "count", dt = "P1D", family = "count")
-  # 0.19.x wrote reflectance under this key for aggregation = "count"
+  # 0.18.0-0.19.2 wrote reflectance under this key for aggregation = "count"
   expect_false(identical(count, "08e0c5510e8ae297"))
   expect_false(identical(count, ckey(aggregation = "count")))
   # the tag alone separates the families
   expect_false(identical(ckey(family = "count"), ckey()))
   expect_identical(count, ckey(aggregation = "count", dt = "P1D",
                                family = "count"))
+})
+
+test_that("a live count is whole clear days, at most the distinct dates, and not reflectance (#92)", {
+  skip_if(Sys.getenv("DRIFT_TEST_NETWORK") != "true",
+          "network test; set DRIFT_TEST_NETWORK=true to run")
+  skip_if_not_installed("gdalcubes")
+  # A 2 km square at the packaged AOI's centroid, July 2023, cloudy scenes
+  # admitted so the mask has work to do. Measured 2026-09-30: 20 items on 12
+  # dates (overlapping MGRS tiles), counts 5-9.
+  ctr <- sf::st_centroid(sf::st_union(sf::st_transform(aoi_pkg(), 32609)))
+  sq <- sf::st_as_sf(sf::st_buffer(ctr, 1000, endCapStyle = "SQUARE"))
+  cache <- withr::local_tempdir()
+  n <- suppressMessages(dft_stac_composite(
+    sq, years = 2023, months = 7, bands = "red", aggregation = "count",
+    res = 20, cloud_cover_max = 100, cache_dir = cache
+  ))[[1]]
+  v <- terra::values(n)[, 1]
+  # the distinct acquisition dates the same query returns
+  items <- rstac::stac("https://planetarycomputer.microsoft.com/api/stac/v1") |>
+    rstac::stac_search(
+      collections = "sentinel-2-l2a",
+      intersects = sf::st_geometry(sf::st_transform(sq, 4326))[[1]],
+      datetime = "2023-07-01T00:00:00Z/2023-07-31T23:59:59Z", limit = 500
+    ) |>
+    rstac::ext_filter(`eo:cloud_cover` <= 100) |>
+    rstac::post_request() |>
+    rstac::items_fetch()
+  dates <- unique(substr(vapply(items$features,
+                                function(f) f$properties$datetime, ""), 1, 10))
+  expect_gt(length(dates), 1)
+  expect_true(all(v == round(v), na.rm = TRUE))
+  expect_gte(min(v, na.rm = TRUE), 1)
+  expect_lte(max(v, na.rm = TRUE), length(dates))
+  # the #92 value was reflectance, median ~0.03-0.04; a count is at least 1
+  expect_gte(stats::median(v, na.rm = TRUE), 1)
+  f <- list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"),
+                  full.names = TRUE)
+  expect_match(basename(f), "^count_[0-9a-f]{16}\\.tif$")
+  expect_equal(terra::datatype(terra::rast(f)), "INT2U")
+})
+
+test_that("a count is matched without case and keys as 'count' (#92)", {
+  skip_if_not_installed("gdalcubes")
+  aoi_t <- sf::st_transform(aoi_pkg(), 32609)
+  seen <- NULL
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) list(features = list(), is_pre = FALSE),
+    stac_cube_assemble = function(fetched, cfg, aoi_target, target_crs, t0, t1,
+                                  res, dt, aggregation, ...) {
+      seen <<- c(seen, aggregation)
+      r <- terra::rast(terra::ext(aoi_t), resolution = 50, crs = "EPSG:32609",
+                       vals = 3)
+      names(r) <- "red"
+      r
+    }
+  )
+  cache <- withr::local_tempdir()
+  for (a in c("COUNT", "count")) {
+    suppressMessages(dft_stac_composite(aoi_pkg(), years = 2021, bands = "red",
+                                        aggregation = a, cache_dir = cache))
+  }
+  # the upper-case call took the count path; the lower-case one hit its cache
+  expect_equal(seen, "first")
+  files <- list.files(drift:::cache_scheme_dir(cache, "sentinel-2-l2a"))
+  expect_length(files, 1L)
+  expect_match(files, "^count_")
 })

@@ -48,7 +48,10 @@
 #' @param dt Character. ISO 8601 duration for the temporal aggregation window
 #'   (default `"P1Y"`).
 #' @param aggregation Character. Temporal aggregation method (default
-#'   `"first"`). Use `"median"` for multi-scene composites.
+#'   `"first"`). Use `"median"` for multi-scene composites. One of `"first"`,
+#'   `"last"`, `"median"`, `"mean"`, `"min"` or `"max"`; anything else is
+#'   refused: gdalcubes reads a value it does not know as no aggregation, with
+#'   no error, so drift passes it only values measured to work.
 #' @param resampling Character. Spatial resampling method (default `"near"`
 #'   for categorical data).
 #' @param tile_size Numeric or `NULL` (default). Edge length, in CRS units

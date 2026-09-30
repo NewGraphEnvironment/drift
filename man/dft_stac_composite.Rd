@@ -49,7 +49,12 @@ colour. Layers are named by role, in the order given.}
 auto-detected from the AOI centroid's UTM zone.}
 
 \item{aggregation}{Character. How scenes within a window are reduced
-(default \code{"median"}).}
+(default \code{"median"}): one of \code{"median"}, \code{"mean"}, \code{"min"}, \code{"max"},
+\code{"first"} or \code{"last"}, or \code{"count"} for the number of clear days per pixel
+instead of reflectance (see the section on counting). Anything else is
+refused. gdalcubes reads a value it does not know as no aggregation at all
+and returns reflectance with no error, which is how \code{"count"} behaved in
+drift 0.18.0 to 0.19.2, so drift passes it only values measured to work.}
 
 \item{resampling}{Character. Spatial resampling (default \code{"bilinear"}).}
 
@@ -63,7 +68,9 @@ default keeps the whole AOI bounding box. \code{TRUE} uses the same rule as
 scenes looks better than one of many cloudy ones).}
 
 \item{mask_values}{Integer vector of mask-band classes to exclude. When
-\code{NULL}, taken from \code{\link[=dft_stac_config]{dft_stac_config()}}.}
+\code{NULL}, taken from \code{\link[=dft_stac_config]{dft_stac_config()}}; for Sentinel-2 that is the SCL
+cloud, cloud-shadow, cirrus and \strong{snow} classes, so snow cover is masked
+as well as cloud.}
 
 \item{tile_size}{Numeric or \code{NULL} (default). Read-tiling edge length in CRS
 units; only tiles intersecting the AOI are streamed. A memory knob, not a
@@ -85,8 +92,10 @@ replacement is atomic.}
 A named list of \link[terra:SpatRaster-class]{terra::SpatRaster}s, one per year, each with one
 layer per band. Names label the window, e.g. \code{"2017 Jun–Jul"}, and
 become layer labels in \code{\link[=dft_map_interactive]{dft_map_interactive()}}. Each raster's
-\code{\link[terra:time]{terra::time()}} is the window start. A year with no usable scenes is
-dropped with a warning; if every year is empty, the call aborts.
+\code{\link[terra:time]{terra::time()}} is the window start. With \code{aggregation = "count"} each layer
+holds integer clear-day counts rather than reflectance. A year with no
+usable scenes (or, for a count, no clear day anywhere) is dropped with a
+warning; if every year is empty, the call aborts.
 }
 \description{
 Reference imagery for windows you choose. For each year, streams every scene
@@ -111,10 +120,31 @@ contrast stretching to display time. \code{\link[=dft_map_interactive]{dft_map_i
 shared stretch to every composite it is given, so a brightness difference
 between years is a real one.
 }
+\section{Counting clear observations}{
+
+\code{aggregation = "count"} returns, instead of reflectance, the number of
+\strong{distinct clear days} per pixel in each window. That is the number a caller
+needs to choose composite windows. It is read one day per time step, so
+where adjacent MGRS tiles overlap, their two items of one acquisition count
+once, and a masked tile does not hide a clear one from the same day. "Clear"
+means not in \code{mask_values} (by default cloud, cloud shadow, cirrus \strong{and
+snow}, so a spring or autumn count excludes snow cover as well as cloud), and
+only scenes passing \code{cloud_cover_max} are counted. The counts are whole
+numbers with no scale or offset applied, stored as integers, one layer per
+band. The mask is shared, so bands count alike and \code{bands = "red"} is enough.
+A pixel with no clear day is \code{NA}, never 0, because gdalcubes cannot tell a
+chunk it failed to read from one that was all cloud. For the same reason a
+day whose read failed for part of a chunk goes uncounted there, so where
+reads fail a count is a lower bound; gdalcubes reports such failures only on
+the console, as a composite's are. A count is not refused
+across the Sentinel-2 2022-01-25 offset change, which does not affect it.
+}
+
 \section{Caching}{
 
 Each year's composite is written once under \code{\link[=dft_cache_path]{dft_cache_path()}} as
-\verb{<source>/composite_<key>.tif}, a Cloud Optimized GeoTIFF. The key hashes the
+\verb{<source>/composite_<key>.tif}, a Cloud Optimized GeoTIFF; a count is written
+as \verb{<source>/count_<key>.tif} and keyed apart from every composite. The key hashes the
 AOI geometry and every parameter that changes the pixels: bands (in order),
 months, the year's window, resolution, CRS, aggregation, resampling, cloud
 cover, mask values, reflectance scale and offset, \code{clip} and \code{tile_size}.
@@ -167,6 +197,11 @@ chips <- lapply(seq_len(nrow(buf)), function(i) {
 })
 
 dft_map_interactive(rgb = c(tc, fc[1]), aoi = aoi)
+
+# How many clear days each July had, to choose a composite window
+n <- dft_stac_composite(aoi, years = 2017:2023, months = 7, bands = "red",
+                        aggregation = "count")
+sapply(n, function(r) terra::global(r, "max", na.rm = TRUE)[[1]])
 }
 
 }

@@ -759,9 +759,10 @@ test_that("aggregation_check refuses anything outside the set drift passes to cu
   for (ok in c("min", "max", "mean", "median", "first", "last")) {
     expect_identical(drift:::aggregation_check(ok), ok)
   }
-  # case-insensitive, as gdalcubes is, and returned lower-cased for the cache key
-  expect_identical(drift:::aggregation_check("Median"), "median")
-  expect_identical(drift:::aggregation_check("LAST"), "last")
+  # case-insensitive, as gdalcubes is, and returned as given: callers hash it
+  # into cache keys, so lower-casing it would move a mixed-case caller's key
+  expect_identical(drift:::aggregation_check("Median"), "Median")
+  expect_identical(drift:::aggregation_check("LAST"), "LAST")
   bad <- list("count", "sum", "none", "count_values", "count_images", "",
               NA_character_, NA, c("median", "mean"), character(0), 1, NULL)
   for (b in bad) {
@@ -813,4 +814,48 @@ test_that("dft_stac_cube and dft_stac_fetch refuse a bad aggregation before any 
   }
   # nothing was written for a refused call
   expect_length(list.files(cache, recursive = TRUE), 0L)
+})
+
+test_that("fetch, cube and composite hash the caller's aggregation as given (#92)", {
+  # v0.19.2 hashed the value as passed, so "Median" and "median" had different
+  # keys. Lowering it anywhere between the check and the key moves every
+  # mixed-case caller's key and silently re-streams a cached cube. Drive the
+  # exported functions and record what reaches each key function.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"),
+    quiet = TRUE
+  )
+  cache <- withr::local_tempdir()
+  hashed <- list()
+  record <- function(name) {
+    function(aoi_target, res, target_crs, a, b, ...) {
+      # the argument order differs: fetch/cube pass dt then aggregation, the
+      # composite passes datetime, dt, then aggregation
+      args <- list(...)
+      hashed[[name]] <<- if (name == "composite") args[[1]] else b
+      stop("recorded")
+    }
+  }
+  testthat::local_mocked_bindings(
+    stac_cache_key = record("fetch"),
+    stac_cube_cache_key = record("cube"),
+    stac_composite_cache_key = record("composite"),
+    # fetch queries and builds its collection before it keys
+    stac_items_paged = function(...) list(features = list(list(id = "x"))),
+    stac_cube_items = function(...) stop("reached the network")
+  )
+  testthat::local_mocked_bindings(
+    stac_image_collection = function(...) NULL, .package = "gdalcubes"
+  )
+  expect_error(suppressMessages(
+    dft_stac_fetch(aoi, source = "io-lulc", years = 2017,
+                   aggregation = "Median", cache_dir = cache)
+  ), "recorded")
+  expect_error(dft_stac_cube(aoi, aggregation = "Median", cache_dir = cache),
+               "recorded")
+  expect_error(dft_stac_composite(aoi, years = 2021, aggregation = "Median",
+                                  cache_dir = cache), "recorded")
+  expect_identical(hashed, list(fetch = "Median", cube = "Median",
+                                composite = "Median"))
 })

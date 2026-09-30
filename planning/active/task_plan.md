@@ -74,19 +74,19 @@ Revised after the plan review (see findings.md, "Plan review" and "Count semanti
       `inst/notes/gdalcubes-pc-gotchas.md`.
 
 ## Phase 3: Docs
-- [ ] Description, `@return` and the Caching section carry the count exception
+- [x] Description, `@return` and the Caching section carry the count exception
       (integer counts, not reflectance; `count_<key>.tif`).
-- [ ] `@param aggregation` in `dft_stac_composite()` lists the valid values and describes
+- [x] `@param aggregation` in `dft_stac_composite()` lists the valid values and describes
       `"count"`: distinct clear days per pixel, per band, integer, no scale; the
       `cloud_cover_max` pre-filter applies, so the count is of scenes that pass it.
       `dft_stac_cube()` and `dft_stac_fetch()` list their valid values.
-- [ ] `@param mask_values`: the default SCL classes include **snow**, so a spring or autumn
+- [x] `@param mask_values`: the default SCL classes include **snow**, so a spring or autumn
       "clear" count excludes snow as well as cloud (ask 4).
-- [ ] Add a count example to `@examples` (inside the existing `\dontrun{}`, since it needs
+- [x] Add a count example to `@examples` (inside the existing `\dontrun{}`, since it needs
       the network). Run `devtools::document()` and `pkgdown::check_pkgdown()`.
 
 ## Phase 4: Live verification and scale
-- [ ] Network test (`DRIFT_TEST_NETWORK`): on the packaged AOI, the count is an integer,
+- [x] Network test (`DRIFT_TEST_NETWORK`): on the packaged AOI, the count is an integer,
       ≥ 0, and ≤ the number of distinct item dates in the window. It must not look like
       reflectance, so its maximum must be ≥ 1 and must be a whole number.
 - [ ] Reproduce the issue's check on a small square: the old call gave continuous values

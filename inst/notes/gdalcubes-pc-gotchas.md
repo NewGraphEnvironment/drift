@@ -216,7 +216,7 @@ Measured on gdalcubes 0.7.5, rstac 1.0.1 and terra 1.9.50, with the BULK floodpl
 
 - **`cube_view()` does not refuse an aggregation it does not know. It reads it as `"none"`.** The R wrapper checks only that the value is one string. The C++ side lower-cases it, and maps anything unrecognised to `AGG_NONE`, which copies every image in. That copy includes NaNs, so a masked item can blank a clear one. This is how `aggregation = "count"` came back as plausible reflectance.
   - Measured by round-tripping values through `cube_view()$aggregation`. `min`, `max`, `mean`, `median`, `first` and `last` survive, and so do the undocumented `count_values` and `count_images`. `count`, `sum` and `""` become `none`.
-  - drift passes only the first six (`aggregation_check()`). `count_*` count **items**, so overlapping MGRS tiles double-count one acquisition, and every drift caller would scale the result as reflectance.
+  - drift passes only the first six (`aggregation_check()`). `count_*` count **items**, so overlapping MGRS tiles double-count one acquisition, and every drift caller would read the result as reflectance, an index or a class code.
   - `resampling` has the same fallback, to `near` (`bilinaer -> near`), in #96.
 - **Count clear days, not items: `dt = "P1D"`, then `reduce_time(cube, "count(B04)", names = ...)`.** Masked pixels are NaN before aggregation, and every aggregation tried (first, max, median) skips NaN within a day. So two same-day tiles give one clear day, and a cloudy tile does not blank a clear one. The string reducer is C++, so the R-callback closure trap above does not apply.
   - `reduce_time()` passes a single-time-step cube through unchanged. A count over a one-day window is therefore the input, not a count.
