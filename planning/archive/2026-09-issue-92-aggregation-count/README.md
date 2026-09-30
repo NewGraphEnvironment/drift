@@ -56,4 +56,4 @@
 - `inst/notes/gdalcubes-pc-gotchas.md`, section "Silent fallbacks and counting clear observations (#92)".
 - `review-*.md` in this directory: each round's findings.
 
-Closed by: PR (link added on open)
+Closed by: PR #97 (https://github.com/NewGraphEnvironment/drift/pull/97)
