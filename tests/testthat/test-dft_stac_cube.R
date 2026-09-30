@@ -754,3 +754,63 @@ test_that("stac_features_resign re-signs features before a read, stubs pass thro
                    list(feat("x")))
   expect_identical(drift:::stac_features_resign(fetched, list()), list())
 })
+
+test_that("aggregation_check refuses anything outside the set drift passes to cube_view (#92)", {
+  for (ok in c("min", "max", "mean", "median", "first", "last")) {
+    expect_identical(drift:::aggregation_check(ok), ok)
+  }
+  # case-insensitive, as gdalcubes is, and returned lower-cased for the cache key
+  expect_identical(drift:::aggregation_check("Median"), "median")
+  expect_identical(drift:::aggregation_check("LAST"), "last")
+  bad <- list("count", "sum", "none", "count_values", "count_images", "",
+              NA_character_, NA, c("median", "mean"), character(0), 1, NULL)
+  for (b in bad) {
+    expect_error(drift:::aggregation_check(b), class = "drift_bad_aggregation")
+  }
+  # the message names the valid set and the value it refused
+  expect_error(drift:::aggregation_check("count"), "median")
+  expect_error(drift:::aggregation_check("count"), "count")
+  # an extended set admits its extra member only
+  expect_identical(drift:::aggregation_check("count", c("median", "count")),
+                   "count")
+})
+
+test_that("every allowed aggregation is one gdalcubes::cube_view actually honours", {
+  # Behaviour, not documentation: gdalcubes maps an unknown aggregation to
+  # "none" silently, so each allowed value must survive the round trip, and
+  # "count" must not (it is the #92 value that came back as reflectance).
+  skip_if_not_installed("gdalcubes")
+  honoured <- function(a) {
+    gdalcubes::cube_view(
+      srs = "EPSG:32609",
+      extent = list(left = 0, right = 40, bottom = 0, top = 40,
+                    t0 = "2021-07-01", t1 = "2021-07-31"),
+      dx = 10, dy = 10, dt = "P1M", aggregation = a
+    )$aggregation
+  }
+  for (a in drift:::.cube_view_aggregations) expect_identical(honoured(a), a)
+  expect_identical(honoured("count"), "none")
+})
+
+test_that("dft_stac_cube and dft_stac_fetch refuse a bad aggregation before any network call (#92)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"),
+    quiet = TRUE
+  )
+  cache <- withr::local_tempdir()
+  # reaching either query means validation ran too late
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) stop("reached the network"),
+    stac_items_paged = function(...) stop("reached the network")
+  )
+  for (b in list("count", "sum", NA_character_, c("median", "mean"))) {
+    expect_error(dft_stac_cube(aoi, aggregation = b, cache_dir = cache),
+                 class = "drift_bad_aggregation")
+    expect_error(dft_stac_fetch(aoi, source = "io-lulc", years = 2017,
+                                aggregation = b, cache_dir = cache),
+                 class = "drift_bad_aggregation")
+  }
+  # nothing was written for a refused call
+  expect_length(list.files(cache, recursive = TRUE), 0L)
+})

@@ -99,6 +99,7 @@ dft_stac_fetch <- function(aoi,
                            force = FALSE,
                            sign_fn = rstac::sign_planetary_computer()) {
   check_gdalcubes("to fetch STAC rasters")
+  aggregation <- aggregation_check(aggregation)
 
   # Normalize tile_size ONCE so the path gate (is.null) and the cache key derive
   # from the same snapped scalar. When tiling, tune GDAL for the many extra

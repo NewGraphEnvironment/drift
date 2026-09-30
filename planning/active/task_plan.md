@@ -17,48 +17,65 @@ Decisions taken at the gate:
   composite cache stays valid.
 
 ## Phase 1: Refuse an aggregation gdalcubes does not honour
-- [ ] Add `aggregation_check(aggregation, allowed)`, a shared validator in
+- [x] Add `aggregation_check(aggregation, allowed)`, a shared validator in
       `R/dft_stac_cube.R`. It requires a single non-NA string in `allowed` and aborts
       with a classed error that names the valid set.
-- [ ] `.cube_view_aggregations <- c("min", "max", "mean", "median", "first")`, one
+- [x] `.cube_view_aggregations <- c("min", "max", "mean", "median", "first")`, one
       constant, commented with its gdalcubes `?cube_view` source.
-- [ ] Call the validator in `dft_stac_cube()` and `dft_stac_fetch()` (allowed = the gdalcubes
+- [x] Call the validator in `dft_stac_cube()` and `dft_stac_fetch()` (allowed = the gdalcubes
       set) and in `dft_stac_composite()` (allowed = the gdalcubes set plus `"count"`).
       Each check runs before any network call or cache lookup.
       `dft_stac_fetch()` is the third caller that shares the harness, so it gets the check too.
-- [ ] Tests, offline: the check fires in all three functions for `"count"` (except the
+- [x] Tests, offline: the check fires in all three functions for `"count"` (except the
       composite), `"sum"`, `NA`, `c("median", "mean")` and a non-character value. Confirm
       the guard runs before any network call by mocking `stac_cube_items` / the STAC
       search to `stop()`. Restore the defect (skip the check) and confirm the tests go red.
 
 ## Phase 2: Clear-observation count path in `dft_stac_composite()`
-- [ ] A count window uses `dt = "P1D"` in the `cube_view`, with a NaN-ignoring day-level
-      aggregation. Same-day items from overlapping MGRS tiles therefore collapse to one
-      acquisition (ask 4). The pixel function is `gdalcubes::reduce_time(cube,
-      "count(<asset>)")` per band, renamed to the band role. It uses the built-in string
-      reducer, not an R callback, so the gotchas-note closure trap does not apply. No scale
-      or offset is applied.
-- [ ] **No offset split for count.** Hand `stac_cube_assemble()` a `fetched` with `is_pre`
-      all FALSE, and skip `composite_offset_check()`. Otherwise `terra::cover(pre, post)`
-      would take the pre-side count wherever it is non-NA, and a count of 0 is non-NA, so
-      the post side would silently never be counted. A window straddling 2022-01-25 is
-      valid for a count.
-- [ ] Separate cache family: pass a `"count"` tag into `stac_composite_cache_key()` (or
-      add a family argument) and use the file prefix `count_`. Write with
-      `datatype = "INT2U"`, so the COG stores integers.
-- [ ] Empty-read guard: a window whose count is 0 everywhere is the gdalcubes failed-read
-      mode wearing the face of "all cloudy". Treat it the way a composite with no clear
-      pixels is treated: warn and drop the year (`drift_empty_cube`).
-      `cube_check_nonempty()` cannot see it, because 0 is not NA.
-- [ ] Offline tests. Cover the key: count ≠ median over the same inputs, count stays
-      stable, and composite keys are unchanged, pinned against a literal pre-change key.
-      Cover the file prefix. Cover the count pixel function on a local
-      `create_image_collection()` fixture of dated GeoTIFFs: two same-day items count
-      once, a masked day is not counted, and the result is an integer with no scale.
-      Cover the straddling-window count, which is not refused.
-      Restore each defect and confirm its test goes red.
+
+Revised after the plan review (see findings.md, "Plan review" and "Count semantics").
+
+- [ ] The count path calls `stac_cube_assemble()` with `dt = "P1D"` and a day
+      aggregation of `"first"`, never `"count"`. `"count"` must never reach `cube_view`,
+      because it maps to `AGG_NONE` (the #92 bug). As a last guard,
+      `aggregation_check()` also runs inside `stac_cube_assemble()`.
+- [ ] Add a helper, `composite_count_cube(cube, band_assets, bands)`, that returns
+      `reduce_time(cube, paste0("count(", band_assets, ")"), names = bands)`. It
+      applies no scale or offset, and `names = bands` satisfies `composite_layers_order()`.
+- [ ] **A pixel with zero clear days is NA, always** (`count_zero_na()`, `0 -> NA`).
+      gdalcubes returns 0 or NaN for it depending on chunk layout, and chunk size
+      follows `parallel`. This rule is therefore what keeps `parallel` a cost-only
+      knob. It fails toward NA because a failed chunk read cannot be told apart from
+      "all cloudy". An all-NA result is caught by `cube_check_nonempty()` and the year
+      is dropped (`drift_empty_cube`).
+- [ ] **No offset split for count.** Set `is_pre` to all FALSE and skip
+      `composite_offset_check()`, because `terra::cover(pre, post)` would drop the post
+      side. A window that straddles 2022-01-25 is valid for a count.
+- [ ] Give the count its own cache family: the `"count"` tag in
+      `stac_composite_cache_key()` (a family argument whose default is `"composite"`,
+      so the median key is byte-identical, pinned to `03ee8ecc66b832a8`), the key
+      hashing `dt = "P1D"`, and the file prefix `count_`. The count key must not
+      equal the stale 0.19 key `08e0c5510e8ae297`. Write the file as INT2U with
+      `OVERVIEW_RESAMPLING=NEAREST`, and use `"count"` as the label in the
+      cache-read and hit messages.
+- [ ] Offline tests:
+  - [ ] Test `composite_count_cube()` on a local `create_image_collection()`
+        fixture of separate B04/SCL files. Cover: a clear same-day item not blanked
+        by a masked one, a count of distinct days rather than items, integer output
+        with no scale, and names equal to the roles.
+  - [ ] Test that the result is chunking-invariant after `count_zero_na()`
+        (`chunking = c(16, 64, 64)` against `c(16, 256, 256)`).
+  - [ ] Build `dft_stac_composite(aggregation = "count")` offline with a mocked
+        `stac_cube_assemble` that captures its arguments. Assert `"first"` and `"P1D"`,
+        that `is_pre` is all FALSE with no refusal for a straddling window, the
+        `count_<key>.tif` name, INT2U, and that zeros become NA.
+  - [ ] Restore each defect and confirm the matching test goes red.
+- [ ] Add the `AGG_NONE` root cause and the chunk-dependent 0/NaN behaviour to
+      `inst/notes/gdalcubes-pc-gotchas.md`.
 
 ## Phase 3: Docs
+- [ ] Description, `@return` and the Caching section carry the count exception
+      (integer counts, not reflectance; `count_<key>.tif`).
 - [ ] `@param aggregation` in `dft_stac_composite()` lists the valid values and describes
       `"count"`: distinct clear days per pixel, per band, integer, no scale; the
       `cloud_cover_max` pre-filter applies, so the count is of scenes that pass it.
@@ -85,7 +102,8 @@ Decisions taken at the gate:
   - the silent reflectance, and which callers now refuse what
   - the new count and its semantics
   - the orphaned 0.19.x `composite_*.tif` files written under `"count"`, which are never
-    read and can be reclaimed via `dft_cache_info()` / `dft_cache_clear()` guidance
+    read. They sit in the current `v2` scheme and cannot be told apart from real
+    composites, so `scheme = "superseded"` does not reclaim them. State this plainly.
   - snow in the default mask
 
 ## Validation

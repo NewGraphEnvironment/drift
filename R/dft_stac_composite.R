@@ -150,6 +150,7 @@ dft_stac_composite <- function(aoi,
       "i" = "Use {.fn dft_stac_fetch} for categorical rasters."
     ))
   }
+  aggregation <- aggregation_check(aggregation)
   years <- composite_years_check(years)
   months <- composite_months_check(months)
   band_assets <- composite_band_assets(bands, cfg$roles)

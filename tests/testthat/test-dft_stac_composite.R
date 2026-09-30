@@ -295,3 +295,17 @@ test_that("a built composite leaves only its COG in the cache, no sidecar", {
                tolerance = 1e-6)
   expect_equal(terra::time(out[[1]])[1], as.Date("2023-06-01"))
 })
+
+test_that("dft_stac_composite refuses an aggregation gdalcubes would not honour (#92)", {
+  skip_if_not_installed("gdalcubes")
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) stop("reached the network")
+  )
+  cache <- withr::local_tempdir()
+  for (b in list("sum", "mode", NA_character_, c("median", "mean"), 1)) {
+    expect_error(dft_stac_composite(aoi_pkg(), years = 2021, aggregation = b,
+                                    cache_dir = cache),
+                 class = "drift_bad_aggregation")
+  }
+  expect_length(list.files(cache, recursive = TRUE), 0L)
+})
