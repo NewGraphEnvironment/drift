@@ -14,10 +14,14 @@
 #'   (`"2017"`, ...). Order does not matter; layers are sorted by year. At
 #'   least two, each single-layer and in the same CRS. Rasters on a different
 #'   grid from the first are resampled to it (nearest neighbour).
-#' @param class_table A tibble with columns `code`, `class_name`, `color`.
-#'   When `NULL`, loaded via [dft_class_table()] using `source`.
-#' @param source Character. Used to load a shipped class table when
-#'   `class_table` is `NULL`. One of `"io-lulc"` or `"esa-worldcover"`.
+#' @param class_table A tibble with columns `code` and `class_name`. Takes
+#'   precedence over `source` and over the rasters' own levels. When `NULL`,
+#'   labels come from `source`, else from the union of the rasters' factor
+#'   levels, exactly as in [dft_rast_transition()].
+#' @param source Character or `NULL` (default). One of `"io-lulc"` or
+#'   `"esa-worldcover"`: decode codes with that shipped table, ignoring any
+#'   levels the rasters carry. Needed for plain integer rasters when no
+#'   `class_table` is given.
 #' @param unit Character. Area unit for the summary. One of `"ha"`
 #'   (default), `"km2"`, or `"m2"`.
 #'
@@ -125,7 +129,7 @@
 #' head(sf::st_drop_geometry(tagged))
 dft_rast_break_class <- function(x,
                                  class_table = NULL,
-                                 source = "io-lulc",
+                                 source = NULL,
                                  unit = "ha") {
   unit <- match.arg(unit, c("ha", "km2", "m2"))
 
@@ -155,12 +159,13 @@ dft_rast_break_class <- function(x,
   years <- years[ord]
   n <- length(years)
 
-  if (is.null(class_table)) {
-    class_table <- dft_class_table(source)
-  }
-  code_lookup <- stats::setNames(class_table$class_name, class_table$code)
-
   for (r in x) dft_check_crs(r, "dft_rast_break_class")
+
+  # Labels are resolved as dft_rast_transition() resolves them (#19), and read
+  # here, before any layer's levels are stripped for the scan.
+  class_table <- transition_class_table(x, class_table, source,
+                                        "dft_rast_break_class")
+  code_lookup <- stats::setNames(class_table$class_name, class_table$code)
 
   files <- character(0)
   tmpf <- function() {

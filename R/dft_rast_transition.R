@@ -7,10 +7,14 @@
 #'   [dft_rast_classify()]). Names identify each time step (typically years).
 #' @param from Character. Name of the "before" layer in `x`.
 #' @param to Character. Name of the "after" layer in `x`.
-#' @param class_table A tibble with columns `code`, `class_name`, `color`.
-#'   When `NULL`, loaded via [dft_class_table()] using `source`.
-#' @param source Character. Used to load a shipped class table when
-#'   `class_table` is `NULL`. One of `"io-lulc"` or `"esa-worldcover"`.
+#' @param class_table A tibble with columns `code` and `class_name` (a
+#'   `color` column is carried but not used here). Takes precedence over
+#'   `source` and over the rasters' own levels. When `NULL`, labels come from
+#'   `source`, else from the factor levels of `x[[from]]` and `x[[to]]`.
+#' @param source Character or `NULL` (default). One of `"io-lulc"` or
+#'   `"esa-worldcover"`: decode codes with that shipped table, ignoring any
+#'   levels the rasters carry. Needed for plain integer rasters when no
+#'   `class_table` is given.
 #' @param from_class Character vector of class names to include as "from"
 #'   classes. When `NULL` (default), all classes are included.
 #' @param to_class Character vector of class names to include as "to"
@@ -32,6 +36,16 @@
 #'     encoding as `raster`.
 #'
 #' @details
+#' **Class labels.** A factor raster carries its own labels, so with neither
+#' `class_table` nor `source` given the labels are the union of the two
+#' rasters' factor levels (layer 1, active category). This is what makes a
+#' raster classified with a `remap` in [dft_rast_classify()], or a
+#' categorical raster from any other source (habitat, soil, climate zones),
+#' work without a class table. A plain integer raster carries no labels and
+#' is an error unless `class_table` or `source` says how to read it. Class
+#' codes must be whole numbers in 0-999, because each transition is encoded
+#' as `from * 1000 + to`.
+#'
 #' The transition raster, filters, and patch removal are computed with streamed
 #' `terra` operations (`ifel`, `patches`, `freq`) on the underlying class codes —
 #' no full-grid vectors are pulled into R — so peak memory scales with the number
@@ -56,11 +70,21 @@
 #' filtered <- dft_rast_transition(classified, from = "2017", to = "2020",
 #'                                 patch_area_min = 500)
 #' filtered$summary
+#'
+#' # Any factor raster works without a class table: its levels are the labels
+#' wet <- lapply(list(a = r17, b = r20), function(r) {
+#'   # IO LULC codes 1-11 recoded to a wetland scheme; NA stays NA
+#'   r <- terra::classify(r, cbind(1:11, c(101, 102, 104, 103, rep(104, 7))))
+#'   terra::set.cats(r, layer = 1, value = data.frame(
+#'     id = 101:104, class_name = c("Open water", "Swamp", "Marsh", "Upland")))
+#'   r
+#' })
+#' dft_rast_transition(wet, from = "a", to = "b")$summary
 dft_rast_transition <- function(x,
                                 from,
                                 to,
                                 class_table = NULL,
-                                source = "io-lulc",
+                                source = NULL,
                                 from_class = NULL,
                                 to_class = NULL,
                                 unit = "ha",
@@ -80,16 +104,15 @@ dft_rast_transition <- function(x,
   if (!from %in% names(x)) stop("Layer '", from, "' not found in `x`.")
   if (!to %in% names(x)) stop("Layer '", to, "' not found in `x`.")
 
-  if (is.null(class_table)) {
-    class_table <- dft_class_table(source)
-  }
-
   r_from <- x[[from]]
   r_to <- x[[to]]
   dft_check_crs(r_from, "dft_rast_transition")
   dft_check_crs(r_to, "dft_rast_transition")
 
-  # code -> class name lookup (small; used only for factor labels + summary)
+  # code -> class name: class_table, else source, else the rasters' own
+  # levels, else an error (#19). Metadata only; shared with break_class.
+  class_table <- transition_class_table(x[c(from, to)], class_table, source,
+                                        "dft_rast_transition")
   code_lookup <- stats::setNames(class_table$class_name, class_table$code)
 
   # Strip factor to raw integer codes as streamed rasters. `* 1L` returns a new

@@ -295,8 +295,13 @@ test_that("an abort inside the scan (a real overflow) strands no output file", {
     r
   })
   names(big) <- 2017:2019
-  ct <- tibble::tibble(code = c(1, 2, 3e6), class_name = c("a", "b", "c"),
-                       color = "#000000")
+  # A table that lists 3e6 is refused up front (#19: codes must be 0-999), so
+  # the table leaves it out: the scan's own handler is what still guards a
+  # raster holding codes its table does not list.
+  ct_listed <- tibble::tibble(code = c(1, 2, 3e6), class_name = c("a", "b", "c"),
+                              color = "#000000")
+  expect_error(dft_rast_break_class(big, class_table = ct_listed), "0-999")
+  ct <- ct_listed[1:2, ]
   before <- list.files(tempdir(), pattern = "^dft_break_class_", full.names = TRUE)
   expect_error(dft_rast_break_class(big, class_table = ct), "overflow the transition encoding")
   after <- list.files(tempdir(), pattern = "^dft_break_class_", full.names = TRUE)

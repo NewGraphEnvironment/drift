@@ -9,7 +9,7 @@ dft_rast_transition(
   from,
   to,
   class_table = NULL,
-  source = "io-lulc",
+  source = NULL,
   from_class = NULL,
   to_class = NULL,
   unit = "ha",
@@ -24,11 +24,15 @@ dft_rast_transition(
 
 \item{to}{Character. Name of the "after" layer in \code{x}.}
 
-\item{class_table}{A tibble with columns \code{code}, \code{class_name}, \code{color}.
-When \code{NULL}, loaded via \code{\link[=dft_class_table]{dft_class_table()}} using \code{source}.}
+\item{class_table}{A tibble with columns \code{code} and \code{class_name} (a
+\code{color} column is carried but not used here). Takes precedence over
+\code{source} and over the rasters' own levels. When \code{NULL}, labels come from
+\code{source}, else from the factor levels of \code{x[[from]]} and \code{x[[to]]}.}
 
-\item{source}{Character. Used to load a shipped class table when
-\code{class_table} is \code{NULL}. One of \code{"io-lulc"} or \code{"esa-worldcover"}.}
+\item{source}{Character or \code{NULL} (default). One of \code{"io-lulc"} or
+\code{"esa-worldcover"}: decode codes with that shipped table, ignoring any
+levels the rasters carry. Needed for plain integer rasters when no
+\code{class_table} is given.}
 
 \item{from_class}{Character vector of class names to include as "from"
 classes. When \code{NULL} (default), all classes are included.}
@@ -61,6 +65,16 @@ Compare two classified rasters cell-by-cell and return a transition raster
 and summary table. Each pixel is encoded with its from→to class pair.
 }
 \details{
+\strong{Class labels.} A factor raster carries its own labels, so with neither
+\code{class_table} nor \code{source} given the labels are the union of the two
+rasters' factor levels (layer 1, active category). This is what makes a
+raster classified with a \code{remap} in \code{\link[=dft_rast_classify]{dft_rast_classify()}}, or a
+categorical raster from any other source (habitat, soil, climate zones),
+work without a class table. A plain integer raster carries no labels and
+is an error unless \code{class_table} or \code{source} says how to read it. Class
+codes must be whole numbers in 0-999, because each transition is encoded
+as \code{from * 1000 + to}.
+
 The transition raster, filters, and patch removal are computed with streamed
 \code{terra} operations (\code{ifel}, \code{patches}, \code{freq}) on the underlying class codes —
 no full-grid vectors are pulled into R — so peak memory scales with the number
@@ -85,4 +99,14 @@ tree_loss$summary
 filtered <- dft_rast_transition(classified, from = "2017", to = "2020",
                                 patch_area_min = 500)
 filtered$summary
+
+# Any factor raster works without a class table: its levels are the labels
+wet <- lapply(list(a = r17, b = r20), function(r) {
+  # IO LULC codes 1-11 recoded to a wetland scheme; NA stays NA
+  r <- terra::classify(r, cbind(1:11, c(101, 102, 104, 103, rep(104, 7))))
+  terra::set.cats(r, layer = 1, value = data.frame(
+    id = 101:104, class_name = c("Open water", "Swamp", "Marsh", "Upland")))
+  r
+})
+dft_rast_transition(wet, from = "a", to = "b")$summary
 }

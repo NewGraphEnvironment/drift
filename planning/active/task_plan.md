@@ -66,23 +66,33 @@ through the existing `* 1L` (for `dft_rast_transition()`) and `strip_copy()` / `
 - [x] Confirm these fail on the current code for the reason each one names
 
 ## Phase 2: Implementation
-- [ ] `R/transition_class_table.R`: the helper, with a roxygen `@noRd` block
-- [ ] `dft_rast_transition()`: `source = NULL`, call the helper, pass its tibble to `apply_codeset()`
+- [x] `R/transition_class_table.R`: the helper, with a roxygen `@noRd` block
+- [x] `dft_rast_transition()`: `source = NULL`, call the helper, pass its tibble to `apply_codeset()`
       and `code_lookup`
-- [ ] `dft_rast_break_class()`: the same change
-- [ ] Roxygen for both: `@param class_table` and `@param source` state the precedence; add a
+- [x] `dft_rast_break_class()`: the same change
+- [x] Roxygen for both: `@param class_table` and `@param source` state the precedence; add a
       `@details` paragraph on labels read from factor levels; add an `@examples` line on a factor with
       custom levels and no `class_table`
-- [ ] Update call sites that pass **raw** integers without `source` so they pass one (existing tests
+- [x] Update call sites that pass **raw** integers without `source` so they pass one (existing tests
       already pass `class_table`; check `data-raw/benchmark_transition_oom.R` and the vignettes)
-- [ ] `devtools::document()`, full `devtools::test()`, `lintr::lint_package()`,
+- [x] `devtools::document()`, full `devtools::test()`, `lintr::lint_package()`,
       `pkgdown::check_pkgdown()`
+- [ ] **PARKED 2026-09-30. Open before Phase 2 can close** (see `review-plan.md` and `review-round1.md`):
+  - [ ] B1: error when an observed from/to code has no label (after the freq in transition, the
+        removed raster, and after the crosstab in break_class). No extra pass over the cells.
+  - [ ] B2: `dft_rast_consensus()` builds its levels from the union of all inputs' levels (a regression
+        this branch introduced; reproduced). Add a 3-raster test.
+  - [ ] Round 1: one label on two codes across rasters must be refused (breaks `from_class != to_class`)
+  - [ ] Round 1: character `class_table$code` fails with an opaque `round()` error (a regression)
+  - [ ] Round 1 / G1: the unlabelled message says "not a factor" for a zero-level factor, and the plural grammar is wrong
+  - [ ] G2 drop NA labels; O1 test a resampled factor in break_class; A1 doc that break_class reads every year
+  - [ ] code-check rounds 2+ on the fixes
 
 ## Phase 3: Scale check and docs
-- [ ] BULK pair (`classified_2017.tif` / `classified_2023.tif`, which carry the published RAT), with no
+- [x] BULK pair (`classified_2017.tif` / `classified_2023.tif`, which carry the published RAT), with no
       `class_table`: check that the labels read from the RAT match the `source = "io-lulc"` labels, and
       `/usr/bin/time -l` on `main` against the branch (expected: no change, since this is metadata only)
-- [ ] Record the numbers in `findings.md`
+- [x] Record the numbers in `findings.md`
 - [ ] Update the CLAUDE.md core pipeline snippet if needed (factor levels are the default source of
       labels)
 

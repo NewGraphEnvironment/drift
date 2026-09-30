@@ -55,3 +55,22 @@ Discovered during code review of #14. The current code works because the test da
 
 | Error | Resolution |
 |-------|------------|
+
+## BULK scale check (2026-09-30, published pair, `/usr/bin/time -l`)
+
+All three runs give the identical summary: 63 rows, 4,108,972 cells, 0 NA labels.
+
+| run | labels from | elapsed | peak RSS |
+|---|---|---|---|
+| main | io-lulc default | 7.8 s | 8.17 GiB |
+| branch | published RAT (levels) | 4.6 s | 8.44 GiB |
+| branch | `source = "io-lulc"` | 4.5 s | 8.03 GiB |
+
+The published COG reads as a factor with activeCat 1 = `class_name`, 9 rows. The label path is metadata
+only, and the RSS spread is noise: the branch was both the highest and the lowest run.
+
+## Parked 2026-09-30
+
+Parked for #92, which blocks floodplains#93. NECR reporting does not depend on this branch, since
+floodplains classifies with `source = "io-lulc"` and no remap. The open items are in `task_plan.md`
+Phase 2. Follow-up filed: #95 (map colours still come from `source`).

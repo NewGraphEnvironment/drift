@@ -4,7 +4,7 @@
 \alias{dft_rast_break_class}
 \title{Detect sustained class switches across an annual classified series}
 \usage{
-dft_rast_break_class(x, class_table = NULL, source = "io-lulc", unit = "ha")
+dft_rast_break_class(x, class_table = NULL, source = NULL, unit = "ha")
 }
 \arguments{
 \item{x}{A named list of classified \code{SpatRaster}s (e.g. from
@@ -13,11 +13,15 @@ dft_rast_break_class(x, class_table = NULL, source = "io-lulc", unit = "ha")
 least two, each single-layer and in the same CRS. Rasters on a different
 grid from the first are resampled to it (nearest neighbour).}
 
-\item{class_table}{A tibble with columns \code{code}, \code{class_name}, \code{color}.
-When \code{NULL}, loaded via \code{\link[=dft_class_table]{dft_class_table()}} using \code{source}.}
+\item{class_table}{A tibble with columns \code{code} and \code{class_name}. Takes
+precedence over \code{source} and over the rasters' own levels. When \code{NULL},
+labels come from \code{source}, else from the union of the rasters' factor
+levels, exactly as in \code{\link[=dft_rast_transition]{dft_rast_transition()}}.}
 
-\item{source}{Character. Used to load a shipped class table when
-\code{class_table} is \code{NULL}. One of \code{"io-lulc"} or \code{"esa-worldcover"}.}
+\item{source}{Character or \code{NULL} (default). One of \code{"io-lulc"} or
+\code{"esa-worldcover"}: decode codes with that shipped table, ignoring any
+levels the rasters carry. Needed for plain integer rasters when no
+\code{class_table} is given.}
 
 \item{unit}{Character. Area unit for the summary. One of \code{"ha"}
 (default), \code{"km2"}, or \code{"m2"}.}
