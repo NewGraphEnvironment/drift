@@ -17,7 +17,7 @@ breakpoint detection."><meta property="og:image" content="https://newgraphenviro
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -121,7 +121,10 @@ must agree with.</p></dd>
 
 <dt id="arg-aggregation">aggregation<a class="anchor" aria-label="anchor" href="#arg-aggregation"></a></dt>
 <dd><p>Character. Temporal aggregation for multiple scenes in one
-<code>dt</code> window (default <code>"median"</code>).</p></dd>
+<code>dt</code> window (default <code>"median"</code>): one of <code>"median"</code>, <code>"mean"</code>, <code>"min"</code>,
+<code>"max"</code>, <code>"first"</code> or <code>"last"</code>. Anything else is refused: gdalcubes reads a
+value it does not know as no aggregation, with no error, so drift passes it
+only values measured to work.</p></dd>
 
 
 <dt id="arg-resampling">resampling<a class="anchor" aria-label="anchor" href="#arg-resampling"></a></dt>

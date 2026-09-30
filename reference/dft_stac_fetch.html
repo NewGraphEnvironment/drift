@@ -13,7 +13,7 @@ custom COGs)."><meta property="og:image" content="https://newgraphenvironment.gi
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,7 +118,10 @@ When <code>NULL</code>, auto-detected from the AOI centroid's UTM zone.</p></dd>
 
 <dt id="arg-aggregation">aggregation<a class="anchor" aria-label="anchor" href="#arg-aggregation"></a></dt>
 <dd><p>Character. Temporal aggregation method (default
-<code>"first"</code>). Use <code>"median"</code> for multi-scene composites.</p></dd>
+<code>"first"</code>). Use <code>"median"</code> for multi-scene composites. One of <code>"first"</code>,
+<code>"last"</code>, <code>"median"</code>, <code>"mean"</code>, <code>"min"</code> or <code>"max"</code>; anything else is
+refused: gdalcubes reads a value it does not know as no aggregation, with
+no error, so drift passes it only values measured to work.</p></dd>
 
 
 <dt id="arg-resampling">resampling<a class="anchor" aria-label="anchor" href="#arg-resampling"></a></dt>

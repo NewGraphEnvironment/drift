@@ -80,7 +80,10 @@ dft_stac_cube(
 - aggregation:
 
   Character. Temporal aggregation for multiple scenes in one `dt` window
-  (default `"median"`).
+  (default `"median"`): one of `"median"`, `"mean"`, `"min"`, `"max"`,
+  `"first"` or `"last"`. Anything else is refused: gdalcubes reads a
+  value it does not know as no aggregation, with no error, so drift
+  passes it only values measured to work.
 
 - resampling:
 

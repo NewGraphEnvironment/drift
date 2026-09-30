@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,33 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.20.0" id="drift-0200">drift 0.20.0<a class="anchor" aria-label="anchor" href="#drift-0200"></a></h2>
+<ul><li>
+<strong><code>dft_stac_composite(aggregation = "count")</code> returned reflectance, not a count, and now returns clear-day counts (<a href="https://github.com/NewGraphEnvironment/drift/issues/92" class="external-link">#92</a>).</strong>
+<ul><li>
+<strong>The cause:</strong> <code>aggregation</code> went straight into <code><a href="https://rdrr.io/pkg/gdalcubes/man/cube_view.html" class="external-link">gdalcubes::cube_view()</a></code>. That function reads any string it does not know as no aggregation at all, with no error, and then copies every scene in, so a masked scene could overwrite a clear one. What came back looked like July red reflectance, 0.008-0.18.</li>
+<li>
+<strong>Refused up front:</strong> <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code>, <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> and <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> now refuse any <code>aggregation</code> other than <code>median</code>, <code>mean</code>, <code>min</code>, <code>max</code>, <code>first</code> and <code>last</code>. Each of the six was measured to survive a round trip through <code>cube_view()</code>; the set was not taken from <code>?cube_view</code>, which omits <code>last</code>. gdalcubes also honours <code>count_values</code> and <code>count_images</code>. drift refuses both, because they count items rather than days and every caller would read the result as reflectance, an index or a class code. Case is ignored, as gdalcubes ignores it, and the value is hashed as given, so no existing cache key moves. The check runs before any network call. <code>resampling</code> has the same silent fallback, to <code>near</code>, and is <a href="https://github.com/NewGraphEnvironment/drift/issues/96" class="external-link">#96</a>.</li>
+</ul></li>
+<li>
+<strong>Clear-day counts.</strong> <code>aggregation = "count"</code> is new in <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code>. It returns the number of <strong>distinct clear days</strong> per pixel in each window, the number needed to choose composite windows.
+<ul><li>
+<strong>What counts as one day:</strong> each day is read as one time step, so overlapping MGRS tiles count one acquisition once. Live, on a 2 km square in July 2023, 20 items on 12 dates gave counts of 5-9, and 6 items on 4 clear dates gave 4 everywhere.</li>
+<li>
+<strong>Format:</strong> counts are whole numbers with no scale or offset, stored as an INT2U COG, <code>count_&lt;key&gt;.tif</code>.</li>
+<li>
+<strong>No clear day is <code>NA</code>, never 0.</strong> gdalcubes returns such a pixel as 0 or <code>NA</code> depending on its chunk layout, which follows <code>parallel</code>, and a chunk that failed to read is <code>NA</code> too. A year with no clear day anywhere is dropped with a warning, like an empty composite.</li>
+<li>
+<strong>The offset change:</strong> a count spans the Sentinel-2 2022-01-25 offset change without refusal, since the offset does not change which pixels are masked.</li>
+<li>
+<strong>“Clear” excludes snow too:</strong> it means outside <code>mask_values</code>, whose Sentinel-2 default includes the SCL <strong>snow</strong> class as well as cloud, shadow and cirrus. A spring or autumn count therefore excludes snow cover. The docs now say so.</li>
+</ul></li>
+<li>
+<strong>Cached “count” files from 0.18.0-0.19.2 are never read.</strong> Since <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> arrived in 0.18.0, it cached what it returned for <code>aggregation = "count"</code>, reflectance, as <code>composite_&lt;key&gt;.tif</code>. A count now keys under its own tag and file prefix, so nothing reads those files again, and every genuine composite key is unchanged (pinned in the tests). They sit in the current <code>v2</code> scheme and cannot be told apart from real composites, so <code>dft_cache_clear(scheme = "superseded")</code> does not reclaim them. To reclaim the space, delete <code>composite_*.tif</code> under <code>&lt;dft_cache_path()&gt;/v2/sentinel-2-l2a/</code>. That removes genuine composites too, which rebuild on their next call, but it leaves the <code>cube_*.tif</code> index caches alone. <code>dft_cache_clear(scheme = "current")</code> would delete those as well.</li>
+<li>
+<strong>Floodplain scale.</strong> 20 count chips on BULK (300 m buffers, 2023 Jul-Aug, <code>bands = "red"</code>): 9.6 min in total, median 24.7 s a chip, 0.46 GiB peak (<code>/usr/bin/time -l</code>). Each chip’s highest count was 5-9 clear days, with no <code>NA</code> cells. The same 20 chips as <a href="https://github.com/NewGraphEnvironment/drift/issues/79" class="external-link">#79</a>’s median true-colour composites took 17.5 min, median 44.4 s a chip. <a href="https://github.com/NewGraphEnvironment/drift/issues/79" class="external-link">#79</a> recorded a 0.48 GiB peak over its full 100 chips, sampled every 2 s, so that figure reads low against the kernel peak above. The count reads daily steps but one band where the median reads three, which is likely why it is the cheaper of the two. The runs were two days apart, so this is not a controlled comparison. Evidence is in <code>data-raw/logs/benchmark_composite_bulk/*count*</code>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.19.2" id="drift-0192">drift 0.19.2<a class="anchor" aria-label="anchor" href="#drift-0192"></a></h2>
 <ul><li>

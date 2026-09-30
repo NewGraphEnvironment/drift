@@ -78,7 +78,13 @@ dft_stac_composite(
 - aggregation:
 
   Character. How scenes within a window are reduced (default
-  `"median"`).
+  `"median"`): one of `"median"`, `"mean"`, `"min"`, `"max"`, `"first"`
+  or `"last"`, or `"count"` for the number of clear days per pixel
+  instead of reflectance (see the section on counting). Anything else is
+  refused. gdalcubes reads a value it does not know as no aggregation at
+  all and returns reflectance with no error, which is how `"count"`
+  behaved in drift 0.18.0 to 0.19.2, so drift passes it only values
+  measured to work.
 
 - resampling:
 
@@ -102,7 +108,9 @@ dft_stac_composite(
 
   Integer vector of mask-band classes to exclude. When `NULL`, taken
   from
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md).
+  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md);
+  for Sentinel-2 that is the SCL cloud, cloud-shadow, cirrus and
+  **snow** classes, so snow cover is masked as well as cloud.
 
 - tile_size:
 
@@ -140,7 +148,9 @@ one per year, each with one layer per band. Names label the window, e.g.
 [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md).
 Each raster's
 [`terra::time()`](https://rspatial.github.io/terra/reference/time.html)
-is the window start. A year with no usable scenes is dropped with a
+is the window start. With `aggregation = "count"` each layer holds
+integer clear-day counts rather than reflectance. A year with no usable
+scenes (or, for a count, no clear day anywhere) is dropped with a
 warning; if every year is empty, the call aborts.
 
 ## Details
@@ -162,17 +172,38 @@ leaves contrast stretching to display time.
 applies one shared stretch to every composite it is given, so a
 brightness difference between years is a real one.
 
+## Counting clear observations
+
+`aggregation = "count"` returns, instead of reflectance, the number of
+**distinct clear days** per pixel in each window. That is the number a
+caller needs to choose composite windows. It is read one day per time
+step, so where adjacent MGRS tiles overlap, their two items of one
+acquisition count once, and a masked tile does not hide a clear one from
+the same day. "Clear" means not in `mask_values` (by default cloud,
+cloud shadow, cirrus **and snow**, so a spring or autumn count excludes
+snow cover as well as cloud), and only scenes passing `cloud_cover_max`
+are counted. The counts are whole numbers with no scale or offset
+applied, stored as integers, one layer per band. The mask is shared, so
+bands count alike and `bands = "red"` is enough. A pixel with no clear
+day is `NA`, never 0, because gdalcubes cannot tell a chunk it failed to
+read from one that was all cloud. For the same reason a day whose read
+failed for part of a chunk goes uncounted there, so where reads fail a
+count is a lower bound; gdalcubes reports such failures only on the
+console, as a composite's are. A count is not refused across the
+Sentinel-2 2022-01-25 offset change, which does not affect it.
+
 ## Caching
 
 Each year's composite is written once under
 [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
-as `<source>/composite_<key>.tif`, a Cloud Optimized GeoTIFF. The key
-hashes the AOI geometry and every parameter that changes the pixels:
-bands (in order), months, the year's window, resolution, CRS,
-aggregation, resampling, cloud cover, mask values, reflectance scale and
-offset, `clip` and `tile_size`. Because the file is a COG, it can be
-copied to object storage and served through titiler unchanged, which is
-how a floodplain-wide composite reaches
+as `<source>/composite_<key>.tif`, a Cloud Optimized GeoTIFF; a count is
+written as `<source>/count_<key>.tif` and keyed apart from every
+composite. The key hashes the AOI geometry and every parameter that
+changes the pixels: bands (in order), months, the year's window,
+resolution, CRS, aggregation, resampling, cloud cover, mask values,
+reflectance scale and offset, `clip` and `tile_size`. Because the file
+is a COG, it can be copied to object storage and served through titiler
+unchanged, which is how a floodplain-wide composite reaches
 [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md):
 `rgb` accepts COG URLs as well as rasters.
 
@@ -229,5 +260,10 @@ chips <- lapply(seq_len(nrow(buf)), function(i) {
 })
 
 dft_map_interactive(rgb = c(tc, fc[1]), aoi = aoi)
+
+# How many clear days each July had, to choose a composite window
+n <- dft_stac_composite(aoi, years = 2017:2023, months = 7, bands = "red",
+                        aggregation = "count")
+sapply(n, function(r) terra::global(r, "max", na.rm = TRUE)[[1]])
 } # }
 ```

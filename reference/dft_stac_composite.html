@@ -17,7 +17,7 @@ dft_map_interactive() carry no capture date, so they cannot."><meta property="og
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.19.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -123,7 +123,12 @@ auto-detected from the AOI centroid's UTM zone.</p></dd>
 
 <dt id="arg-aggregation">aggregation<a class="anchor" aria-label="anchor" href="#arg-aggregation"></a></dt>
 <dd><p>Character. How scenes within a window are reduced
-(default <code>"median"</code>).</p></dd>
+(default <code>"median"</code>): one of <code>"median"</code>, <code>"mean"</code>, <code>"min"</code>, <code>"max"</code>,
+<code>"first"</code> or <code>"last"</code>, or <code>"count"</code> for the number of clear days per pixel
+instead of reflectance (see the section on counting). Anything else is
+refused. gdalcubes reads a value it does not know as no aggregation at all
+and returns reflectance with no error, which is how <code>"count"</code> behaved in
+drift 0.18.0 to 0.19.2, so drift passes it only values measured to work.</p></dd>
 
 
 <dt id="arg-resampling">resampling<a class="anchor" aria-label="anchor" href="#arg-resampling"></a></dt>
@@ -145,7 +150,9 @@ scenes looks better than one of many cloudy ones).</p></dd>
 
 <dt id="arg-mask-values">mask_values<a class="anchor" aria-label="anchor" href="#arg-mask-values"></a></dt>
 <dd><p>Integer vector of mask-band classes to exclude. When
-<code>NULL</code>, taken from <code><a href="dft_stac_config.html">dft_stac_config()</a></code>.</p></dd>
+<code>NULL</code>, taken from <code><a href="dft_stac_config.html">dft_stac_config()</a></code>; for Sentinel-2 that is the SCL
+cloud, cloud-shadow, cirrus and <strong>snow</strong> classes, so snow cover is masked
+as well as cloud.</p></dd>
 
 
 <dt id="arg-tile-size">tile_size<a class="anchor" aria-label="anchor" href="#arg-tile-size"></a></dt>
@@ -179,8 +186,10 @@ replacement is atomic.</p></dd>
     <p>A named list of <a href="https://rspatial.github.io/terra/reference/SpatRaster-class.html" class="external-link">terra::SpatRaster</a>s, one per year, each with one
 layer per band. Names label the window, e.g. <code>"2017 Jun–Jul"</code>, and
 become layer labels in <code><a href="dft_map_interactive.html">dft_map_interactive()</a></code>. Each raster's
-<code><a href="https://rspatial.github.io/terra/reference/time.html" class="external-link">terra::time()</a></code> is the window start. A year with no usable scenes is
-dropped with a warning; if every year is empty, the call aborts.</p>
+<code><a href="https://rspatial.github.io/terra/reference/time.html" class="external-link">terra::time()</a></code> is the window start. With <code>aggregation = "count"</code> each layer
+holds integer clear-day counts rather than reflectance. A year with no
+usable scenes (or, for a count, no clear day anywhere) is dropped with a
+warning; if every year is empty, the call aborts.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -198,11 +207,33 @@ shared stretch to every composite it is given, so a brightness difference
 between years is a real one.</p>
     </div>
     <div class="section level2">
+    <h2 id="counting-clear-observations">Counting clear observations<a class="anchor" aria-label="anchor" href="#counting-clear-observations"></a></h2>
+
+
+<p><code>aggregation = "count"</code> returns, instead of reflectance, the number of
+<strong>distinct clear days</strong> per pixel in each window. That is the number a caller
+needs to choose composite windows. It is read one day per time step, so
+where adjacent MGRS tiles overlap, their two items of one acquisition count
+once, and a masked tile does not hide a clear one from the same day. "Clear"
+means not in <code>mask_values</code> (by default cloud, cloud shadow, cirrus <strong>and
+snow</strong>, so a spring or autumn count excludes snow cover as well as cloud), and
+only scenes passing <code>cloud_cover_max</code> are counted. The counts are whole
+numbers with no scale or offset applied, stored as integers, one layer per
+band. The mask is shared, so bands count alike and <code>bands = "red"</code> is enough.
+A pixel with no clear day is <code>NA</code>, never 0, because gdalcubes cannot tell a
+chunk it failed to read from one that was all cloud. For the same reason a
+day whose read failed for part of a chunk goes uncounted there, so where
+reads fail a count is a lower bound; gdalcubes reports such failures only on
+the console, as a composite's are. A count is not refused
+across the Sentinel-2 2022-01-25 offset change, which does not affect it.</p>
+    </div>
+    <div class="section level2">
     <h2 id="caching">Caching<a class="anchor" aria-label="anchor" href="#caching"></a></h2>
 
 
 <p>Each year's composite is written once under <code><a href="dft_cache_path.html">dft_cache_path()</a></code> as
-<code>&lt;source&gt;/composite_&lt;key&gt;.tif</code>, a Cloud Optimized GeoTIFF. The key hashes the
+<code>&lt;source&gt;/composite_&lt;key&gt;.tif</code>, a Cloud Optimized GeoTIFF; a count is written
+as <code>&lt;source&gt;/count_&lt;key&gt;.tif</code> and keyed apart from every composite. The key hashes the
 AOI geometry and every parameter that changes the pixels: bands (in order),
 months, the year's window, resolution, CRS, aggregation, resampling, cloud
 cover, mask values, reflectance scale and offset, <code>clip</code> and <code>tile_size</code>.
@@ -263,6 +294,11 @@ median. Only a January 2022 window can straddle it.</p>
 <span class="r-in"><span><span class="op">}</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="fu"><a href="dft_map_interactive.html">dft_map_interactive</a></span><span class="op">(</span>rgb <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">tc</span>, <span class="va">fc</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span><span class="op">)</span>, aoi <span class="op">=</span> <span class="va">aoi</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># How many clear days each July had, to choose a composite window</span></span></span>
+<span class="r-in"><span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fu">dft_stac_composite</span><span class="op">(</span><span class="va">aoi</span>, years <span class="op">=</span> <span class="fl">2017</span><span class="op">:</span><span class="fl">2023</span>, months <span class="op">=</span> <span class="fl">7</span>, bands <span class="op">=</span> <span class="st">"red"</span>,</span></span>
+<span class="r-in"><span>                        aggregation <span class="op">=</span> <span class="st">"count"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">n</span>, <span class="kw">function</span><span class="op">(</span><span class="va">r</span><span class="op">)</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/global.html" class="external-link">global</a></span><span class="op">(</span><span class="va">r</span>, <span class="st">"max"</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

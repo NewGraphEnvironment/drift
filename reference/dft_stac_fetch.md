@@ -74,7 +74,10 @@ dft_stac_fetch(
 - aggregation:
 
   Character. Temporal aggregation method (default `"first"`). Use
-  `"median"` for multi-scene composites.
+  `"median"` for multi-scene composites. One of `"first"`, `"last"`,
+  `"median"`, `"mean"`, `"min"` or `"max"`; anything else is refused:
+  gdalcubes reads a value it does not know as no aggregation, with no
+  error, so drift passes it only values measured to work.
 
 - resampling:
 
