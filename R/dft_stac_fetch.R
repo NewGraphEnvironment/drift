@@ -52,8 +52,13 @@
 #'   `"last"`, `"median"`, `"mean"`, `"min"` or `"max"`; anything else is
 #'   refused: gdalcubes reads a value it does not know as no aggregation, with
 #'   no error, so drift passes it only values measured to work.
-#' @param resampling Character. Spatial resampling method (default `"near"`
-#'   for categorical data).
+#' @param resampling Character. Spatial resampling method (default `"near"`,
+#'   right for categorical data; `"mode"`, the most common class, also suits it):
+#'   one of `"near"`, `"bilinear"`, `"cubic"`, `"cubicspline"`,
+#'   `"lanczos"`, `"average"`, `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or
+#'   `"q3"`. Anything else is refused: gdalcubes reads a value it does not know as
+#'   `"near"`, with no error, so drift passes it only values measured to work.
+#'   `"mean"` and `"median"` are refused too; use `"average"` and `"med"`.
 #' @param tile_size Numeric or `NULL` (default). Edge length, in CRS units
 #'   (metres for the default UTM CRS), of the download-tiling grid. When `NULL`,
 #'   one cube is streamed over the whole AOI bounding box (the download scales
@@ -103,6 +108,7 @@ dft_stac_fetch <- function(aoi,
                            sign_fn = rstac::sign_planetary_computer()) {
   check_gdalcubes("to fetch STAC rasters")
   aggregation <- aggregation_check(aggregation)
+  resampling <- resampling_check(resampling)
 
   # Normalize tile_size ONCE so the path gate (is.null) and the cache key derive
   # from the same snapped scalar. When tiling, tune GDAL for the many extra
@@ -608,6 +614,10 @@ tile_grid <- function(aoi_target, tile_size, res) {
 #' @noRd
 fetch_extent_to <- function(col, ext, t0, t1, target_crs, res, dt,
                             aggregation, resampling, out_nc) {
+  # the last point before cube_view(), which reads an unknown aggregation as
+  # "none" (#92) and an unknown resampling as "near" (#96) without an error
+  aggregation_check(aggregation)
+  resampling_check(resampling)
   v <- gdalcubes::cube_view(
     srs = target_crs,
     extent = list(

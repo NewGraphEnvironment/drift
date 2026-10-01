@@ -40,7 +40,12 @@
 #'   `"max"`, `"first"` or `"last"`. Anything else is refused: gdalcubes reads a
 #'   value it does not know as no aggregation, with no error, so drift passes it
 #'   only values measured to work.
-#' @param resampling Character. Spatial resampling (default `"bilinear"`).
+#' @param resampling Character. Spatial resampling (default `"bilinear"`):
+#'   one of `"near"`, `"bilinear"`, `"cubic"`, `"cubicspline"`,
+#'   `"lanczos"`, `"average"`, `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or
+#'   `"q3"`. Anything else is refused: gdalcubes reads a value it does not know as
+#'   `"near"`, with no error, so drift passes it only values measured to work.
+#'   `"mean"` and `"median"` are refused too; use `"average"` and `"med"`.
 #' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
 #'   polygon with `terra::mask()`, so
 #'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. The
@@ -167,6 +172,7 @@ dft_stac_cube <- function(aoi,
                           sign_fn = rstac::sign_planetary_computer()) {
   check_gdalcubes("to fetch STAC cubes")
   aggregation <- aggregation_check(aggregation)
+  resampling <- resampling_check(resampling)
 
   # gdalcubes worker count and GDAL /vsicurl tuning, both restored on exit so
   # the caller's session is untouched (see stac_cube_session()).
@@ -309,6 +315,20 @@ dft_stac_cube <- function(aoi,
 # an index or a class code. "none" is the silent fallback itself.
 .cube_view_aggregations <- c("min", "max", "mean", "median", "first", "last")
 
+# The resamplings drift passes to gdalcubes::cube_view(). gdalcubes 0.7.5
+# lower-cases the string and maps anything it does not know to "near" without
+# error, so a typo returns a nearest-neighbour cube (#96). Measured by
+# round-tripping each value through cube_view()$resampling: the twelve below come
+# back unchanged. "mean" and "median" are honoured too, but come back as
+# "average" and "med"; drift refuses them (naming the spelling to use) so each
+# method has one documented spelling and the behaviour test stays a round trip.
+# "nearest" reaches "near" only through the fallback, the same as a typo. sum, rms
+# and gauss (GDAL names) fall back as well.
+.cube_view_resamplings <- c("near", "bilinear", "cubic", "cubicspline",
+                            "lanczos", "average", "mode", "max", "min", "med",
+                            "q1", "q3")
+.cube_view_resampling_aliases <- c(mean = "average", median = "med")
+
 #' Refuse an `aggregation` outside `allowed`, before any network call
 #'
 #' Shared by [dft_stac_fetch()], [dft_stac_cube()] and [dft_stac_composite()],
@@ -319,20 +339,49 @@ dft_stac_cube <- function(aoi,
 #' mixed-case caller, silently re-streaming a cube that is already cached.
 #' @noRd
 aggregation_check <- function(aggregation, allowed = .cube_view_aggregations) {
-  if (!is.character(aggregation) || length(aggregation) != 1L ||
-        is.na(aggregation) || !tolower(aggregation) %in% allowed) {
+  cube_view_choice_check(aggregation, "aggregation", allowed,
+                         fallback = "none", class = "drift_bad_aggregation")
+}
+
+#' Refuse a `resampling` gdalcubes would read as `"near"`, before any network call
+#'
+#' The `resampling` sibling of `aggregation_check()`, with the same callers and
+#' the same as-given return (#96).
+#' @noRd
+resampling_check <- function(resampling) {
+  cube_view_choice_check(resampling, "resampling", .cube_view_resamplings,
+                         fallback = "near", class = "drift_bad_resampling",
+                         aliases = .cube_view_resampling_aliases)
+}
+
+#' Refuse a `cube_view()` string argument outside `allowed`
+#'
+#' gdalcubes reads a value it does not know as `fallback` with no error, so
+#' anything outside the measured set is an error here. Case is ignored, as
+#' gdalcubes ignores it, and `x` is returned as given. `aliases` names values
+#' gdalcubes does honour under another spelling: those are refused too, but the
+#' message says what they mean rather than calling them unknown.
+#' @noRd
+cube_view_choice_check <- function(x, arg, allowed, fallback, class,
+                                   aliases = character(0),
+                                   call = rlang::caller_env()) {
+  is_string <- is.character(x) && length(x) == 1L && !is.na(x)
+  if (!is_string || !tolower(x) %in% allowed) {
+    alias <- if (is_string) unname(aliases[tolower(x)]) else NA_character_
     cli::cli_abort(c(
-      "{.arg aggregation} must be one of {.or {.val {allowed}}}.",
-      "x" = if (is.character(aggregation) && length(aggregation) == 1L &&
-                  !is.na(aggregation)) {
-        "Got {.val {aggregation}}. gdalcubes reads a value it does not know as \\
-         {.val none} without an error, so drift passes only these."
+      "{.arg {arg}} must be one of {.or {.val {allowed}}}.",
+      "x" = if (!is.na(alias)) {
+        "Got {.val {x}}, which gdalcubes reads as {.val {alias}}. drift takes \\
+         one spelling per method: use {.val {alias}}."
+      } else if (is_string) {
+        "Got {.val {x}}. gdalcubes reads a value it does not know as \\
+         {.val {fallback}} without an error, so drift passes only these."
       } else {
-        "Got {.obj_type_friendly {aggregation}}."
+        "Got {.obj_type_friendly {x}}."
       }
-    ), class = "drift_bad_aggregation")
+    ), class = class, call = call)
   }
-  aggregation
+  x
 }
 
 
@@ -572,8 +621,9 @@ stac_cube_assemble <- function(fetched, cfg, aoi_target, target_crs, t0, t1,
                                mask_values, offset, offset_before, pixel_fn,
                                tile_size = NULL) {
   # the last point before cube_view(): an aggregation it does not honour is
-  # read as "none" and returns plausible pixels (#92)
+  # read as "none" and returns plausible pixels (#92), a resampling as "near" (#96)
   aggregation_check(aggregation)
+  resampling_check(resampling)
   mask_asset <- cfg$roles$mask
   features <- fetched$features
   is_pre <- fetched$is_pre

@@ -310,6 +310,24 @@ test_that("dft_stac_composite refuses an aggregation outside the set drift passe
   expect_length(list.files(cache, recursive = TRUE), 0L)
 })
 
+test_that("dft_stac_composite refuses a resampling gdalcubes would read as near (#96)", {
+  skip_if_not_installed("gdalcubes")
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) stop("reached the network")
+  )
+  cache <- withr::local_tempdir()
+  for (b in list("bilinaer", "median", NA_character_, c("near", "bilinear"), 1)) {
+    expect_error(dft_stac_composite(aoi_pkg(), years = 2021, resampling = b,
+                                    cache_dir = cache),
+                 class = "drift_bad_resampling")
+  }
+  # a count refuses it too: the count path also reaches cube_view()
+  expect_error(dft_stac_composite(aoi_pkg(), years = 2021, aggregation = "count",
+                                  resampling = "bilinaer", cache_dir = cache),
+               class = "drift_bad_resampling")
+  expect_length(list.files(cache, recursive = TRUE), 0L)
+})
+
 # A local, dated Sentinel-2-shaped collection: one B04 and one SCL GeoTIFF per
 # item, on an n x n grid at 10 m in EPSG:32609. `items` is a list of
 # list(id, date, scl), `scl` a function of cell x/y returning SCL classes. Separate

@@ -56,7 +56,12 @@ refused. gdalcubes reads a value it does not know as no aggregation at all
 and returns reflectance with no error, which is how \code{"count"} behaved in
 drift 0.18.0 to 0.19.2, so drift passes it only values measured to work.}
 
-\item{resampling}{Character. Spatial resampling (default \code{"bilinear"}).}
+\item{resampling}{Character. Spatial resampling (default \code{"bilinear"}):
+one of \code{"near"}, \code{"bilinear"}, \code{"cubic"}, \code{"cubicspline"},
+\code{"lanczos"}, \code{"average"}, \code{"mode"}, \code{"max"}, \code{"min"}, \code{"med"}, \code{"q1"} or
+\code{"q3"}. Anything else is refused: gdalcubes reads a value it does not know as
+\code{"near"}, with no error, so drift passes it only values measured to work.
+\code{"mean"} and \code{"median"} are refused too; use \code{"average"} and \code{"med"}.}
 
 \item{clip}{Logical. Clip the output to the AOI polygon (default \code{FALSE}).
 Reference imagery is read around a place, not only inside it, so the
