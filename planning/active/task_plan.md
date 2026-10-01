@@ -42,14 +42,14 @@ Case-insensitive: `Bilinear -> bilinear`, `MODE -> mode`, `Q1 -> q1`.
 
 ## Phase 2: Docs and NEWS
 
-- [ ] `@param resampling` in `dft_stac_cube.R`, `dft_stac_fetch.R`, `dft_stac_composite.R`: list the set, say anything else is refused because gdalcubes reads it as `"near"`; keep fetch's "`near` for categorical" note; `devtools::document()`
-- [ ] `inst/notes/gdalcubes-pc-gotchas.md` L220: replace the "#96" forward pointer with the measured set, the aliases and the decision
-- [ ] `NEWS.md` new `# drift 0.20.1` entry; update the 0.20.0 sentence pointing at #96 only if it reads as still-open (it's history — leave it)
-- [ ] `lintr::lint_package()` clean
+- [x] `@param resampling` in `dft_stac_cube.R`, `dft_stac_fetch.R`, `dft_stac_composite.R`: list the set, say anything else is refused because gdalcubes reads it as `"near"`; keep fetch's "`near` for categorical" note; `devtools::document()`
+- [x] `inst/notes/gdalcubes-pc-gotchas.md` L220: replace the "#96" forward pointer with the measured set, the aliases and the decision
+- [x] `NEWS.md` new `# drift 0.21.0` entry (version moved from 0.20.1 on plan review: refusing `mean`/`median` is a behaviour change); 0.20.0 sentence pointing at #96 left as history
+- [x] lintr clean on touched files (vignette and `dup` lints predate this branch)
 
 ## Phase 3: Release
 
-- [ ] Version bump to 0.20.1 in `DESCRIPTION` as the final branch commit ("Release v0.20.1 (#96)")
+- [ ] Version bump to 0.21.0 in `DESCRIPTION` as the final branch commit ("Release v0.21.0 (#96)")
 
 ## Not doing
 

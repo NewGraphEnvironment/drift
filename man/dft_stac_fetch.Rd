@@ -51,8 +51,13 @@ When \code{NULL}, auto-detected from the AOI centroid's UTM zone.}
 refused: gdalcubes reads a value it does not know as no aggregation, with
 no error, so drift passes it only values measured to work.}
 
-\item{resampling}{Character. Spatial resampling method (default \code{"near"}
-for categorical data).}
+\item{resampling}{Character. Spatial resampling method (default \code{"near"},
+right for categorical data; \code{"mode"}, the most common class, also suits it):
+one of \code{"near"}, \code{"bilinear"}, \code{"cubic"}, \code{"cubicspline"},
+\code{"lanczos"}, \code{"average"}, \code{"mode"}, \code{"max"}, \code{"min"}, \code{"med"}, \code{"q1"} or
+\code{"q3"}. Anything else is refused: gdalcubes reads a value it does not know as
+\code{"near"}, with no error, so drift passes it only values measured to work.
+\code{"mean"} and \code{"median"} are refused too; use \code{"average"} and \code{"med"}.}
 
 \item{tile_size}{Numeric or \code{NULL} (default). Edge length, in CRS units
 (metres for the default UTM CRS), of the download-tiling grid. When \code{NULL},

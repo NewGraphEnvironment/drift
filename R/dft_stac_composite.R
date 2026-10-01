@@ -93,7 +93,12 @@
 #'   refused. gdalcubes reads a value it does not know as no aggregation at all
 #'   and returns reflectance with no error, which is how `"count"` behaved in
 #'   drift 0.18.0 to 0.19.2, so drift passes it only values measured to work.
-#' @param resampling Character. Spatial resampling (default `"bilinear"`).
+#' @param resampling Character. Spatial resampling (default `"bilinear"`):
+#'   one of `"near"`, `"bilinear"`, `"cubic"`, `"cubicspline"`,
+#'   `"lanczos"`, `"average"`, `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or
+#'   `"q3"`. Anything else is refused: gdalcubes reads a value it does not know as
+#'   `"near"`, with no error, so drift passes it only values measured to work.
+#'   `"mean"` and `"median"` are refused too; use `"average"` and `"med"`.
 #' @param clip Logical. Clip the output to the AOI polygon (default `FALSE`).
 #'   Reference imagery is read around a place, not only inside it, so the
 #'   default keeps the whole AOI bounding box. `TRUE` uses the same rule as

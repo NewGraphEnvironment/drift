@@ -40,7 +40,12 @@
 #'   `"max"`, `"first"` or `"last"`. Anything else is refused: gdalcubes reads a
 #'   value it does not know as no aggregation, with no error, so drift passes it
 #'   only values measured to work.
-#' @param resampling Character. Spatial resampling (default `"bilinear"`).
+#' @param resampling Character. Spatial resampling (default `"bilinear"`):
+#'   one of `"near"`, `"bilinear"`, `"cubic"`, `"cubicspline"`,
+#'   `"lanczos"`, `"average"`, `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or
+#'   `"q3"`. Anything else is refused: gdalcubes reads a value it does not know as
+#'   `"near"`, with no error, so drift passes it only values measured to work.
+#'   `"mean"` and `"median"` are refused too; use `"average"` and `"med"`.
 #' @param clip Logical. When `TRUE` (default), clip the returned stack to the AOI
 #'   polygon with `terra::mask()`, so
 #'   [dft_rast_break()] / [dft_rast_trend()] reduce only in-polygon pixels. The
@@ -340,7 +345,7 @@ aggregation_check <- function(aggregation, allowed = .cube_view_aggregations) {
 
 #' Refuse a `resampling` gdalcubes would read as `"near"`, before any network call
 #'
-#' The `resampling` sibling of [aggregation_check()], with the same callers and
+#' The `resampling` sibling of `aggregation_check()`, with the same callers and
 #' the same as-given return (#96).
 #' @noRd
 resampling_check <- function(resampling) {

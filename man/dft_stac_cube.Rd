@@ -52,7 +52,12 @@ must agree with.}
 value it does not know as no aggregation, with no error, so drift passes it
 only values measured to work.}
 
-\item{resampling}{Character. Spatial resampling (default \code{"bilinear"}).}
+\item{resampling}{Character. Spatial resampling (default \code{"bilinear"}):
+one of \code{"near"}, \code{"bilinear"}, \code{"cubic"}, \code{"cubicspline"},
+\code{"lanczos"}, \code{"average"}, \code{"mode"}, \code{"max"}, \code{"min"}, \code{"med"}, \code{"q1"} or
+\code{"q3"}. Anything else is refused: gdalcubes reads a value it does not know as
+\code{"near"}, with no error, so drift passes it only values measured to work.
+\code{"mean"} and \code{"median"} are refused too; use \code{"average"} and \code{"med"}.}
 
 \item{clip}{Logical. When \code{TRUE} (default), clip the returned stack to the AOI
 polygon with \code{terra::mask()}, so

@@ -52,8 +52,13 @@
 #'   `"last"`, `"median"`, `"mean"`, `"min"` or `"max"`; anything else is
 #'   refused: gdalcubes reads a value it does not know as no aggregation, with
 #'   no error, so drift passes it only values measured to work.
-#' @param resampling Character. Spatial resampling method (default `"near"`
-#'   for categorical data).
+#' @param resampling Character. Spatial resampling method (default `"near"`,
+#'   right for categorical data; `"mode"`, the most common class, also suits it):
+#'   one of `"near"`, `"bilinear"`, `"cubic"`, `"cubicspline"`,
+#'   `"lanczos"`, `"average"`, `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or
+#'   `"q3"`. Anything else is refused: gdalcubes reads a value it does not know as
+#'   `"near"`, with no error, so drift passes it only values measured to work.
+#'   `"mean"` and `"median"` are refused too; use `"average"` and `"med"`.
 #' @param tile_size Numeric or `NULL` (default). Edge length, in CRS units
 #'   (metres for the default UTM CRS), of the download-tiling grid. When `NULL`,
 #'   one cube is streamed over the whole AOI bounding box (the download scales
