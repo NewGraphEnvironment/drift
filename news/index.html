@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.21.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,20 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.21.0" id="drift-0210">drift 0.21.0<a class="anchor" aria-label="anchor" href="#drift-0210"></a></h2>
+<ul><li>
+<strong>A misspelt <code>resampling</code> no longer returns a nearest-neighbour raster without a word (<a href="https://github.com/NewGraphEnvironment/drift/issues/96" class="external-link">#96</a>).</strong> <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code>, <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> and <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> passed <code>resampling</code> straight to <code><a href="https://rdrr.io/pkg/gdalcubes/man/cube_view.html" class="external-link">gdalcubes::cube_view()</a></code>, which reads a value it does not know as <code>near</code> with no error. So <code>resampling = "bilinaer"</code> returned and cached a nearest-neighbour cube. This is the same silent fallback <a href="https://github.com/NewGraphEnvironment/drift/issues/92" class="external-link">#92</a> fixed for <code>aggregation</code>.
+<ul><li>
+<strong>Refused up front:</strong> all three now refuse any <code>resampling</code> outside <code>near</code>, <code>bilinear</code>, <code>cubic</code>, <code>cubicspline</code>, <code>lanczos</code>, <code>average</code>, <code>mode</code>, <code>max</code>, <code>min</code>, <code>med</code>, <code>q1</code> and <code>q3</code>. Each of the twelve was measured to come back unchanged from <code>cube_view()</code>. Case is ignored and the value is hashed as given, so no existing cache key moves. The check runs before any network call, and again at both <code>cube_view()</code> call sites.</li>
+<li>
+<strong><code>mean</code> and <code>median</code> are refused too, which can break a call that used to work.</strong> gdalcubes honours them, but renames them to <code>average</code> and <code>med</code>. drift keeps one spelling per method, and the error names the one to use. Switching to it changes the cache key, so the first call re-streams once.</li>
+<li>
+<strong>Old caches:</strong> a file cached under a <code>resampling</code> gdalcubes did not know (a typo, or <code>sum</code>, <code>rms</code>, <code>gauss</code>, <code>nearest</code>, <code>none</code>) holds nearest-neighbour data, and since that value is now refused, nothing reads it again. It sits in the current cache scheme beside good files and cannot be told apart from them, so only <code><a href="../reference/dft_cache_clear.html">dft_cache_clear()</a></code>, which clears everything by default, reclaims it.</li>
+<li>
+<code>aggregation</code> is now also checked where <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> builds each <code>cube_view()</code>, tiled or not, as it already was in <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> and <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code>.</li>
+</ul></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.20.0" id="drift-0200">drift 0.20.0<a class="anchor" aria-label="anchor" href="#drift-0200"></a></h2>
 <ul><li>

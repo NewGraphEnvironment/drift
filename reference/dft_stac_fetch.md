@@ -81,8 +81,14 @@ dft_stac_fetch(
 
 - resampling:
 
-  Character. Spatial resampling method (default `"near"` for categorical
-  data).
+  Character. Spatial resampling method (default `"near"`, right for
+  categorical data; `"mode"`, the most common class, also suits it): one
+  of `"near"`, `"bilinear"`, `"cubic"`, `"cubicspline"`, `"lanczos"`,
+  `"average"`, `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or `"q3"`.
+  Anything else is refused: gdalcubes reads a value it does not know as
+  `"near"`, with no error, so drift passes it only values measured to
+  work. `"mean"` and `"median"` are refused too; use `"average"` and
+  `"med"`.
 
 - tile_size:
 

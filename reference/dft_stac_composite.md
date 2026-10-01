@@ -88,7 +88,12 @@ dft_stac_composite(
 
 - resampling:
 
-  Character. Spatial resampling (default `"bilinear"`).
+  Character. Spatial resampling (default `"bilinear"`): one of `"near"`,
+  `"bilinear"`, `"cubic"`, `"cubicspline"`, `"lanczos"`, `"average"`,
+  `"mode"`, `"max"`, `"min"`, `"med"`, `"q1"` or `"q3"`. Anything else
+  is refused: gdalcubes reads a value it does not know as `"near"`, with
+  no error, so drift passes it only values measured to work. `"mean"`
+  and `"median"` are refused too; use `"average"` and `"med"`.
 
 - clip:
 

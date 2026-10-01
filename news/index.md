@@ -1,5 +1,47 @@
 # Changelog
 
+## drift 0.21.0
+
+- **A misspelt `resampling` no longer returns a nearest-neighbour raster
+  without a word
+  ([\#96](https://github.com/NewGraphEnvironment/drift/issues/96)).**
+  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md),
+  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  and
+  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  passed `resampling` straight to
+  [`gdalcubes::cube_view()`](https://rdrr.io/pkg/gdalcubes/man/cube_view.html),
+  which reads a value it does not know as `near` with no error. So
+  `resampling = "bilinaer"` returned and cached a nearest-neighbour
+  cube. This is the same silent fallback
+  [\#92](https://github.com/NewGraphEnvironment/drift/issues/92) fixed
+  for `aggregation`.
+  - **Refused up front:** all three now refuse any `resampling` outside
+    `near`, `bilinear`, `cubic`, `cubicspline`, `lanczos`, `average`,
+    `mode`, `max`, `min`, `med`, `q1` and `q3`. Each of the twelve was
+    measured to come back unchanged from `cube_view()`. Case is ignored
+    and the value is hashed as given, so no existing cache key moves.
+    The check runs before any network call, and again at both
+    `cube_view()` call sites.
+  - **`mean` and `median` are refused too, which can break a call that
+    used to work.** gdalcubes honours them, but renames them to
+    `average` and `med`. drift keeps one spelling per method, and the
+    error names the one to use. Switching to it changes the cache key,
+    so the first call re-streams once.
+  - **Old caches:** a file cached under a `resampling` gdalcubes did not
+    know (a typo, or `sum`, `rms`, `gauss`, `nearest`, `none`) holds
+    nearest-neighbour data, and since that value is now refused, nothing
+    reads it again. It sits in the current cache scheme beside good
+    files and cannot be told apart from them, so only
+    [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md),
+    which clears everything by default, reclaims it.
+  - `aggregation` is now also checked where
+    [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+    builds each `cube_view()`, tiled or not, as it already was in
+    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+    and
+    [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md).
+
 ## drift 0.20.0
 
 - **`dft_stac_composite(aggregation = "count")` returned reflectance,

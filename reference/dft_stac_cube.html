@@ -17,7 +17,7 @@ breakpoint detection."><meta property="og:image" content="https://newgraphenviro
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.20.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.21.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -128,7 +128,12 @@ only values measured to work.</p></dd>
 
 
 <dt id="arg-resampling">resampling<a class="anchor" aria-label="anchor" href="#arg-resampling"></a></dt>
-<dd><p>Character. Spatial resampling (default <code>"bilinear"</code>).</p></dd>
+<dd><p>Character. Spatial resampling (default <code>"bilinear"</code>):
+one of <code>"near"</code>, <code>"bilinear"</code>, <code>"cubic"</code>, <code>"cubicspline"</code>,
+<code>"lanczos"</code>, <code>"average"</code>, <code>"mode"</code>, <code>"max"</code>, <code>"min"</code>, <code>"med"</code>, <code>"q1"</code> or
+<code>"q3"</code>. Anything else is refused: gdalcubes reads a value it does not know as
+<code>"near"</code>, with no error, so drift passes it only values measured to work.
+<code>"mean"</code> and <code>"median"</code> are refused too; use <code>"average"</code> and <code>"med"</code>.</p></dd>
 
 
 <dt id="arg-clip">clip<a class="anchor" aria-label="anchor" href="#arg-clip"></a></dt>
