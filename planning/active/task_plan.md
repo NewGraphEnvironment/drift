@@ -28,17 +28,17 @@ Case-insensitive: `Bilinear -> bilinear`, `MODE -> mode`, `Q1 -> q1`.
 
 ## Phase 1: Validate `resampling` (tests first)
 
-- [ ] Tests in `tests/testthat/test-dft_stac_cube.R`, beside the #92 blocks (~L758):
+- [x] Tests in `tests/testthat/test-dft_stac_cube.R`, beside the #92 blocks (~L758):
   - `resampling_check()` accepts the 12; returns mixed case **as given** (`"Bilinear"`, `"Q1"`) — cache keys hash it, lower-casing would move them
   - refuses `"bilinaer" "foo" "nearest" "sum" "rms" "none" "mean" "median" "" NA_character_ NA c("near","bilinear") character(0) 1 NULL` with class `drift_bad_resampling`; message names the set and the refused value
   - behaviour pin: every `.cube_view_resamplings` member round-trips through `cube_view()` unchanged, and `"bilinaer"` comes back `"near"` (so the test fails if gdalcubes ever starts refusing, or the set drifts)
   - before-network: `dft_stac_cube`, `dft_stac_fetch` (io-lulc), `dft_stac_composite` with bad `resampling` error with `drift_bad_resampling` under the existing `stac_cube_items`/`stac_items_paged` → `stop("reached the network")` mocks, and the cache dir stays empty (composite case in `test-dft_stac_composite.R` ~L300)
-- [ ] `R/dft_stac_cube.R`: add `.cube_view_resamplings` (comment carrying the measurement + alias/nearest rationale) and `resampling_check()`. Factor the body of `aggregation_check()` into one private helper (`cube_view_choice_check(x, arg, allowed, fallback, class)`) that both call, so the two messages and the as-given return cannot drift apart; `aggregation_check()`'s signature and existing tests unchanged
-- [ ] Call sites, each beside the existing `aggregation_check()`:
+- [x] `R/dft_stac_cube.R`: add `.cube_view_resamplings` (comment carrying the measurement + alias/nearest rationale) and `resampling_check()`. Factor the body of `aggregation_check()` into one private helper (`cube_view_choice_check(x, arg, allowed, fallback, class)`) that both call, so the two messages and the as-given return cannot drift apart; `aggregation_check()`'s signature and existing tests unchanged
+- [x] Call sites, each beside the existing `aggregation_check()`:
   - top of `dft_stac_cube()`, `dft_stac_fetch()`, `dft_stac_composite()` (before any network call)
   - `stac_cube_assemble()` — last point before `cube_view()` (covers cube + composite)
   - `fetch_extent_to()` (`R/dft_stac_fetch.R:609`) — last point before `cube_view()` for fetch
-- [ ] `devtools::test()` green; restore-the-bug check: drop the call in `dft_stac_cube()` and confirm the before-network test goes red
+- [x] `devtools::test()` green; restore-the-bug check: drop the call in `dft_stac_cube()` and confirm the before-network test goes red
 
 ## Phase 2: Docs and NEWS
 

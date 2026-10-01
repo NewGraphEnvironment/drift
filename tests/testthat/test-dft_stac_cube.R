@@ -793,6 +793,114 @@ test_that("every allowed aggregation is one gdalcubes::cube_view actually honour
   expect_identical(honoured("count"), "none")
 })
 
+test_that("resampling_check refuses anything outside the set drift passes to cube_view (#96)", {
+  allowed <- c("near", "bilinear", "cubic", "cubicspline", "lanczos", "average",
+               "mode", "max", "min", "med", "q1", "q3")
+  expect_setequal(drift:::.cube_view_resamplings, allowed)
+  for (ok in allowed) expect_identical(drift:::resampling_check(ok), ok)
+  # case-insensitive, as gdalcubes is, and returned as given: callers hash it
+  # into cache keys, so lower-casing it would move a mixed-case caller's key
+  expect_identical(drift:::resampling_check("Bilinear"), "Bilinear")
+  expect_identical(drift:::resampling_check("Q1"), "Q1")
+  # "mean" and "median" are honoured under another name, "nearest" only by the
+  # fallback: one spelling per method, so one output never caches under two keys
+  bad <- list("bilinaer", "foo", "nearest", "sum", "rms", "none", "mean",
+              "median", "", NA_character_, NA, c("near", "bilinear"),
+              character(0), 1, NULL)
+  for (b in bad) {
+    expect_error(drift:::resampling_check(b), class = "drift_bad_resampling")
+  }
+  # the message names the valid set, the value it refused, and the fallback
+  expect_error(drift:::resampling_check("bilinaer"), "cubicspline")
+  expect_error(drift:::resampling_check("bilinaer"), "bilinaer")
+  expect_error(drift:::resampling_check("bilinaer"), "does not know as \"near\"")
+  # an alias gdalcubes honours is refused with the spelling to use, not called
+  # unknown; matched without case like everything else
+  expect_error(drift:::resampling_check("mean"), "reads as \"average\"",
+               class = "drift_bad_resampling")
+  expect_error(drift:::resampling_check("Median"), "use \"med\"",
+               class = "drift_bad_resampling")
+  expect_no_match(
+    tryCatch(drift:::resampling_check("mean"), error = conditionMessage),
+    "does not know"
+  )
+  # aggregation keeps its own class and fallback through the shared helper
+  expect_error(drift:::aggregation_check("bilinear"), "none",
+               class = "drift_bad_aggregation")
+})
+
+test_that("every allowed resampling is one gdalcubes::cube_view actually honours", {
+  # Behaviour, not documentation: gdalcubes maps an unknown resampling to
+  # "near" silently, so each allowed value must survive the round trip, and the
+  # #96 typo must not.
+  skip_if_not_installed("gdalcubes")
+  honoured <- function(r) {
+    gdalcubes::cube_view(
+      srs = "EPSG:32609",
+      extent = list(left = 0, right = 40, bottom = 0, top = 40,
+                    t0 = "2021-07-01", t1 = "2021-07-31"),
+      dx = 10, dy = 10, dt = "P1M", resampling = r
+    )$resampling
+  }
+  for (r in drift:::.cube_view_resamplings) expect_identical(honoured(r), r)
+  expect_identical(honoured("bilinaer"), "near")
+  # the alias hint claims gdalcubes reads these as another member of the set
+  for (a in names(drift:::.cube_view_resampling_aliases)) {
+    expect_identical(honoured(a), drift:::.cube_view_resampling_aliases[[a]])
+  }
+})
+
+test_that("dft_stac_cube and dft_stac_fetch refuse a bad resampling before any network call (#96)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(
+    system.file("extdata", "example_aoi.gpkg", package = "drift"),
+    quiet = TRUE
+  )
+  cache <- withr::local_tempdir()
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) stop("reached the network"),
+    stac_items_paged = function(...) stop("reached the network")
+  )
+  for (b in list("bilinaer", "nearest", NA_character_, c("near", "bilinear"), 1)) {
+    expect_error(dft_stac_cube(aoi, resampling = b, cache_dir = cache),
+                 class = "drift_bad_resampling")
+    expect_error(dft_stac_fetch(aoi, source = "io-lulc", years = 2017,
+                                resampling = b, cache_dir = cache),
+                 class = "drift_bad_resampling")
+  }
+  expect_length(list.files(cache, recursive = TRUE), 0L)
+})
+
+test_that("the two cube_view() call sites refuse a bad value themselves (#96)", {
+  # The last line of defence for a future caller that skips the exported entry
+  # points' checks. Both checks run before their other arguments are touched, so
+  # placeholders suffice.
+  expect_error(
+    drift:::stac_cube_assemble(
+      fetched = list(), cfg = list(), aoi_target = NULL, target_crs = NULL,
+      t0 = NULL, t1 = NULL, res = 10, dt = "P1M", aggregation = "median",
+      resampling = "bilinaer", band_assets = NULL, mask_values = NULL,
+      offset = 0, offset_before = 0, pixel_fn = identity
+    ),
+    class = "drift_bad_resampling"
+  )
+  for (args in list(
+    list(aggregation = "first", resampling = "bilinaer",
+         class = "drift_bad_resampling"),
+    list(aggregation = "count", resampling = "near",
+         class = "drift_bad_aggregation")
+  )) {
+    expect_error(
+      drift:::fetch_extent_to(
+        col = NULL, ext = list(), t0 = NULL, t1 = NULL, target_crs = NULL,
+        res = 10, dt = "P1Y", aggregation = args$aggregation,
+        resampling = args$resampling, out_nc = tempfile()
+      ),
+      class = args$class
+    )
+  }
+})
+
 test_that("dft_stac_cube and dft_stac_fetch refuse a bad aggregation before any network call (#92)", {
   skip_if_not_installed("gdalcubes")
   aoi <- sf::st_read(

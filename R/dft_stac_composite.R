@@ -185,6 +185,7 @@ dft_stac_composite <- function(aoi,
   }
   aggregation <- aggregation_check(aggregation,
                                    c(.cube_view_aggregations, "count"))
+  resampling <- resampling_check(resampling)
   # matched without case, like every aggregation; the count family is new, so
   # normalising it moves no existing key
   is_count <- identical(tolower(aggregation), "count")

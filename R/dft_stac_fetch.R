@@ -103,6 +103,7 @@ dft_stac_fetch <- function(aoi,
                            sign_fn = rstac::sign_planetary_computer()) {
   check_gdalcubes("to fetch STAC rasters")
   aggregation <- aggregation_check(aggregation)
+  resampling <- resampling_check(resampling)
 
   # Normalize tile_size ONCE so the path gate (is.null) and the cache key derive
   # from the same snapped scalar. When tiling, tune GDAL for the many extra
@@ -608,6 +609,10 @@ tile_grid <- function(aoi_target, tile_size, res) {
 #' @noRd
 fetch_extent_to <- function(col, ext, t0, t1, target_crs, res, dt,
                             aggregation, resampling, out_nc) {
+  # the last point before cube_view(), which reads an unknown aggregation as
+  # "none" (#92) and an unknown resampling as "near" (#96) without an error
+  aggregation_check(aggregation)
+  resampling_check(resampling)
   v <- gdalcubes::cube_view(
     srs = target_crs,
     extent = list(
