@@ -49,7 +49,7 @@ Case-insensitive: `Bilinear -> bilinear`, `MODE -> mode`, `Q1 -> q1`.
 
 ## Phase 3: Release
 
-- [ ] Version bump to 0.21.0 in `DESCRIPTION` as the final branch commit ("Release v0.21.0 (#96)")
+- [x] Version bump to 0.21.0 in `DESCRIPTION` as the final branch commit ("Release v0.21.0 (#96)")
 
 ## Not doing
 
@@ -62,7 +62,7 @@ Case-insensitive: `Bilinear -> bilinear`, `MODE -> mode`, `Q1 -> q1`.
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion
+- [x] Tests pass
+- [x] `/code-check` clean on each commit
+- [x] PWF checkboxes match landed work
+- [x] `/planning-archive` on completion
