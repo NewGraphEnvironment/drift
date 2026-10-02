@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.21.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.22.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,6 +37,21 @@
       <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.22.0" id="drift-0220">drift 0.22.0<a class="anchor" aria-label="anchor" href="#drift-0220"></a></h2>
+<ul><li>
+<strong>A cube, composite or fetch whose images could not be opened now aborts, and nothing is cached (<a href="https://github.com/NewGraphEnvironment/drift/issues/87" class="external-link">#87</a>).</strong> When a signed URL had expired or was refused, gdalcubes wrote those chunks as <code>NA</code> and raised nothing in R. drift then cached the holed result and served it under <code>force = FALSE</code> from then on. <a href="https://github.com/NewGraphEnvironment/drift/issues/79" class="external-link">#79</a> lost 15 of 30 tiles of a floodplain composite this way.
+<ul><li>
+<strong>How it is caught:</strong> gdalcubes records each chunk’s status in the NetCDF it writes, including from worker processes, where its console warning never reaches R. <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code>, <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> and <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code>, tiled or not, now read it after every write and abort with class <code>drift_incomplete_cube</code> before caching. They also abort on gdalcubes’ “could not be added to output” merge warning.</li>
+<li>
+<strong>Why the pixels could not show it:</strong> a median over two scenes, one of which failed, fills every cell from the other. The cube has no <code>NA</code> at all.</li>
+<li>
+<strong>What it does not catch:</strong> gdalcubes records only an image that fails to <em>open</em>. An image that opens and then fails mid-read (a throttled request) is not caught. Nor is a cloud-mask image that fails, which can leave a scene unmasked. See <a href="https://github.com/NewGraphEnvironment/drift/issues/99" class="external-link">#99</a>. GDAL now retries a transient 429 or 5xx (<code>GDAL_HTTP_MAX_RETRY</code>) on these reads.</li>
+<li>
+<strong>Old caches:</strong> an untiled <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> cache that records failed chunks is now re-fetched. Cube, composite and tiled-fetch caches cannot be re-checked. Re-run long tiled reads made before this version with <code>force = TRUE</code>. Cache keys are unchanged.</li>
+<li>A tiled <code><a href="../reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> that aborts no longer leaves its tile files in the session temp directory.</li>
+</ul></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.21.0" id="drift-0210">drift 0.21.0<a class="anchor" aria-label="anchor" href="#drift-0210"></a></h2>
 <ul><li>
