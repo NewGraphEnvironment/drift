@@ -1,3 +1,12 @@
+# drift 0.22.0
+
+- **A cube, composite or fetch whose images could not be opened now aborts, and nothing is cached (#87).** When a signed URL had expired or was refused, gdalcubes wrote those chunks as `NA` and raised nothing in R. drift then cached the holed result and served it under `force = FALSE` from then on. #79 lost 15 of 30 tiles of a floodplain composite this way.
+  - **How it is caught:** gdalcubes records each chunk's status in the NetCDF it writes, including from worker processes, where its console warning never reaches R. `dft_stac_cube()`, `dft_stac_composite()` and `dft_stac_fetch()`, tiled or not, now read it after every write and abort with class `drift_incomplete_cube` before caching. They also abort on gdalcubes' "could not be added to output" merge warning.
+  - **Why the pixels could not show it:** a median over two scenes, one of which failed, fills every cell from the other. The cube has no `NA` at all.
+  - **What it does not catch:** gdalcubes records only an image that fails to *open*. An image that opens and then fails mid-read (a throttled request) is not caught. Nor is a cloud-mask image that fails, which can leave a scene unmasked. See #99. GDAL now retries a transient 429 or 5xx (`GDAL_HTTP_MAX_RETRY`) on these reads.
+  - **Old caches:** an untiled `dft_stac_fetch()` cache that records failed chunks is now re-fetched. Cube, composite and tiled-fetch caches cannot be re-checked. Re-run long tiled reads made before this version with `force = TRUE`. Cache keys are unchanged.
+  - A tiled `dft_stac_fetch()` that aborts no longer leaves its tile files in the session temp directory.
+
 # drift 0.21.0
 
 - **A misspelt `resampling` no longer returns a nearest-neighbour raster without a word (#96).** `dft_stac_cube()`, `dft_stac_composite()` and `dft_stac_fetch()` passed `resampling` straight to `gdalcubes::cube_view()`, which reads a value it does not know as `near` with no error. So `resampling = "bilinaer"` returned and cached a nearest-neighbour cube. This is the same silent fallback #92 fixed for `aggregation`.
