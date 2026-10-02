@@ -967,3 +967,153 @@ test_that("fetch, cube and composite hash the caller's aggregation as given (#92
   expect_identical(hashed, list(fetch = "Median", cube = "Median",
                                 composite = "Median"))
 })
+
+
+# --- #87: failed chunk reads ------------------------------------------------
+#
+# gdalcubes prints "n out of m chunks have repoprted errors" and writes the
+# failed chunks as NA, raising nothing in R; with worker processes the line never
+# reaches R at all. What it does write, at every worker count, is a per-chunk
+# `chunk_status` variable in the output NetCDF. These tests delete an image after
+# the collection is built, which fails the read the way an expired signed URL
+# does, and drive the real gdalcubes writer.
+
+test_that("a clean gdalcubes write passes the chunk check at 1 and 4 workers (#87)", {
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"))
+  for (p in c(1, 4)) {
+    nc <- chunk_fixture_write(col, parallel = p)
+    expect_silent(drift:::cube_check_chunks(nc))
+  }
+})
+
+test_that("a failed image read aborts the chunk check at 1 and 4 workers (#87)", {
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13")
+  for (p in c(1, 4)) {
+    nc <- chunk_fixture_write(col, parallel = p)
+    # PREMISE: the fixture really holes the cube, so a pass here would be the
+    # guard failing and not the fixture being clean
+    expect_lt(sum(terra::global(terra::rast(nc), "notNA")$notNA),
+              terra::ncell(terra::rast(nc)) * terra::nlyr(terra::rast(nc)))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a failed read the pixels cannot show still aborts (#87)", {
+  # A monthly median over two scenes where one failed fills every cell from the
+  # survivor: no NA anywhere, so no check on the pixels can see it. This is the
+  # case that makes chunk_status the only discriminating evidence.
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13")
+  nc <- chunk_fixture_write(col, dt = "P1M", aggregation = "median", parallel = 4)
+  r <- terra::rast(nc)
+  expect_equal(sum(terra::global(r, "notNA")$notNA),
+               terra::ncell(r) * terra::nlyr(r))
+  expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+})
+
+test_that("the chunk-check abort says how many chunks failed and that nothing was cached (#87)", {
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13")
+  nc <- chunk_fixture_write(col, parallel = 1)
+  e <- expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  msg <- conditionMessage(e)
+  expect_match(msg, "9 of 279", fixed = TRUE)
+  expect_match(msg, "Nothing was cached", fixed = TRUE)
+})
+
+test_that("a NetCDF with no chunk_status aborts rather than passing (#87)", {
+  # A guard that cannot find its evidence must not report the read clean.
+  skip_if_not_installed("gdalcubes")
+  r <- terra::rast(nrows = 4, ncols = 4, xmin = 0, xmax = 40, ymin = 0,
+                   ymax = 40, crs = "EPSG:32609", vals = 1)
+  nc <- withr::local_tempfile(fileext = ".nc")
+  terra::writeCDF(r, nc, varname = "B04")
+  expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+})
+
+test_that("a chunk gdalcubes could not merge aborts the write (#87)", {
+  # A chunk whose worker output could not be merged keeps the fill value, which
+  # cube_check_chunks() must read as OK because a skipped empty chunk keeps it
+  # too. gdalcubes' only signal is an R warning, so the wrapper turns that into
+  # an abort. Simulated: the write lands a clean file and then warns as
+  # multiprocess.cpp does.
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"))
+  clean <- chunk_fixture_write(col, parallel = 4)
+  out <- withr::local_tempfile(fileext = ".nc")
+  testthat::local_mocked_bindings(
+    # warn FIRST, then land the file: an abort raised inside the handler
+    # unwinds before the copy, so `out` is missing exactly when the abort did
+    # not wait for the write (the order is what makes the last assertion bite)
+    write_ncdf = function(x, fname, ...) {
+      warning("Chunk 3 could not be added to output")
+      file.copy(clean, fname, overwrite = TRUE)
+      invisible(fname)
+    },
+    .package = "gdalcubes"
+  )
+  # PREMISE: the file it lands passes the status check on its own
+  expect_silent(drift:::cube_check_chunks(clean))
+  expect_error(drift:::cube_write_ncdf(NULL, out), class = "drift_incomplete_cube")
+  # the abort waited for the write to return rather than unwinding through it:
+  # gdalcubes' C++ frames run their cleanup only if the write completes
+  expect_true(file.exists(out) && file.size(out) > 0)
+})
+
+test_that("an unrelated gdalcubes warning passes through the write (#87)", {
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"))
+  clean <- chunk_fixture_write(col, parallel = 4)
+  out <- withr::local_tempfile(fileext = ".nc")
+  testthat::local_mocked_bindings(
+    write_ncdf = function(x, fname, ...) {
+      file.copy(clean, fname, overwrite = TRUE)
+      warning("something else gdalcubes says")
+      invisible(fname)
+    },
+    .package = "gdalcubes"
+  )
+  expect_warning(drift:::cube_write_ncdf(NULL, out), "something else")
+})
+
+test_that("a failed read on the post-boundary side of an offset split aborts (#87)", {
+  # stac_cube_assemble() builds two cubes over one view when the items straddle
+  # the offset boundary and coalesces them with terra::cover(). Each write is
+  # checked: a holed post side must not be hidden by a complete pre side.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  aoi_t <- sf::st_transform(aoi, 32609)
+  bb <- sf::st_bbox(aoi_t)
+  ext <- c(floor(bb[["xmin"]] / 10) * 10 - 20, ceiling(bb[["xmax"]] / 10) * 10 + 20,
+           floor(bb[["ymin"]] / 10) * 10 - 20, ceiling(bb[["ymax"]] / 10) * 10 + 20)
+  pre <- chunk_fixture(c("2021-07-03", "2021-07-13"), ext = ext)
+  post <- chunk_fixture(c("2022-07-03", "2022-07-13"), ext = ext,
+                        break_dates = "2022-07-13")
+  calls <- 0L
+  testthat::local_mocked_bindings(
+    stac_image_collection = function(...) {
+      calls <<- calls + 1L
+      if (calls == 1L) pre else post
+    },
+    .package = "gdalcubes"
+  )
+  restore <- drift:::stac_cube_session(4)
+  withr::defer(restore())
+  run <- function() {
+    drift:::stac_cube_assemble(
+      list(features = list(list(id = "a"), list(id = "b")),
+           is_pre = c(TRUE, FALSE)),
+      dft_stac_config("sentinel-2-l2a"), aoi_t, "EPSG:32609",
+      t0 = "2021-07-01", t1 = "2022-07-31", res = 10, dt = "P1Y",
+      aggregation = "median", resampling = "near", band_assets = "B04",
+      mask_values = c(8, 9), offset = 0, offset_before = 0,
+      pixel_fn = function(cube, offset_use) gdalcubes::select_bands(cube, "B04")
+    )
+  }
+  expect_error(run(), class = "drift_incomplete_cube")
+  # both sides were built: the abort is the post side's, not a short-circuit
+  expect_equal(calls, 2L)
+})

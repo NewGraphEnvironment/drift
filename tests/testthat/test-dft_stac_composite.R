@@ -663,3 +663,96 @@ test_that("a count is matched without case and keys as 'count' (#92)", {
   expect_length(files, 1L)
   expect_match(files, "^count_")
 })
+
+
+# --- #87: a failed chunk read aborts and caches nothing ----------------------
+#
+# The real gdalcubes writer over a local collection (chunk_fixture(), in
+# helper-gdalcubes.R) whose 2021-07-13 image is deleted after the collection is
+# built: the read fails the way an expired signed URL does. Only the STAC query
+# and the collection constructor are stubbed, so stac_cube_assemble(), the
+# write, the guard and the cache publish all run as in production. At
+# parallel = 4, because the default resolves to 1 on a two-core runner, and the
+# fill value an unvisited chunk keeps (which the guard must read as OK) is the
+# worker path's.
+
+# The fixture's extent: the packaged AOI's bbox in its UTM zone, widened to whole
+# cells and a margin so every cube_view drift builds over it lies inside.
+aoi_fixture_ext <- function(aoi) {
+  bb <- sf::st_bbox(sf::st_transform(aoi, 32609))
+  c(floor(bb[["xmin"]] / 10) * 10 - 20, ceiling(bb[["xmax"]] / 10) * 10 + 20,
+    floor(bb[["ymin"]] / 10) * 10 - 20, ceiling(bb[["ymax"]] / 10) * 10 + 20)
+}
+
+# `break_dates` holds one entry per year: the dates to break in that year's
+# collection. Years are 2021, 2022, ...; each has scenes on 07-03 and 07-13.
+composite_on_fixture <- function(break_dates, tile_size = NULL, cache,
+                                 env = parent.frame()) {
+  aoi <- aoi_pkg()
+  years <- 2020 + seq_along(break_dates)
+  cols <- lapply(seq_along(years), function(i) {
+    chunk_fixture(paste0(years[i], c("-07-03", "-07-13")),
+                  ext = aoi_fixture_ext(aoi), break_dates = break_dates[[i]],
+                  envir = env)
+  })
+  year_now <- 0L
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) {
+      year_now <<- year_now + 1L
+      list(features = list(list(id = "a"), list(id = "b")),
+           is_pre = rep(years[year_now] < 2022, 2))
+    },
+    .env = env
+  )
+  testthat::local_mocked_bindings(
+    stac_image_collection = function(...) cols[[year_now]],
+    .package = "gdalcubes", .env = env
+  )
+  suppressMessages(dft_stac_composite(aoi, years = years, months = 7,
+                                      bands = "red", tile_size = tile_size,
+                                      parallel = 4, cache_dir = cache))
+}
+
+test_that("a composite whose chunk reads failed aborts and caches nothing (#87)", {
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(composite_on_fixture(list("2021-07-13"), cache = cache),
+               class = "drift_incomplete_cube")
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
+})
+
+test_that("a tiled composite whose chunk reads failed aborts and caches nothing (#87)", {
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(composite_on_fixture(list("2021-07-13"), tile_size = 1000,
+                                    cache = cache),
+               class = "drift_incomplete_cube")
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
+})
+
+test_that("a composite over a readable collection is built and cached as before (#87)", {
+  # False-refusal control: the guard must not fire on a clean read, tiled or not.
+  skip_if_not_installed("gdalcubes")
+  for (ts in list(NULL, 1000)) {
+    cache <- withr::local_tempdir()
+    out <- composite_on_fixture(list(character(0)), tile_size = ts,
+                                cache = cache)
+    expect_s4_class(out[[1]], "SpatRaster")
+    expect_gt(sum(terra::global(out[[1]], "notNA")$notNA), 0)
+    expect_length(list.files(cache, pattern = "\\.tif$", recursive = TRUE), 1L)
+  }
+})
+
+test_that("a failed year is an abort, not a skipped year (#87)", {
+  # The year loop turns drift_no_items and drift_empty_cube into a warning and a
+  # dropped year. A holed read must not take that exit: it would return the
+  # other years as though the window simply had no scenes.
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(
+    composite_on_fixture(list(character(0), "2022-07-13"), cache = cache),
+    class = "drift_incomplete_cube"
+  )
+  # year 1 was built before year 2 failed, and stays cached; year 2 does not
+  expect_length(list.files(cache, pattern = "\\.tif$", recursive = TRUE), 1L)
+})

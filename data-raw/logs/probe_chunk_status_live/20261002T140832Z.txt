@@ -1,0 +1,18 @@
+14:08:32Z drift 0.21.0 (source tree), gdalcubes 0.7.5, cores 10, auto parallel 4 
+14:08:37Z PASS | composite untiled, bad tokens | expect drift_incomplete_cube | got drift_incomplete_cube | cache files 0 | 5 s | gdalcubes parallel after 1 
+14:08:37Z     gdalcubes could not read 9 of 9 chunks: an image would not open. ✖ Those cells are "NA", or computed from only the scenes that did open. ℹ Usually an expired or refused signed URL. Nothing was cached. ℹ Re-running signs the request again. If the same read fails every time, an asset may be missing fr 
+14:08:41Z PASS | composite tiled 1000 m, bad tokens | expect drift_incomplete_cube | got drift_incomplete_cube | cache files 0 | 4 s | gdalcubes parallel after 1 
+14:08:41Z     gdalcubes could not read 4 of 4 chunks: an image would not open. ✖ Those cells are "NA", or computed from only the scenes that did open. ℹ Usually an expired or refused signed URL. Nothing was cached. ℹ Re-running signs the request again. If the same read fails every time, an asset may be missing fr 
+14:08:52Z PASS | cube untiled, bad tokens | expect drift_incomplete_cube | got drift_incomplete_cube | cache files 0 | 10 s | gdalcubes parallel after 1 
+14:08:52Z     gdalcubes could not read 9 of 9 chunks: an image would not open. ✖ Those cells are "NA", or computed from only the scenes that did open. ℹ Usually an expired or refused signed URL. Nothing was cached. ℹ Re-running signs the request again. If the same read fails every time, an asset may be missing fr 
+14:08:54Z PASS | fetch untiled, bad tokens, session parallel | expect drift_incomplete_cube | got drift_incomplete_cube | cache files 0 | 2 s | gdalcubes parallel after 1 
+14:08:54Z     gdalcubes could not read 4 of 4 chunks: an image would not open. ✖ Those cells are "NA", or computed from only the scenes that did open. ℹ Usually an expired or refused signed URL. Nothing was cached. ℹ Re-running signs the request again. If the same read fails every time, an asset may be missing fr 
+14:08:56Z PASS | fetch tiled 1000 m, bad tokens, session parallel | expect drift_incomplete_cube | got drift_incomplete_cube | cache files 0 | 2 s | gdalcubes parallel after 1 
+14:08:56Z     gdalcubes could not read 1 of 1 chunk: an image would not open. ✖ Those cells are "NA", or computed from only the scenes that did open. ℹ Usually an expired or refused signed URL. Nothing was cached. ℹ Re-running signs the request again. If the same read fails every time, an asset may be missing fro 
+14:13:22Z PASS | control: cube months 6:9, 2023, parallel 4 | expect returned | got returned | cache files 1 | 266 s | gdalcubes parallel after 1 
+14:13:22Z     SpatRaster 
+14:15:45Z PASS | control: composite 2023 July, tiled 1000 m, parallel 4 | expect returned | got returned | cache files 1 | 142 s | gdalcubes parallel after 1 
+14:15:45Z     list 
+14:15:52Z PASS | control: fetch 2023 untiled | expect returned | got returned | cache files 1 | 8 s | gdalcubes parallel after 1 
+14:15:52Z     list 
+14:15:52Z 8 of 8 as expected 

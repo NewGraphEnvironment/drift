@@ -90,3 +90,57 @@ the mosaic. Cache key untouched (no new argument).
 
 | Error | Resolution |
 |-------|------------|
+
+## Plan review triage (2026-10-02)
+
+Full summary in `review-plan.md`. Probed offline before acting (scratchpad `probe3.R`,
+local fixture, `select_bands(B04)`, monthly median, 9 chunks of 16x16, p = 1 and 4):
+
+| case | p=1 status | p=4 status | non-NA cells |
+|---|---|---|---|
+| clean, SCL mask | 0x9 | 0x9 | 1600 |
+| B04 deleted (open fails) | 2x9 | 2x9 | 1600 |
+| B04 truncated (open fails) | 2x9 | — | 1600 |
+| **B04 opens, tile data corrupt (read fails)** | **0x9** | **0x9** | 1600 |
+| **SCL deleted, SCL mask** | **0x9** | **0x9** | 1600 |
+
+- **Reviewer right on its high-severity claim.** `chunk_status` records only a band
+  asset that fails to OPEN. A read that fails after a good open, and a mask asset that
+  fails to open, leave status 0 and every cell filled from the surviving scene.
+  (A corrupted tile with the IFD intact: `terra::values()` errors, gdalcubes reports OK.)
+- `gdalcubes_options(log_file =, debug = TRUE)` writes 11 identical lines for clean and
+  failing reads alike, at p = 1 and 4: not a detector either.
+- What the guard does cover: an expired or corrupted SAS token, a 403/404 at open — the
+  #79 failure (every chunk of 15 tiles failed) and the issue's acceptance test.
+- Reviewer's "fill appears only with workers" is wrong: probe 1 showed fill at p = 1
+  too. Harmless — the tests run p = 4 regardless.
+
+Plan changes (in the mandate; none touches stored data):
+- message drops "throttled"; says a persistent failure is not fixed by re-running
+- integration tests at `parallel = 4`; two-year composite (incomplete not swallowed as a
+  skip); offset-split assemble with the broken read on the post side; un-wire → red
+- tiled fetch: tile cleanup registered before the reads
+- GDAL HTTP retries in both session/config blocks, since a transient open failure now
+  aborts the run (and retries also shrink the undetectable mid-read class)
+- untiled fetch caches are the gdalcubes `.nc`: check `chunk_status` on cache hit and
+  treat a failed one as a miss, so holed caches from earlier versions re-fetch
+- follow-up issue: read-after-open and mask-open failures are undetected; draft an
+  upstream gdalcubes proposal there (set INCOMPLETE on warp/RasterIO and mask-open
+  failure) — not posted
+- not taken: build_stack's tempfile never unlinked (pre-existing); log_file route (dead)
+
+## Code-check rounds (2026-10-02)
+
+| Round | Findings | Fixed | Accepted / moved | Inside previous fix? |
+|---|---|---|---|---|
+| 1 | 1 (fill also = unmerged chunk) | 1 (`cube_write_ncdf()` merge warning) | worker-signal hang → #99 | — |
+| 2 | 3 | 2 (abort after write returns; retries on every fetch) | unreadable worker chunk file → #99 | **yes**: aborting inside the `Rcpp::warning` handler skipped C++ cleanup |
+| 3 | 3 + 4 low, + enumeration | test ordering; notes/roxygen | 9 gdalcubes paths → #99 by class | **yes**: round 2's merge test could not fail (mutant green) |
+
+Ended by enumeration (round 3, `review-round3.md`): 38 failure paths in gdalcubes'
+write pipeline — 25 detected by drift, 4 already in #99, 9 added to #99. The
+mechanism: gdalcubes sets `chunk_status` only on band `GDALOpen` failure; every other
+I/O step drops its return code. Nothing on the list is fixable in drift.
+
+Worst undetected case (measured, round 3): a mask image that opens then fails
+mid-read leaves the scene UNMASKED — cloud values in the result, status OK.

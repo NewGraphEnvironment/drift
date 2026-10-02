@@ -1243,3 +1243,86 @@ test_that("the key does not move when rlang's hash does", {
   expect_identical(cache_key(), before)
   expect_identical(cache_key(), "8b02f87e393e7f9a")
 })
+
+
+# ---------------------------------------------------------------------------
+# #87 — a failed chunk read aborts and caches nothing
+# ---------------------------------------------------------------------------
+#
+# The real gdalcubes writer over a local collection (chunk_fixture(), in
+# helper-gdalcubes.R) whose 2020-07-13 image is deleted after the collection is
+# built, so the read fails the way an expired signed URL does. Only the STAC
+# query and the collection constructor are stubbed.
+
+fetch_on_fixture <- function(break_dates, tile_size = NULL, cache,
+                             env = parent.frame()) {
+  aoi <- read_aoi()
+  bb <- sf::st_bbox(sf::st_transform(aoi, 32609))
+  ext <- c(floor(bb[["xmin"]] / 10) * 10 - 20, ceiling(bb[["xmax"]] / 10) * 10 + 20,
+           floor(bb[["ymin"]] / 10) * 10 - 20, ceiling(bb[["ymax"]] / 10) * 10 + 20)
+  col <- chunk_fixture(c("2020-07-03", "2020-07-13"), ext = ext,
+                       break_dates = break_dates, envir = env)
+  testthat::local_mocked_bindings(
+    stac_items_paged = function(...) fake_items("a", next_link = FALSE),
+    .env = env
+  )
+  testthat::local_mocked_bindings(
+    stac_image_collection = function(...) col, .package = "gdalcubes", .env = env
+  )
+  # dft_stac_fetch() reads at the session's gdalcubes worker count, which ships
+  # as 1; run the worker path, where an unvisited chunk keeps the fill value
+  old <- gdalcubes::gdalcubes_options()$parallel
+  gdalcubes::gdalcubes_options(parallel = 4)
+  withr::defer(gdalcubes::gdalcubes_options(parallel = old))
+  suppressMessages(dft_stac_fetch(aoi, source = "io-lulc", years = 2020,
+                                  tile_size = tile_size, cache_dir = cache))
+}
+
+test_that("a fetch whose chunk reads failed aborts and caches nothing (#87)", {
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(fetch_on_fixture("2020-07-13", cache = cache),
+               class = "drift_incomplete_cube")
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
+})
+
+test_that("a tiled fetch whose chunk reads failed aborts and caches nothing (#87)", {
+  # Its own test: the untiled case also trips the cache gate's chunk_status arm
+  # at publish, so a shared loop would stop there and never reach this path.
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(fetch_on_fixture("2020-07-13", tile_size = 1000, cache = cache),
+               class = "drift_incomplete_cube")
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
+})
+
+test_that("a fetch over a readable collection is fetched and cached as before (#87)", {
+  skip_if_not_installed("gdalcubes")
+  for (ts in list(NULL, 1000)) {
+    cache <- withr::local_tempdir()
+    out <- fetch_on_fixture(character(0), tile_size = ts, cache = cache)
+    expect_gt(sum(terra::global(out[["2020"]], "notNA")$notNA), 0)
+    expect_length(list.files(cache, pattern = "^2020_", recursive = TRUE), 1L)
+  }
+})
+
+test_that("an untiled fetch cache that records failed chunks is re-fetched (#87)", {
+  # Caches written before #87 could hold a failed read, and the key did not
+  # change, so the gate has to look. The untiled cache is the gdalcubes NetCDF
+  # itself, which keeps its chunk_status.
+  skip_if_not_installed("gdalcubes")
+  holed <- chunk_fixture_write(
+    chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13"),
+    parallel = 4
+  )
+  clean <- chunk_fixture_write(chunk_fixture(c("2021-07-03", "2021-07-13")),
+                               parallel = 4)
+  expect_match(drift:::cache_invalid_reason(holed), "failed when it was fetched")
+  expect_true(is.na(drift:::cache_invalid_reason(clean)))
+  # a .nc that is not a gdalcubes output has no chunk_status and is not refused
+  r <- terra::rast(nrows = 4, ncols = 4, xmin = 0, xmax = 40, ymin = 0,
+                   ymax = 40, crs = "EPSG:32609", vals = 1)
+  other <- withr::local_tempfile(fileext = ".nc")
+  suppressWarnings(terra::writeCDF(r, other, varname = "B04"))
+  expect_true(is.na(drift:::cache_invalid_reason(other)))
+})
