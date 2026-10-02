@@ -401,7 +401,9 @@ cube_view_choice_check <- function(x, arg, allowed, fallback, class,
 #' parallel = 1 measured finer chunks 45% SLOWER.
 #'
 #' GDAL cloud-read tuning for /vsicurl COG streaming (biggest win:
-#' DISABLE_READDIR_ON_OPEN avoids a remote directory listing on every open).
+#' DISABLE_READDIR_ON_OPEN avoids a remote directory listing on every open), and
+#' HTTP retries (#87). Environment variables, so gdalcubes' worker processes
+#' inherit them.
 #' @noRd
 stac_cube_session <- function(parallel) {
   old_parallel <- gdalcubes::gdalcubes_options()$parallel
@@ -413,7 +415,11 @@ stac_cube_session <- function(parallel) {
     GDAL_HTTP_MULTIPLEX = "YES",
     GDAL_HTTP_VERSION = "2",
     VSI_CACHE = "TRUE",
-    CPL_VSIL_CURL_ALLOWED_EXTENSIONS = ".tif"
+    CPL_VSIL_CURL_ALLOWED_EXTENSIONS = ".tif",
+    # A transient 429 or 5xx now aborts a whole read (#87), and one that strikes
+    # after an image has opened is a hole nothing can detect, so retry them.
+    GDAL_HTTP_MAX_RETRY = "3",
+    GDAL_HTTP_RETRY_DELAY = "5"
   )
   old_cfg <- Sys.getenv(names(gdal_cfg), unset = NA)
   do.call(Sys.setenv, as.list(gdal_cfg))
@@ -549,10 +555,9 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
 #' expired token and replaces the `sig` parameter of an already-signed href, so
 #' re-signing before each extent keeps every read inside a live token (verified
 #' live: features with a corrupted `sig` read 102,364 cells after re-signing, 0
-#' without). A single extent whose read outlives one token is still exposed, and
-#' gdalcubes reports a failed chunk only on the worker's stderr, which R cannot
-#' reliably capture (#87). A `fetched` without `sign_fn` (a test stub) passes
-#' through unchanged.
+#' without). A single extent whose read outlives one token is still exposed; an
+#' image that then fails to open aborts the read through cube_write_ncdf() (#87).
+#' A `fetched` without `sign_fn` (a test stub) passes through unchanged.
 #' @noRd
 stac_features_resign <- function(fetched, feats) {
   if (is.null(fetched$sign_fn) || is.null(fetched$items) || !length(feats)) {
@@ -639,7 +644,8 @@ stac_cube_assemble <- function(fetched, cfg, aoi_target, target_crs, t0, t1,
     )
     out <- pixel_fn(cube, offset_use)
     tmp <- tempfile(fileext = ".nc")
-    gdalcubes::write_ncdf(out, tmp, overwrite = TRUE)
+    # aborts on a failed chunk read, before any caller caches the result (#87)
+    cube_write_ncdf(out, tmp)
     terra::rast(tmp)
   }
 
@@ -661,10 +667,12 @@ stac_cube_assemble <- function(fetched, cfg, aoi_target, target_crs, t0, t1,
     # re-sign here, per extent, so no read outlives its token
     feats <- stac_features_resign(fetched, features)
     if (any(is_pre) && !all(is_pre)) {
-      terra::cover(
-        build_stack(feats[is_pre], offset_before, v),
-        build_stack(feats[!is_pre], offset, v)
-      )
+      # Both sides built BEFORE terra::cover(): built as its arguments, they are
+      # evaluated inside S4 method selection, which re-raises an abort as a plain
+      # "error in evaluating the argument" and drops its class (#87).
+      pre <- build_stack(feats[is_pre], offset_before, v)
+      post <- build_stack(feats[!is_pre], offset, v)
+      terra::cover(pre, post)
     } else {
       build_stack(feats, if (all(is_pre)) offset_before else offset, v)
     }
@@ -717,6 +725,141 @@ cube_check_nonempty <- function(stk, collection, datetime, cached) {
       "Nothing was cached. Check the AOI, {.arg datetime} and {.arg months}."
     }
   ))
+}
+
+
+#' Write a gdalcubes cube to NetCDF, aborting if any chunk failed to read
+#'
+#' The one place drift calls [gdalcubes::write_ncdf()], shared by
+#' stac_cube_assemble() (so [dft_stac_cube()] and [dft_stac_composite()]) and
+#' fetch_extent_to() ([dft_stac_fetch()]). Both call it before anything derived
+#' from the file is cached, so a failed read aborts with nothing cached.
+#'
+#' gdalcubes signals a failed chunk in two ways, and this watches both:
+#' * a chunk whose merge into the output throws raises an R warning, `Chunk N
+#'   could not be added to output`, and the write carries on (gdalcubes 0.7.5,
+#'   `src/multiprocess.cpp`). That chunk holds no status at all, so
+#'   cube_check_chunks() alone would pass it.
+#' * a chunk whose image would not open is recorded in the file; see
+#'   cube_check_chunks().
+#'
+#' The warning is only NOTED in the handler, and the abort comes after
+#' `write_ncdf()` returns. gdalcubes raises it with `Rcpp::warning()`, so an
+#' abort from inside the handler would longjmp through its C++ frames and skip
+#' their destructors: the worker shutdown, the work directory, the output
+#' file's close (Rcpp's own header warns of exactly this). Other gdalcubes
+#' warnings pass through untouched.
+#'
+#' Not every failed merge reaches either signal: a worker chunk file the main
+#' process cannot open is skipped with status OK and no warning, a C++ stderr
+#' line only (round-2 review of #87; drift#99).
+#' @noRd
+cube_write_ncdf <- function(cube, out) {
+  unmerged <- character(0)
+  withCallingHandlers(
+    gdalcubes::write_ncdf(cube, out, overwrite = TRUE),
+    warning = function(w) {
+      if (grepl("could not be added to output", conditionMessage(w),
+                fixed = TRUE)) {
+        unmerged <<- c(unmerged, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  if (length(unmerged)) {
+    cli::cli_abort(class = "drift_incomplete_cube", c(
+      "gdalcubes could not merge {length(unmerged)} chunk{?s} into its output.",
+      "x" = "{unmerged[[1]]}",
+      "i" = "Nothing was cached."
+    ))
+  }
+  cube_check_chunks(out)
+}
+
+
+#' Abort on a gdalcubes NetCDF whose chunk reads failed
+#'
+#' gdalcubes does not raise when it cannot read a chunk. It prints `[WARNING] n
+#' out of m chunks have repoprted errors / incompleteness` from C++ stdio and
+#' writes the chunk as `NA`. That line never reaches R from a worker process, and
+#' only sometimes from the main one, so capturing it was measured unreliable
+#' (#79, #87).
+#'
+#' What gdalcubes does write, at every worker count, is a `chunk_status` variable
+#' in the output NetCDF, one integer per chunk: `0` OK, `1` ERROR, `2`
+#' INCOMPLETE, `128` UNKNOWN (gdalcubes 0.7.5, `src/gdalcubes/src/cube.cpp`). A
+#' worker carries the status to the main process inside its chunk file.
+#'
+#' **What it records is narrower than "the read failed".** Measured offline
+#' (#87): a band image that fails to OPEN marks its chunks INCOMPLETE, which is
+#' the expired or refused signed URL. A band image that opens and then fails
+#' mid-read (a corrupted tile here; a throttled range request on the network)
+#' leaves the status OK, and so does a mask (SCL) image that fails to open, which
+#' silently drops that scene. A mask image that opens and then fails mid-read is
+#' worse: the scene is used unmasked. gdalcubes sets the status only when a band
+#' image will not open; every other I/O step drops its return code, so none of
+#' these is visible to this check or to anything else R can see (drift#99;
+#' inst/notes/gdalcubes-pc-gotchas.md).
+#'
+#' **The netCDF integer fill value means no status was written for that id**,
+#' not that the chunk was empty: a worker skips writing a chunk that is OK and
+#' all-`NA` (no image, or fully masked), and a chunk whose merge threw keeps fill
+#' too. That second case raises an R warning, which cube_write_ncdf() turns into
+#' an abort, so fill is read as OK here. A worker chunk file the main process
+#' cannot open is recorded as OK, with neither signal (drift#99). Anything that is neither OK nor fill fails, so a
+#' status code a later gdalcubes adds aborts rather than passes.
+#'
+#' For an open failure, this is the only check that sees it. A median over two
+#' scenes where one failed fills every cell from the survivor (measured: 1600 of
+#' 1600 cells set), so no test on the pixels, cube_check_nonempty() included, can
+#' tell that cube from a complete one.
+#'
+#' A file with no `chunk_status` variable also aborts: a guard that cannot find
+#' its evidence must not report the read clean.
+#'
+#' Read with ncdf4, which gdalcubes imports: GDAL does not list the
+#' one-dimensional variable as a subdataset, so terra cannot open it by name.
+#' @noRd
+cube_check_chunks <- function(nc_file) {
+  failed <- chunk_status_failed(nc_file)
+  if (is.na(failed[["failed"]])) {
+    cli::cli_abort(class = "drift_incomplete_cube", c(
+      "The gdalcubes output has no {.field chunk_status}, so its chunk reads \\
+       cannot be checked.",
+      "i" = "Nothing was cached. drift needs a gdalcubes that records per-chunk \\
+             status in {.fn gdalcubes::write_ncdf} output (0.7.5 does)."
+    ))
+  }
+  if (failed[["failed"]] == 0L) return(invisible(nc_file))
+  cli::cli_abort(class = "drift_incomplete_cube", c(
+    "gdalcubes could not read {failed[['failed']]} of {failed[['chunks']]} \\
+     chunk{?s}: an image would not open.",
+    "x" = "Those cells are {.val NA}, or computed from only the scenes that \\
+           did open.",
+    "i" = "Usually an expired or refused signed URL. Nothing was cached.",
+    "i" = "Re-running signs the request again. If the same read fails every \\
+           time, an asset may be missing from the catalogue."
+  ))
+}
+
+
+#' Count the failed chunks recorded in a gdalcubes NetCDF
+#'
+#' The reader behind cube_check_chunks() and the cache gate. Returns integers
+#' `failed` and `chunks`, with `failed` `NA` when the file has no
+#' `chunk_status` variable. Status `0` and the netCDF integer fill
+#' (`NC_FILL_INT`, no chunk merged for that id) count as OK; see
+#' cube_check_chunks().
+#' @noRd
+chunk_status_failed <- function(nc_file) {
+  nc <- ncdf4::nc_open(nc_file)
+  on.exit(ncdf4::nc_close(nc), add = TRUE)
+  if (!"chunk_status" %in% names(nc$var)) {
+    return(c(failed = NA_integer_, chunks = NA_integer_))
+  }
+  status <- as.vector(ncdf4::ncvar_get(nc, "chunk_status", raw_datavals = TRUE))
+  failed <- !is.na(status) & status != 0L & status != -2147483647L
+  c(failed = sum(failed), chunks = length(status))
 }
 
 

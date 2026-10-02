@@ -47,6 +47,7 @@ Suggests:
     leaflet,
     leaflet.extras,
     mapgl,
+    ncdf4,
     rmarkdown,
     testthat (>= 3.2.0),
     withr,

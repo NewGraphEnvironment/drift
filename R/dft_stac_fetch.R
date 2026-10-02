@@ -110,6 +110,18 @@ dft_stac_fetch <- function(aoi,
   aggregation <- aggregation_check(aggregation)
   resampling <- resampling_check(resampling)
 
+  # Retry a transient 429 or 5xx rather than abort the read on it: a failed
+  # open now aborts (#87). Tiled or not, restored on exit.
+  gdal_retry <- c(GDAL_HTTP_MAX_RETRY = "3", GDAL_HTTP_RETRY_DELAY = "5")
+  old_retry <- Sys.getenv(names(gdal_retry), unset = NA)
+  do.call(Sys.setenv, as.list(gdal_retry))
+  on.exit({
+    set_again <- old_retry[!is.na(old_retry)]
+    if (length(set_again)) do.call(Sys.setenv, as.list(set_again))
+    unset <- names(old_retry)[is.na(old_retry)]
+    if (length(unset)) Sys.unsetenv(unset)
+  }, add = TRUE)
+
   # Normalize tile_size ONCE so the path gate (is.null) and the cache key derive
   # from the same snapped scalar. When tiling, tune GDAL for the many extra
   # per-item COG opens (restored on exit so the caller's session is untouched).
@@ -226,14 +238,17 @@ dft_stac_fetch <- function(aoi,
       })
     } else {
       message("  ", yr, ": fetching ", length(tiles), " tile(s)...")
+      # Named and registered for removal BEFORE any read: on.exit, not a
+      # trailing unlink(), because a failed tile (#87) or a mosaic_tiles() error
+      # would otherwise strand every tile already written.
       tile_files <- vapply(seq_along(tiles), function(i) {
-        fetch_extent_to(col, tiles[[i]], t0, t1, target_crs, res, dt,
-                        aggregation, resampling,
-                        tempfile(sprintf("drift_tile%d_", i), fileext = ".nc"))
+        tempfile(sprintf("drift_tile%d_", i), fileext = ".nc")
       }, character(1))
-      # on.exit, not a trailing unlink(): a mosaic_tiles() error would otherwise
-      # strand every tile file for the life of the session.
       on.exit(unlink(tile_files), add = TRUE)
+      for (i in seq_along(tiles)) {
+        fetch_extent_to(col, tiles[[i]], t0, t1, target_crs, res, dt,
+                        aggregation, resampling, tile_files[[i]])
+      }
       cache_write_atomic(cache_file, function(out) mosaic_tiles(tile_files, out))
     }
 
@@ -629,7 +644,9 @@ fetch_extent_to <- function(col, ext, t0, t1, target_crs, res, dt,
     aggregation = aggregation, resampling = resampling
   )
   cube <- gdalcubes::raster_cube(col, v)
-  gdalcubes::write_ncdf(cube, out_nc, overwrite = TRUE)
+  # aborts on a failed chunk read: inside cache_write_atomic() untiled, before
+  # the mosaic tiled, so nothing is cached (#87)
+  cube_write_ncdf(cube, out_nc)
   out_nc
 }
 
@@ -802,6 +819,21 @@ cache_invalid_reason <- function(path, probe = cache_probe_last_row) {
     }
   )
   if (!ok) return("its pixel data could not be read cleanly")
+
+  # An untiled dft_stac_fetch() cache IS the gdalcubes NetCDF, so it still holds
+  # the chunk_status it was written with, and one cached before #87 can record an
+  # image that never opened. A miss re-fetches it. A .nc with no chunk_status
+  # (written by something other than gdalcubes) has nothing to say and passes:
+  # the read arms above already vouched for it.
+  if (identical(tolower(tools::file_ext(path)), "nc") &&
+        requireNamespace("ncdf4", quietly = TRUE)) {
+    failed <- tryCatch(chunk_status_failed(path)[["failed"]],
+                       error = function(e) NA_integer_)
+    if (!is.na(failed) && failed > 0L) {
+      return(paste0("records ", failed, " chunk read(s) that failed when it ",
+                    "was fetched"))
+    }
+  }
   NA_character_
 }
 

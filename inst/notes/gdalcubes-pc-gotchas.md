@@ -205,7 +205,7 @@ Measured on gdalcubes 0.7.5, rstac 1.0.1 and terra 1.9.50, with the BULK floodpl
   - Verified live: corrupted tokens read 102,364 cells after re-signing, 0 without. With re-signing, a full 3 h 16 min BULK read had no failed tiles.
 - **gdalcubes reports failed chunks only on stderr**, as `[WARNING] n out of m chunks have repoprted errors / incompleteness`. It is not an R warning. The cube is written with those chunks NA and passes an any-data check.
   - `capture.output(type = "message")` caught the line in 1 of 4 configurations, and never with `parallel > 1`, where workers write to the process's stderr directly.
-  - Do not build a guard on it. Detection is #87.
+  - Do not build a guard on it. The output file records the same failure reliably; see the #87 section below.
 - **terra reads a multi-variable gdalcubes NetCDF with its variables in ALPHABETICAL order.** A true-colour `apply_pixel(names = c("red","green","blue"))` reads back as `blue, green, red`, so select layers by name, never by position. The composite does this in `composite_layers_order()`.
   - The layers also arrive carrying a time (step `yearmonths`).
   - Writing that to a COG makes terra emit a `.aux.json` sidecar. So do units, varnames, longnames, metags and scoff; names alone do not.
@@ -228,3 +228,29 @@ Measured on gdalcubes 0.7.5, rstac 1.0.1 and terra 1.9.50, with the BULK floodpl
   - `count_zero_na()` maps 0 to NA, after which the chunkings agree.
   - NA rather than 0, because a failed chunk read is NaN too.
 - **`create_image_collection(one_band_per_file = FALSE)` on two-band GeoTIFFs segfaulted a worker** (0.7.5). Separate files per band with a format JSON work. The #92 test fixture uses them.
+
+## Detecting failed chunk reads (#87, 2026-10-02)
+
+Measured on gdalcubes 0.7.5 (`appelmar/gdalcubes@ed68331`) with a local collection whose image is deleted after the collection is built, which fails the read the way an expired signed URL does. Fixture: `chunk_fixture()` in `tests/testthat/helper-gdalcubes.R`.
+
+- **`write_ncdf()` records every chunk's status in the output file**, as an integer variable `chunk_status` with one value per chunk: `0` OK, `1` ERROR, `2` INCOMPLETE, `128` UNKNOWN (`src/gdalcubes/src/cube.cpp`, `cube.h`). A chunk with no status written keeps the netCDF integer fill, `-2147483647`: a worker skips writing a chunk that is OK and all-NA (no image, or fully masked), and a chunk whose merge threw keeps it too. A worker carries the status to the main process inside its chunk file, so the record does not depend on `parallel`:
+
+  | parallel | stderr line | `chunk_status` non-OK | non-NA cells |
+  |---|---|---|---|
+  | 1, clean (daily, 2 scenes) | none | 0 | 3200 |
+  | 4, clean | none | 0 | 3200 |
+  | 1, one image gone | printed | 9 of 279 (`2`) | 1600 |
+  | 4, one image gone | **not printed** | 9 of 279 (`2`) | 1600 |
+  | 4, one image gone, monthly median | not printed | 1 of 1 (`2`) | **1600 of 1600, every cell** |
+
+- **The last row is why a pixel check cannot do this.** A median over two scenes where one failed fills every cell from the survivor, so the holed cube has no NA at all. The issue's third option (require data under every item footprint) would have passed it.
+- **Read it with ncdf4, not terra.** GDAL does not list a one-dimensional variable as a subdataset, so `terra::rast(f, subds = "chunk_status")` errors; the `NETCDF:"f":chunk_status` form opens but prints a stray `R_nc4_open` error line. ncdf4 is a gdalcubes import.
+- **The `[WARNING]` line is C++ stdio**, so neither an R handler nor `capture.output()` silences it, even at `parallel = 1`.
+- **Only one failure is recorded: a band image that fails to open.** gdalcubes sets `chunk_status` in six places, all in `image_collection_cube::read_chunk()`, and only band `GDALOpen` returning NULL can fire in practice; every other I/O step between `GDALOpen` and the final `nc_close` drops its return code or warns and continues. A code-check enumeration of the write pipeline (#87, round 3, `planning/archive/2026-10-issue-87-silent-chunk-read-failures/review-round3.md`) found 38 failure paths: 25 detected by drift (13 through `chunk_status` or the merge warning, 12 as an R error before anything is cached), 13 not. The ones that matter:
+  - a band image that opens then fails mid-read: status OK, cells filled from the scenes that read;
+  - **a mask (SCL) image that opens then fails mid-read: the scene is used UNMASKED** — cloud values in the median, not NA (measured: an all-cloud scene gave 1600 of 1600 cells, status OK);
+  - a mask image that fails to open, or a scene with no mask asset: dropped, or used unmasked;
+  - a worker that writes no chunk file, or a partial or unreadable one: status OK or fill, no R warning;
+  - a worker killed by a signal: `write_ncdf()` hangs.
+  These are drift#99. A chunk whose merge throws keeps fill and raises an R warning (`Chunk N could not be added to output`), which drift does catch.
+- `cube_write_ncdf()` is drift's one `write_ncdf()` call, in `stac_cube_assemble()` and `fetch_extent_to()`. It notes the merge warning, lets gdalcubes return (aborting from inside an `Rcpp::warning()` handler would skip its C++ cleanup), then aborts on it or on `chunk_status`, so a failed read aborts before anything is cached. Before it, the offline fixture showed both `dft_stac_composite()` and `dft_stac_fetch()` caching the holed result, tiled and untiled.
