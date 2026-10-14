@@ -125,6 +125,9 @@ default-make_valid parse that floodplains also uses (before round 2's fix), so i
   cells of 1.3k-322k. 27.7 s for the 20 (cold).
 - 39.9 min wall, network-bound (362 s user), peak RSS 1.81 GB. Metadata requests slowed from about
   2.6 s per release (first 50) to about 23 s per release (releases 50-100).
+- Re-run with the fixed (`valid_linework`) parse: 90,538 rows, 960 of 960 picks still identical. The
+  parse bug moved no NECR pick (the touching-part footprints the reviewer found over BC do not decide a
+  sample point here). 49.3 min wall (414 s user), peak RSS 2.24 GB.
 
 ## Errors Encountered
 
