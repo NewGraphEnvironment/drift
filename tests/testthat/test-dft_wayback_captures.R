@@ -162,7 +162,22 @@ test_that("a base layer on top hides the capture beneath it at a point", {
 test_that("an unreadable date format aborts rather than reading as no imagery", {
   spec <- list(R1 = list("5" = list(wb_footprint(list(big()),
                                                  date = "2017-06-11"))))
-  expect_error(wb_run(wb_point(0, 0), spec), "capture date could be read")
+  expect_error(wb_run(wb_point(0, 0), spec), "could not be read")
+})
+
+test_that("one release in a new date format aborts, though others parse", {
+  # epoch milliseconds in R2: dropping it as a base layer would hide its
+  # captures while R1 still answered
+  spec <- list(R1 = list("5" = list(wb_footprint(list(big()), date = 20150101))),
+               R2 = list("5" = list(wb_footprint(list(big()),
+                                                 date = 1546300800000))))
+  expect_error(wb_run(wb_point(0, 0), spec, releases = wb_releases(2)),
+               "release .*200")
+})
+
+test_that("an impossible eight-digit date aborts", {
+  spec <- list(R1 = list("5" = list(wb_footprint(list(big()), date = 20171340))))
+  expect_error(wb_run(wb_point(0, 0), spec), "could not be read")
 })
 
 test_that("a footprint with two outer rings matches in either", {

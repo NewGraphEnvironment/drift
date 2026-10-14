@@ -98,7 +98,8 @@ chip <- dft_wayback_fetch(buf[pick$feature[1], ], pick$release_id[1], pick$zoom[
 ```
 
 zoom is 10-22 (GDAL cannot open 23), a polygon's `cover` is the share where that capture is drawn on top,
-and no GDAL tile cache (with one, every 404 tile raises read errors on GDAL 3.13.0). Only chips are cached.
+and no GDAL tile cache (with one, every 404 tile raises read errors on GDAL 3.13.0). Chips and metadata
+responses are cached (metadata never expires: `force = TRUE` re-reads it); tiles are not.
 
 Accuracy and error-adjusted area (#81; Olofsson et al. 2014, Stehman 2014). Mapped area is
 biased wherever the map is wrong. These correct it from reference labels at stratified random points:

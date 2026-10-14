@@ -158,14 +158,21 @@ wayback_captures_finish <- function(h) {
     cli::cli_warn("No Wayback capture covers any feature of {.arg aoi}.")
     return(empty)
   }
-  dated <- grepl("^[0-9]{8}$", h$src_date)
-  if (!any(dated) && any(!is.na(h$src_date))) {
+  # Only a null date is a base layer. Any other value that is not a real
+  # YYYYMMDD date means the service's format changed, in some releases or all;
+  # dropping those rows would read as "no imagery here", so it aborts.
+  base <- is.na(h$src_date)
+  ok <- grepl("^[0-9]{8}$", h$src_date)
+  parsed <- as.Date(ifelse(ok, h$src_date, NA_character_), format = "%Y%m%d")
+  bad <- !base & is.na(parsed)
+  if (any(bad)) {
     cli::cli_abort(c(
-      "No Wayback capture date could be read.",
-      "i" = "Expected {.code YYYYMMDD}; first seen: {.val {h$src_date[!is.na(h$src_date)][1]}}."
+      "{sum(bad)} Wayback capture date{?s} could not be read.",
+      "i" = "Expected {.code YYYYMMDD}; first seen: {.val {h$src_date[bad][1]}} \\
+             in release {.val {h$release_id[bad][1]}}."
     ))
   }
-  h <- h[dated, , drop = FALSE]
+  h <- h[!base, , drop = FALSE]
   if (!nrow(h)) {
     cli::cli_warn("Only base layers (no capture date) cover {.arg aoi}.")
     return(empty)
@@ -299,10 +306,11 @@ wayback_visible <- function(geom, rank, ks) {
 #' One release-layer's footprints over a bbox, through the cache
 #' @noRd
 wayback_meta_cached <- function(meta_url, layer, bbox, dir_meta, force) {
-  # The salt names the fixed query choices: change any of them, change it.
+  # The entry is the PARSED footprints, so the salt names the fixed query
+  # choices and the parse: change the query or wayback_meta_parse(), bump it.
   key <- cache_key_hash(list(
     meta_url, as.integer(layer), as.numeric(bbox),
-    "wayback-meta-v1 outSR=3857 geometryPrecision=1 orderBy=OBJECTID"
+    "wayback-meta-v1 outSR=3857 geometryPrecision=1 orderBy=OBJECTID parse-v1"
   ))
   f <- file.path(dir_meta, paste0("meta_", key, ".rds"))
   if (!force && file.exists(f)) {
@@ -375,6 +383,9 @@ wayback_meta_page <- function(url, meta_url, layer, tries = 3L) {
 
 
 #' Esri JSON polygon features to sf, in EPSG:3857
+#'
+#' Its output is what the metadata cache holds: a change here must bump the
+#' `parse-v1` salt in wayback_meta_cached(), or old entries keep their shape.
 #'
 #' All of a feature's rings go into one polygon and `st_make_valid()` sorts
 #' them: its linework method keeps faces by parity, so a multi-part footprint
