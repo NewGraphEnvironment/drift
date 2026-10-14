@@ -204,10 +204,10 @@ wayback_warp <- function(src, target, crs, res) {
       sf::gdal_utils(
         "warp", source = src, destination = out,
         # -ovr NONE: at a res coarser than the zoom's, gdalwarp would read a
-      # shallower zoom from the service's overviews, which can be another
-      # capture
-      options = c("-t_srs", crs, "-te", b, "-tr", res, res, "-tap",
-                  "-r", "bilinear", "-ovr", "NONE", "-overwrite"),
+        # shallower zoom from the service's overviews, which can be another
+        # capture
+        options = c("-t_srs", crs, "-te", b, "-tr", res, res, "-tap",
+                    "-r", "bilinear", "-ovr", "NONE", "-overwrite"),
         config_options = c(GDAL_PAM_ENABLED = "NO")
       ),
       warning = function(w) {

@@ -87,6 +87,19 @@ chips <- lapply(seq_len(nrow(buf)), \(i) dft_stac_composite(buf[i, ], years = 20
 n  <- dft_stac_composite(aoi, years = 2017:2023, months = 7, bands = "red", aggregation = "count")
 ```
 
+Sub-metre dated imagery from Esri Wayback (#101, from floodplains#115). **A release date is not a
+capture date**: a release mosaics captures of many years, so choose by capture, never by release:
+
+```r
+cap  <- dft_wayback_captures(pts)                       # per (feature, release): capture_date, res_m, zoom, cover
+pick <- dft_wayback_pick(cap, as.Date("2017-07-01"))    # nearest capture; release_id + zoom to fetch
+chip <- dft_wayback_fetch(buf[pick$feature[1], ], pick$release_id[1], pick$zoom[1],
+                          crs = "EPSG:3005", res = 0.35)  # one call per buffered point; same crs/res to mosaic
+```
+
+zoom is 10-22 (GDAL cannot open 23), a polygon's `cover` is the share where that capture is drawn on top,
+and no GDAL tile cache (with one, every 404 tile raises read errors on GDAL 3.13.0). Only chips are cached.
+
 Accuracy and error-adjusted area (#81; Olofsson et al. 2014, Stehman 2014). Mapped area is
 biased wherever the map is wrong. These correct it from reference labels at stratified random points:
 

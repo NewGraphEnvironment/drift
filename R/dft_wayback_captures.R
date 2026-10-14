@@ -235,13 +235,16 @@ wayback_join <- function(feat_3857, is_point, area, m) {
       if (is.null(v)) next
       j <- which(g$poly == k)
       # Covered whole is the common case for a patch and needs no overlay.
-      inside <- seq_along(j) %in% unlist(sf::st_covers(v, feat_3857[g$feature[j]]))
+      inside <- seq_along(j) %in%
+        unlist(sf::st_covers(v, feat_3857[g$feature[j]]))
       g$cover[j[inside]] <- 1
       for (jj in j[!inside]) {
         x <- sf::st_intersection(feat_3857[g$feature[jj]], v)
         g$cover[jj] <- if (length(x)) {
           sum(as.numeric(sf::st_area(x))) / area[g$feature[jj]]
-        } else 0
+        } else {
+          0
+        }
       }
     }
     key <- paste(g$feature, g$src_date, g$src_res, g$source, sep = "\x1f")
