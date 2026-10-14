@@ -54,11 +54,12 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - [x] BULK scale run of the polygon cover path, moved here from Phase 5 (review O1)
 
 ## Phase 3: Pick
-- [ ] `dft_wayback_pick(captures, date)`: `date` is a `Date` vector, and the result has one row per (feature, date) for every feature that has a capture. The ranking order is in the API block above, and it is a total order. Drop NA capture dates.
-- [ ] Tests:
+- [x] `dft_wayback_pick(captures, date)`: `date` is a `Date` vector, and the result has one row per (feature, date) for every feature that has a capture. The ranking order is in the API block above, and it is a total order. Drop NA capture dates.
+- [x] Tests:
   - Each tiebreak level gets its own case, and restoring the defect must fail the case (bug-restore).
   - Several dates.
   - A feature with no capture returns no row, and this is documented.
+- [x] Review G3/G4 folded in: release_id compared as a number; cover, earlier capture_date and source close the order; days_from_date signed. Mutation table (6 keys) all caught
 
 ## Phase 4: Fetch
 - [ ] Internal `wayback_wms_xml(release, zoom, cache)`, ported from `fp_acc_wayback_wms_xml` with `ZeroBlockHttpCodes 204,404` and the tile cache under `cache_scheme_dir(cache_dir, "esri-wayback")/tiles`.
