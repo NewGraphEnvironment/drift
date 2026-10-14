@@ -17,10 +17,12 @@ pak::pak("NewGraphEnvironment/drift")
 
 The STAC fetch and cube functions (`dft_stac_fetch()`, `dft_stac_cube()`) also need
 [gdalcubes](https://github.com/appelmar/gdalcubes), which was archived on CRAN on
-2026-09-16. Install it from GitHub until it is back:
+2026-09-16. drift installs it from the `newgraph` branch of NewGraphEnvironment's fork, which is upstream
+plus read-failure fixes proposed upstream (#104). Installing drift with pak brings it along; to install
+it alone:
 
 ```r
-pak::pak("appelmar/gdalcubes")
+pak::pak("NewGraphEnvironment/gdalcubes@newgraph")
 ```
 
 ## Quick start

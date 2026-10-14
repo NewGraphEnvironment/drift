@@ -10,11 +10,14 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
 (`8bad203`), which is 0.7.4 plus the `filter_geom` segfault fix — with terra
 1.9.34. Each bullet says which.
 
-**Where gdalcubes comes from now (#80, 2026-09-28).** gdalcubes was archived on
-CRAN on 2026-09-16. drift lists `appelmar/gdalcubes` in `Remotes:` with no suffix,
-and upstream master (0.7.5, `ed68331`) has merged the `filter_geom` fix (their
-PR #111), so the `NewGraphEnvironment/gdalcubes@newgraph` fork is no longer needed.
-Do not install the fork over 0.7.5.
+**Where gdalcubes comes from now (#104, 2026-10-14).** gdalcubes was archived on
+CRAN on 2026-09-16. Upstream master (0.7.5, `ed68331`) merged the `filter_geom` fix
+(their PR #111), and from #80 to #104 drift listed `appelmar/gdalcubes`. drift now
+lists `NewGraphEnvironment/gdalcubes@newgraph`: upstream master plus the #99
+read-failure, worker-log-hang and overview fixes (appelmar/gdalcubes#113, #114,
+#115), nothing behind. flooded pins the same, because two sources for one package
+make pak fail when both install together. When those three PRs merge upstream,
+revert both to `appelmar/gdalcubes`.
 
 - **`gdalcubes::filter_geom()` is not worth using — now for measured reasons, not
   because it crashes (#47).** The original defect was a segfault in the compute
@@ -251,7 +254,7 @@ Measured on gdalcubes 0.7.5 (`appelmar/gdalcubes@ed68331`) with a local collecti
 
 ## Failed reads after open, mask failures, worker deaths (#99, 2026-10-14)
 
-Fixed on `NewGraphEnvironment/gdalcubes`, branch `99-chunk-status-read-failures` (off `ed68331`), for upstream. drift keeps `Remotes: appelmar/gdalcubes`; its tests for these cases skip with a drift#99 reason until the installed gdalcubes records them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`).
+Fixed on `NewGraphEnvironment/gdalcubes`, branch `99-chunk-status-read-failures` (off `ed68331`), proposed upstream as appelmar/gdalcubes#114 and merged into the fork's `newgraph`, which drift's `Remotes:` names from #104. drift's tests for these cases still skip with a drift#99 reason wherever the installed gdalcubes does not record them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`), so an install of upstream 0.7.5 stays green.
 
 | case | 0.7.5 | fork branch |
 |---|---|---|

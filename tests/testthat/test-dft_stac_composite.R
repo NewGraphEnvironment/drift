@@ -281,7 +281,7 @@ test_that("false colour keeps band order: NIR is brightest over summer vegetatio
 test_that("a missing gdalcubes names the GitHub install (#80)", {
   testthat::local_mocked_bindings(gdalcubes_available = function() FALSE)
   expect_error(dft_stac_composite(aoi_pkg(), years = 2023),
-               "appelmar/gdalcubes", fixed = TRUE)
+               "NewGraphEnvironment/gdalcubes@newgraph", fixed = TRUE)
 })
 
 test_that("a built composite leaves only its COG in the cache, no sidecar", {

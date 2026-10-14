@@ -927,7 +927,7 @@ check_gdalcubes <- function(reason) {
   cli::cli_abort(c(
     "The {.pkg gdalcubes} package is required {reason}.",
     "i" = "It was archived on CRAN on 2026-09-16. Install it from GitHub:",
-    " " = "{.code pak::pak(\"appelmar/gdalcubes\")}"
+    " " = "{.code pak::pak(\"NewGraphEnvironment/gdalcubes@newgraph\")}"
   ))
 }
 
