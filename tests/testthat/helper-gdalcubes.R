@@ -120,10 +120,11 @@ chunk_fixture_write <- function(col, ext = c(0, 400, 0, 400), res = 10,
 # Does the installed gdalcubes record a read that fails AFTER its image opened in
 # chunk_status? 0.7.5 does not (drift#99); the NewGraphEnvironment/gdalcubes fix
 # does. The tests that need it skip without it, naming drift#99. Asked of the
-# capability, not a version, and at parallel 1 and 2: worker processes load
-# gdalcubes from R_LIBS, not from this session's .libPaths(), so the two can
-# disagree, and that is an error rather than a skip. Lazy and memoised, so it
-# costs two small writes once per session and only in files that ask.
+# capability, not a version. gdalcubes computes every chunk in Rscript worker
+# processes, at parallel = 1 too, and they load gdalcubes from R_LIBS rather
+# than from this session's .libPaths(); so this answers for the library that
+# actually does drift's reads, which is the one that matters. Lazy and memoised:
+# one small write per session, only in files that ask.
 # DRIFT_TEST_ASSUME_READ_STATUS=true|false overrides it, which is how the tests
 # are shown to fail against a gdalcubes without the fix.
 read_failures_recorded <- local({
@@ -136,15 +137,8 @@ read_failures_recorded <- local({
     if (is.null(answer)) {
       col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
                            break_mode = "corrupt")
-      seen <- vapply(c(1, 2), function(p) {
-        nc <- suppressWarnings(chunk_fixture_write(col, parallel = p))
-        drift:::chunk_status_failed(nc)[["failed"]] > 0
-      }, logical(1))
-      if (seen[1] != seen[2]) {
-        stop("gdalcubes records a failed read at parallel 1 but not 2 (or the ",
-             "reverse): the workers load a different gdalcubes than this session")
-      }
-      answer <<- seen[1]
+      nc <- suppressWarnings(chunk_fixture_write(col, parallel = 2))
+      answer <<- drift:::chunk_status_failed(nc)[["failed"]] > 0
     }
     answer
   }

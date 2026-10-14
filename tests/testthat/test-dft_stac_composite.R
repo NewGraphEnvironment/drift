@@ -769,6 +769,21 @@ test_that("a composite over a readable collection is built and cached as before 
   }
 })
 
+test_that("a composite whose mask (SCL) image is gone aborts and caches nothing (#99)", {
+  # Not gated: through drift's own read path (stac_cube_assemble(), no
+  # select_bands() before the pixel function) gdalcubes also reads SCL as a band,
+  # so 0.7.5 records the failed open. If drift ever selected bands first, the
+  # scene would be dropped silently on 0.7.5, and this would fail.
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(
+    suppressWarnings(composite_on_fixture(list("2021-07-13"), cache = cache,
+                                          break_asset = "SCL", break_mode = "delete")),
+    class = "drift_incomplete_cube"
+  )
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
+})
+
 test_that("a composite whose mask (SCL) read failed aborts and caches nothing (#99)", {
   # On gdalcubes 0.7.5 the scene is used unmasked and the chunk is recorded OK.
   skip_if_no_read_failure_status()

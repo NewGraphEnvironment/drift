@@ -25,3 +25,9 @@
   (mutant probe -> fails), `drift_no_mask_items` subclass with its own composite skip reason,
   `tif_corrupt_tile()` asserts classic TIFF and one tile
 - Drift code-check round 2: 1 finding (message test matched fixed text, not the id) fixed; no defect inside round-1 fixes; reviewer's mutations (probe FALSE, handler order) went red
+- Drift code-check round 3: mechanism (checks written from the same belief they test) + a walk of
+  every new assertion/guard with mutations; 2 rows passed with their defect: the probe's
+  parallel 1-vs-2 comparison (workers run at every parallel, so it cannot fire) — removed; the
+  ungated deleted-SCL test used the helper's copy of drift's shape — added a real-path composite
+  test, which fails under M9 (select_bands() in stac_cube_assemble()). Loop ended by that
+  enumeration.
