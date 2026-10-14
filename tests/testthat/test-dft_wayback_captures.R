@@ -189,6 +189,23 @@ test_that("a footprint with two outer rings matches in either", {
   expect_identical(cap$feature, c(1L, 2L))
 })
 
+test_that("outer rings that share an edge are both part of the footprint", {
+  # sf's default make_valid reads ring 2 as a hole of ring 1 and drops it
+  rings <- list(wb_square(wb_x0, wb_y0, 100), wb_square(wb_x0 + 100, wb_y0, 100))
+  spec <- list(R1 = list("5" = list(wb_footprint(rings))))
+  cap <- wb_run(rbind(wb_point(50, 50), wb_point(150, 50)), spec)
+  expect_identical(cap$feature, c(1L, 2L))
+})
+
+test_that("a hole in a footprint's second part is a hole", {
+  rings <- list(wb_square(wb_x0, wb_y0, 100),
+                wb_square(wb_x0 + 200, wb_y0, 100),
+                rev(wb_square(wb_x0 + 240, wb_y0 + 40, 20)))
+  spec <- list(R1 = list("5" = list(wb_footprint(rings))))
+  cap <- wb_run(rbind(wb_point(250, 50), wb_point(210, 10)), spec)
+  expect_identical(cap$feature, 2L)
+})
+
 test_that("a point in a footprint's hole is not covered", {
   rings <- list(wb_square(wb_x0 - 500, wb_y0 - 500, 1000),
                 rev(wb_square(wb_x0 - 50, wb_y0 - 50, 100)))

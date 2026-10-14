@@ -101,6 +101,16 @@ metadata fetch (about 30 s per release cold). Scripts: scratchpad `bulk_patches.
 - gdalwarp at a `-tr` coarser than the zoom's ground res reads a WMS overview (a shallower zoom): with
   `-tr 0.5` the z22 source returned real imagery from a shallower level. `-ovr NONE` forces the requested zoom.
 
+## Footprint parse: sf's default make_valid drops parts (code-check round 2, 2026-10-14)
+
+`sf::st_make_valid()` defaults to `geos_method = "valid_structure"` (sf 1.1.2 / GEOS 3.13.0): ring 1 is the
+shell, every later ring a hole. Two outer rings sharing an edge parse to 100 of 200 m2, a hole in part 2 is
+filled. `valid_linework` gives 200 and 196. Live (reviewer, release 2014_r08 layer 6 over BC): 17 of 101
+multi-ring footprints change area. floodplains' `wayback_index-capture.R` uses the default too.
+Fix: `valid_linework`; the cache now holds the raw answer and parses on read (key salt v2), so a parse
+change never strands cached geometry. Cost at BULK: cached run 12.7 s -> 18.7 s per release, peak RSS
+0.82 -> 1.43 GB; same 21,878 rows for release 2026-09-24.
+
 ## Errors Encountered
 
 | Error | Resolution |

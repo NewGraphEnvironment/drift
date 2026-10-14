@@ -304,27 +304,34 @@ wayback_visible <- function(geom, rank, ks) {
 
 
 #' One release-layer's footprints over a bbox, through the cache
+#'
+#' The cache holds the service's answer in compact raw form (attribute text and
+#' ring coordinates), and the footprints are parsed after every read. So a
+#' change to wayback_meta_parse() takes effect on cached entries too, with no
+#' re-fetch: round 2 of #101's review found a parse defect that would otherwise
+#' have stayed in every cached entry.
 #' @noRd
 wayback_meta_cached <- function(meta_url, layer, bbox, dir_meta, force) {
-  # The entry is the PARSED footprints, so the salt names the fixed query
-  # choices and the parse: change the query or wayback_meta_parse(), bump it.
+  # The salt names the fixed query choices and the entry's shape.
   key <- cache_key_hash(list(
     meta_url, as.integer(layer), as.numeric(bbox),
-    "wayback-meta-v1 outSR=3857 geometryPrecision=1 orderBy=OBJECTID parse-v1"
+    "wayback-meta-v2 raw outSR=3857 geometryPrecision=1 orderBy=OBJECTID"
   ))
   f <- file.path(dir_meta, paste0("meta_", key, ".rds"))
+  raw <- NULL
   if (!force && file.exists(f)) {
-    m <- tryCatch(readRDS(f), error = function(e) e)
-    if (!inherits(m, "error")) return(m)
+    raw <- tryCatch(readRDS(f), error = function(e) NULL)
   }
-  m <- wayback_meta_query(meta_url, layer, bbox)
-  tmp <- paste0(f, ".tmp", Sys.getpid(), "-", basename(tempfile("")))
-  on.exit(unlink(tmp), add = TRUE)
-  saveRDS(m, tmp)
-  if (!isTRUE(file.rename(tmp, f))) {
-    cli::cli_abort("Could not move the Wayback metadata cache entry into place.")
+  if (is.null(raw)) {
+    raw <- wayback_meta_query(meta_url, layer, bbox)
+    tmp <- paste0(f, ".tmp", Sys.getpid(), "-", basename(tempfile("")))
+    on.exit(unlink(tmp), add = TRUE)
+    saveRDS(raw, tmp)
+    if (!isTRUE(file.rename(tmp, f))) {
+      cli::cli_abort("Could not move the Wayback metadata cache entry into place.")
+    }
   }
-  m
+  wayback_meta_parse(raw)
 }
 
 
@@ -361,7 +368,38 @@ wayback_meta_query <- function(meta_url, layer, bbox) {
   ids <- vapply(feats, function(f) as.character(f$attributes$OBJECTID %||% NA),
                 "")
   feats <- feats[is.na(ids) | !duplicated(ids)]
-  wayback_meta_parse(feats)
+  wayback_meta_compact(feats)
+}
+
+
+#' Esri JSON features to the cached raw form: attributes as text, rings as
+#' coordinate matrices. A JSON null stays NA (unlist() would drop it and
+#' misalign the column); a number is written without an exponent.
+#' @noRd
+wayback_meta_compact <- function(feats) {
+  a <- function(k) {
+    v <- vapply(feats, function(f) {
+      x <- f$attributes[[k]]
+      if (is.null(x)) NA_character_ else if (is.numeric(x)) {
+        format(x, scientific = FALSE, digits = 15)
+      } else {
+        as.character(x)
+      }
+    }, character(1))
+    trimws(v)
+  }
+  list(
+    attr = data.frame(
+      src_date = a("SRC_DATE"), src_res = a("SRC_RES"), sensor = a("SRC_DESC"),
+      provider = a("NICE_DESC"), draw_order = a("DrawOrder"),
+      stringsAsFactors = FALSE
+    ),
+    rings = lapply(feats, function(f) {
+      lapply(f$geometry$rings, function(r) {
+        do.call(rbind, lapply(r, function(xy) as.numeric(unlist(xy))))
+      })
+    })
+  )
 }
 
 
@@ -382,46 +420,32 @@ wayback_meta_page <- function(url, meta_url, layer, tries = 3L) {
 }
 
 
-#' Esri JSON polygon features to sf, in EPSG:3857
+#' The cached raw footprints to sf, in EPSG:3857
 #'
-#' Its output is what the metadata cache holds: a change here must bump the
-#' `parse-v1` salt in wayback_meta_cached(), or old entries keep their shape.
-#'
-#' All of a feature's rings go into one polygon and `st_make_valid()` sorts
-#' them: its linework method keeps faces by parity, so a multi-part footprint
-#' (several outer rings) and a holed one both come out right. These are drift's
-#' own constructions, not a caller's geometry.
+#' All of a feature's rings go into one polygon, and `st_make_valid()` with
+#' `geos_method = "valid_linework"` sorts them by parity. sf's default,
+#' `valid_structure`, takes ring 1 as the shell and every later ring as a hole,
+#' so it drops a second part that touches the first and fills a hole in any
+#' part after the first (measured, sf 1.1.2 / GEOS 3.13.0: two outer rings
+#' sharing an edge parse to half their area; live, 17 of 101 multi-ring
+#' footprints of one 2014 release over BC). These are drift's own
+#' constructions, not a caller's geometry.
 #' @noRd
-wayback_meta_parse <- function(feats) {
-  if (!length(feats)) return(NULL)
-  rings <- lapply(feats, function(f) {
-    sf::st_polygon(lapply(f$geometry$rings, function(r) {
-      do.call(rbind, lapply(r, function(xy) as.numeric(unlist(xy))))
-    }))
-  })
-  # a JSON null arrives as NULL; unlist() would drop it and misalign the column
-  a <- function(k) {
-    vapply(feats, function(f) {
-      v <- f$attributes[[k]]
-      if (is.null(v)) NA_character_ else as.character(v)
-    }, character(1))
-  }
-  src_date <- a("SRC_DATE")
-  # a number arrives as a double; format it without an exponent
-  num <- !is.na(src_date) & grepl("e", src_date, ignore.case = TRUE)
-  src_date[num] <- format(as.numeric(src_date[num]), scientific = FALSE)
-  provider <- a("NICE_DESC")
-  sensor <- a("SRC_DESC")
-  source <- trimws(paste(ifelse(is.na(provider), "", provider),
-                         ifelse(is.na(sensor), "", sensor)))
+wayback_meta_parse <- function(raw) {
+  if (is.null(raw) || !length(raw$rings)) return(NULL)
+  rings <- lapply(raw$rings, sf::st_polygon)
+  at <- raw$attr
+  source <- trimws(paste(ifelse(is.na(at$provider), "", at$provider),
+                         ifelse(is.na(at$sensor), "", at$sensor)))
   source[!nzchar(source)] <- NA_character_
-  draw <- suppressWarnings(as.numeric(a("DrawOrder")))
+  draw <- suppressWarnings(as.numeric(at$draw_order))
   sf::st_sf(
-    src_date = src_date,
-    src_res = suppressWarnings(as.numeric(a("SRC_RES"))),
+    src_date = at$src_date,
+    src_res = suppressWarnings(as.numeric(at$src_res)),
     source = source,
     draw_order = ifelse(is.na(draw), -Inf, draw),
-    geometry = sf::st_make_valid(sf::st_sfc(rings, crs = 3857))
+    geometry = sf::st_make_valid(sf::st_sfc(rings, crs = 3857),
+                                 geos_method = "valid_linework")
   )
 }
 
