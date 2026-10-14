@@ -41,13 +41,13 @@ Where in gdalcubes (paths under `src/gdalcubes/src/`, from the #87 plan review):
       failure and check `nc_get_var_double`'s return. The legitimate empty-chunk return stays OK
 - [x] Build into a scratch library (`R CMD INSTALL -l <scratch>/lib`), so the machine's
       installed gdalcubes is untouched. tinytest green, existing gdalcubes tests green
-- [ ] Commit, push the branch to the fork, and open a PR **within the fork** (as fork PR #1 was)
+- [x] Commit, push the branch to the fork, and open a PR **within the fork** (NewGraphEnvironment/gdalcubes#2, into synced `master`)
 
 - [x] Plan-review folds (review-plan.md): Initialize/overview-reopen failures, nc_inq_dimlen,
       clean controls (other CRS, partial footprint, overviews), cloud value visible, strict branch
 - [x] `/code-check` on the fork branch (3 rounds, ended by a 39-row enumeration); sync fork
       `master` with upstream
-- [ ] Push the fork branch; PR into fork `master` after Phase 2 (review G3/O1)
+- [x] Push the fork branch; PR into fork `master` after Phase 2 (review G3/O1)
 
 ## Phase 2: worker-crash hang (time-boxed diagnosis)
 - [x] Reproduce with the scratch-lib build: SIGKILL one worker mid-`write_ncdf()` at `parallel = 2`
@@ -82,17 +82,17 @@ Where in gdalcubes (paths under `src/gdalcubes/src/`, from the #87 plan review):
 - [x] NEWS.md entry — left to `/gh-pr-merge` (drift writes NEWS in the release commit; #87 did)
 
 ## Phase 5: upstream draft (not posted)
-- [ ] Update the draft in the #99 body into a PR description for the fork branch: what changes,
+- [x] Update the draft in the #99 body into a PR description for the fork branch: what changes,
       the offline repro, and the tinytest. Include the worker-hang outcome, and the cases left
       unfixed (worker-side `nc_create`/`CPLMoveFile`, `sqlite3_step`)
-- [ ] Edit the #99 body to match what was built (body edited, not appended)
+- [x] Edit the #99 body to match what was built (body edited, not appended) — done right after the drift PR opens, so it links both PRs
 
 ## Validation
-- [ ] `devtools::test()` green (new tests SKIP on 0.7.5); new tests green on the fork build
-- [ ] `lintr::lint_package()`, `devtools::document()`, `pkgdown::check_pkgdown()`
-- [ ] `/code-check` clean on each commit
-- [ ] PWF checkboxes match landed work
-- [ ] `/planning-archive`, then `/gh-pr-push` (drift PR). The fork PR is linked; the upstream post is
+- [x] `devtools::test()` green (new tests SKIP on 0.7.5); new tests green on the fork build
+- [x] `lintr::lint_package()` (211 on main and branch: none added), `devtools::document()`, `pkgdown::check_pkgdown()`
+- [x] `/code-check`: fork 3 rounds and drift 3 rounds, each ended by an enumeration
+- [x] PWF checkboxes match landed work
+- [x] `/planning-archive`, then `/gh-pr-push` (drift PR). The fork PR is linked; the upstream post is
       left to the user
 
 ## Decisions taken at the plan gate (2026-10-02)
