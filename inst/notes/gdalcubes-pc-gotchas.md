@@ -46,9 +46,9 @@ revert both to `appelmar/gdalcubes`.
     max abs diff 0) — it is the footprint that moves, silently. Any future
     adoption must hand `filter_geom` a polygon buffered by `>= res*sqrt(2)/2`
     and KEEP the `terra::mask()`, so the footprint does not move.
-  - Upstream `appelmar/gdalcubes#110` is open and the fix PR #111 unmerged, so
-    CRAN 0.7.4 still segfaults — and reports the **same version string** as the
-    fork, so no version check can tell them apart.
+  - The fix is upstream since 0.7.5 (`appelmar/gdalcubes#111`, merged). CRAN
+    0.7.4 still segfaults, and the fork at the time reported the **same version
+    string**, so no version check could tell them apart.
 
   Use the AOI bbox in `cube_view(extent=)` and
   `terra::mask()` afterward, as `dft_stac_fetch()` does. **Resolved (#32):**
