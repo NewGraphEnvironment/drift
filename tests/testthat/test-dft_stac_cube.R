@@ -1188,6 +1188,8 @@ test_that("stac_cube_items drops items without the mask asset, keeping is_pre al
 test_that("stac_cube_items raises drift_no_items when no item has the mask asset", {
   feats <- list(mask_feature("a", "B04"), mask_feature("b", "B04"))
   expect_error(stac_items_mocked(feats), class = "drift_no_items")
+  # its own subclass, so a composite does not report it as "no scenes"
+  expect_error(stac_items_mocked(feats), class = "drift_no_mask_items")
   expect_error(stac_items_mocked(feats), "mask asset")
 })
 
@@ -1212,14 +1214,33 @@ test_that("a corrupted fixture tile opens and then fails to read (#99 premise)",
   expect_error(suppressWarnings(terra::values(r)))  # but its tile does not decode
 })
 
-test_that("the capability probe agrees with the installed gdalcubes's own record (#99)", {
-  # The probe runs the same corrupted-band read the tests below rely on; a
-  # forced answer is honoured, so the tests can be run against 0.7.5 on purpose.
+test_that("the capability probe agrees with an independent read failure (#99)", {
+  # Not gated, and asked without the override: the probe (a corrupted BAND)
+  # must give the same answer as a corrupted MASK read in drift's shape, so a
+  # probe that wrongly says FALSE on a fixed gdalcubes fails here instead of
+  # silently skipping the tests below.
   skip_if_not_installed("gdalcubes")
-  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = "false")
-  expect_false(read_failures_recorded())
-  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = "true")
-  expect_true(read_failures_recorded())
+  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = NA)
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_asset = "SCL", break_mode = "corrupt")
+  nc <- suppressWarnings(chunk_fixture_write(col, parallel = 2, mask = scl_mask(),
+                                             pixel = production_pixel))
+  expect_identical(read_failures_recorded(),
+                   drift:::chunk_status_failed(nc)[["failed"]] > 0)
+})
+
+test_that("the capability probe honours a forced answer (#99)", {
+  skip_if_not_installed("gdalcubes")
+  for (v in c("true", "TRUE", "1")) {
+    withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = v)
+    expect_true(read_failures_recorded())
+  }
+  for (v in c("false", "0")) {
+    withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = v)
+    expect_false(read_failures_recorded())
+  }
+  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = "yes")
+  expect_error(read_failures_recorded(), "true or false")
 })
 
 test_that("a band read that fails after open aborts the chunk check (#99)", {

@@ -529,7 +529,7 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
   if (length(items$features) == 0) {
     rlang::abort(paste0(n_items, " STAC items found for ", cfg$collection,
                         ", but none has the mask asset '", cfg$roles$mask, "'"),
-                 class = "drift_no_items")
+                 class = c("drift_no_mask_items", "drift_no_items"))
   }
 
   # Baseline-conditional offset: split items at the boundary so each side is

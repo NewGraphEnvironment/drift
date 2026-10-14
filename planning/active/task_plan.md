@@ -45,8 +45,9 @@ Where in gdalcubes (paths under `src/gdalcubes/src/`, from the #87 plan review):
 
 - [x] Plan-review folds (review-plan.md): Initialize/overview-reopen failures, nc_inq_dimlen,
       clean controls (other CRS, partial footprint, overviews), cloud value visible, strict branch
-- [ ] `/code-check` on the fork branch; sync fork `master` with upstream; PR into fork `master`
-      after Phase 2 (review G3/O1)
+- [x] `/code-check` on the fork branch (3 rounds, ended by a 39-row enumeration); sync fork
+      `master` with upstream
+- [ ] Push the fork branch; PR into fork `master` after Phase 2 (review G3/O1)
 
 ## Phase 2: worker-crash hang (time-boxed diagnosis)
 - [x] Reproduce with the scratch-lib build: SIGKILL one worker mid-`write_ncdf()` at `parallel = 2`
@@ -55,7 +56,7 @@ Where in gdalcubes (paths under `src/gdalcubes/src/`, from the #87 plan review):
       sh-wrapper pid vs. the R pid
 - [x] If the fix is contained, add it with a test to the fork branch. If not, record the mechanism
       and repro in findings and file a drift issue for it
-- [ ] Either way, record the outcome in `inst/notes/gdalcubes-pc-gotchas.md`
+- [x] Either way, record the outcome in `inst/notes/gdalcubes-pc-gotchas.md`
 
 ## Phase 3: drift: drop items without a mask asset
 - [x] Failing test first, in `test-dft_stac_cube.R`. A feature list where one item lacks the

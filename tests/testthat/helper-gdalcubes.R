@@ -63,7 +63,9 @@ chunk_fixture <- function(dates, ext = c(0, 400, 0, 400), res = 10,
 tif_corrupt_tile <- function(f) {
   con <- file(f, "r+b")
   on.exit(close(con))
-  stopifnot(identical(readBin(con, "raw", 2), charToRaw("II")))
+  # little-endian classic TIFF (42; BigTIFF, 43, has 8-byte offsets)
+  stopifnot(identical(readBin(con, "raw", 2), charToRaw("II")),
+            readBin(con, "integer", size = 2, signed = FALSE, endian = "little") == 42L)
   seek(con, 4)
   ifd <- readBin(con, "integer", size = 4, endian = "little")
   seek(con, ifd)
@@ -71,9 +73,15 @@ tif_corrupt_tile <- function(f) {
   tile <- NA
   for (i in seq_len(n)) {
     tag <- readBin(con, "integer", size = 2, signed = FALSE, endian = "little")
-    seek(con, 6, origin = "current")
+    seek(con, 2, origin = "current")
+    count <- readBin(con, "integer", size = 4, endian = "little")
     val <- readBin(con, "integer", size = 4, endian = "little")
-    if (tag == 324) tile <- val
+    # one tile: the value IS its offset; more and it points at an array of them,
+    # and overwriting there would corrupt the directory, not the pixels
+    if (tag == 324) {
+      stopifnot(count == 1L)
+      tile <- val
+    }
   }
   stopifnot(!is.na(tile))
   seek(con, tile, rw = "write")
@@ -121,8 +129,10 @@ chunk_fixture_write <- function(col, ext = c(0, 400, 0, 400), res = 10,
 read_failures_recorded <- local({
   answer <- NULL
   function() {
-    forced <- Sys.getenv("DRIFT_TEST_ASSUME_READ_STATUS")
-    if (nzchar(forced)) return(identical(forced, "true"))
+    forced <- tolower(Sys.getenv("DRIFT_TEST_ASSUME_READ_STATUS"))
+    if (forced %in% c("true", "1")) return(TRUE)
+    if (forced %in% c("false", "0")) return(FALSE)
+    if (nzchar(forced)) stop("DRIFT_TEST_ASSUME_READ_STATUS must be true or false, not ", forced)
     if (is.null(answer)) {
       col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
                            break_mode = "corrupt")

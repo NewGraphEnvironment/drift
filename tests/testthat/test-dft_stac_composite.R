@@ -160,6 +160,30 @@ test_that("composite_layers_order selects layers by name, not position", {
                "do not match")
 })
 
+test_that("a year with no masked scene is skipped for that reason, not as 'no scenes' (#99)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- aoi_pkg()
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) {
+      rlang::abort("2 STAC items found for sentinel-2-l2a, but none has the mask asset 'SCL'",
+                   class = c("drift_no_mask_items", "drift_no_items"))
+    }
+  )
+  w <- character(0)
+  expect_error(
+    withCallingHandlers(
+      suppressMessages(dft_stac_composite(aoi, years = 2017, cache_dir = withr::local_tempdir())),
+      warning = function(cnd) {
+        w <<- c(w, conditionMessage(cnd))
+        invokeRestart("muffleWarning")
+      }
+    ),
+    "the warnings say why"
+  )
+  expect_true(any(grepl("no scene has the cloud-mask asset", w, fixed = TRUE)))
+  expect_false(any(grepl(": no scenes.", w, fixed = TRUE)))
+})
+
 test_that("an empty year is dropped with a warning and the others are kept", {
   skip_if_not_installed("gdalcubes")
   aoi <- aoi_pkg()

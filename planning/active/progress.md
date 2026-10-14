@@ -18,3 +18,9 @@
 - Phase 4: fixture writes DEFLATE COGs, can corrupt or delete B04 or SCL; lazy memoised probe at
   parallel 1 and 2 with a forced override; gated tests + ungated production-shape mask-open test +
   composite SCL test; abort text, roxygen and gotchas notes updated
+- Fork code-check round 2: 1 pre-existing finding (warp_complex overview transformer type), out
+  of scope, in the upstream draft. Round 3: mechanism + 39-row enumeration; every branch-introduced
+  row consistent -> loop ended by enumeration. Fork `master` synced with upstream.
+- Drift code-check round 1: 3 findings fixed — probe cross-checked against an independent SCL read
+  (mutant probe -> fails), `drift_no_mask_items` subclass with its own composite skip reason,
+  `tif_corrupt_tile()` asserts classic TIFF and one tile
