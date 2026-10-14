@@ -1,5 +1,39 @@
 # Changelog
 
+## drift 0.23.0
+
+- **Cloud-mask failures can no longer put unmasked scenes into a cube or
+  composite without a word
+  ([\#99](https://github.com/NewGraphEnvironment/drift/issues/99)).**
+  - **STAC items with no mask asset are dropped.** gdalcubes reads a
+    scene whose SCL asset is missing *unmasked* and records it as fine,
+    so cloud reached the median.
+    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+    and
+    [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+    now drop such items before the read and say how many and which. If
+    none has the asset, the read stops with `drift_no_items`, under its
+    own subclass `drift_no_mask_items`, and a composite skips that year
+    with that reason rather than “no scenes”.
+  - **Failed reads after an image opens are fixed in gdalcubes, not yet
+    released.**
+    [\#87](https://github.com/NewGraphEnvironment/drift/issues/87)’s
+    check sees only an image that fails to *open*. A read that fails
+    after opening (a throttled or refused range request), including a
+    corrupted SCL read that leaves the scene unmasked, is still recorded
+    as OK by gdalcubes 0.7.5. The fix is on
+    NewGraphEnvironment/gdalcubes#2 and proposed upstream. drift picks
+    it up unchanged once installed, and its tests for those cases skip
+    until then.
+  - **A deleted SCL file was already caught.** In drift’s reads
+    gdalcubes also reads SCL as a band, so a missing SCL fails as an
+    image that would not open and aborts under
+    [\#87](https://github.com/NewGraphEnvironment/drift/issues/87). A
+    test now pins that.
+  - The `drift_incomplete_cube` message now names read failures and
+    unreadable worker files as causes, not only an image that would not
+    open.
+
 ## drift 0.22.0
 
 - **A cube, composite or fetch whose images could not be opened now

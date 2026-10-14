@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.22.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.23.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,9 +34,22 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/v0.23.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.23.0" id="drift-0230">drift 0.23.0<a class="anchor" aria-label="anchor" href="#drift-0230"></a></h2>
+<ul><li>
+<strong>Cloud-mask failures can no longer put unmasked scenes into a cube or composite without a word (<a href="https://github.com/NewGraphEnvironment/drift/issues/99" class="external-link">#99</a>).</strong>
+<ul><li>
+<strong>STAC items with no mask asset are dropped.</strong> gdalcubes reads a scene whose SCL asset is missing <em>unmasked</em> and records it as fine, so cloud reached the median. <code><a href="../reference/dft_stac_cube.html">dft_stac_cube()</a></code> and <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> now drop such items before the read and say how many and which. If none has the asset, the read stops with <code>drift_no_items</code>, under its own subclass <code>drift_no_mask_items</code>, and a composite skips that year with that reason rather than “no scenes”.</li>
+<li>
+<strong>Failed reads after an image opens are fixed in gdalcubes, not yet released.</strong> <a href="https://github.com/NewGraphEnvironment/drift/issues/87" class="external-link">#87</a>’s check sees only an image that fails to <em>open</em>. A read that fails after opening (a throttled or refused range request), including a corrupted SCL read that leaves the scene unmasked, is still recorded as OK by gdalcubes 0.7.5. The fix is on NewGraphEnvironment/gdalcubes#2 and proposed upstream. drift picks it up unchanged once installed, and its tests for those cases skip until then.</li>
+<li>
+<strong>A deleted SCL file was already caught.</strong> In drift’s reads gdalcubes also reads SCL as a band, so a missing SCL fails as an image that would not open and aborts under <a href="https://github.com/NewGraphEnvironment/drift/issues/87" class="external-link">#87</a>. A test now pins that.</li>
+<li>The <code>drift_incomplete_cube</code> message now names read failures and unreadable worker files as causes, not only an image that would not open.</li>
+</ul></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.22.0" id="drift-0220">drift 0.22.0<a class="anchor" aria-label="anchor" href="#drift-0220"></a></h2>
 <ul><li>
