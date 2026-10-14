@@ -228,9 +228,11 @@ test_that("inputs are checked", {
   expect_error(dft_wayback_captures(line, releases = wb_releases()),
                "points or polygons")
   expect_error(dft_wayback_captures(wb_point(0, 0), zoom = 9,
-                                    releases = wb_releases()), "10 to 23")
+                                    releases = wb_releases()), "10 to 22")
+  expect_error(dft_wayback_captures(wb_point(0, 0), zoom = 23,
+                                    releases = wb_releases()), "10 to 22")
   expect_error(dft_wayback_captures(wb_point(0, 0), zoom = 17.5,
-                                    releases = wb_releases()), "10 to 23")
+                                    releases = wb_releases()), "10 to 22")
   expect_error(dft_wayback_captures(wb_point(0, 0),
                                     releases = wb_releases()[0, ]), "no rows")
   expect_error(dft_wayback_captures(wb_point(0, 0),

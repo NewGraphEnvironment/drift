@@ -49,3 +49,31 @@ wb_point <- function(dx, dy) {
   sf::st_sf(geometry = sf::st_sfc(sf::st_point(c(wb_x0 + dx, wb_y0 + dy)),
                                   crs = 3857))
 }
+
+# A local 3-band EPSG:3857 raster standing in for the tile service: 200 x 200
+# at 1 m from the origin, every band 100, except an all-zero (empty, as a 404
+# tile reads) block in the north-east `empty_px` columns and a red band of 0
+# (a real black-ish pixel) in the first row.
+wb_local_source <- function(dir, empty_px = 0L) {
+  r <- terra::rast(nrows = 200, ncols = 200, nlyrs = 3,
+                   xmin = wb_x0, xmax = wb_x0 + 200,
+                   ymin = wb_y0, ymax = wb_y0 + 200, crs = "EPSG:3857")
+  v <- matrix(100, terra::ncell(r), 3)
+  v[1:200, 1] <- 0
+  if (empty_px > 0) {
+    cols <- (200 - empty_px + 1):200
+    cells <- terra::cellFromRowColCombine(r, 1:200, cols)
+    v[cells, ] <- 0
+  }
+  terra::values(r) <- v
+  f <- file.path(dir, sprintf("src_%d.tif", empty_px))
+  terra::writeRaster(r, f, datatype = "INT1U", overwrite = TRUE)
+  f
+}
+
+wb_poly <- function(x0, y0, size) {
+  sf::st_sf(geometry = sf::st_sfc(sf::st_polygon(list(rbind(
+    c(x0, y0), c(x0, y0 + size), c(x0 + size, y0 + size), c(x0 + size, y0),
+    c(x0, y0)
+  ))), crs = 3857))
+}

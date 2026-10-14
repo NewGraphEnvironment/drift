@@ -16,7 +16,7 @@ Decisions made at this gate:
 
 Measured during exploration (2026-10-14):
 - `waybackconfig.json` holds 197 releases. `itemTitle` reads "World Imagery (Wayback YYYY-MM-DD)".
-- Each metadata MapServer has layers 0-13: layer 0 is 1.9 cm (zoom 23) and layer 13 is 150 m (zoom ≤ 10). So valid zoom is 10:23.
+- Each metadata MapServer has layers 0-13: layer 0 is 1.9 cm (zoom 23) and layer 13 is 150 m (zoom ≤ 10). Valid zoom is 10:22, because GDAL cannot open zoom 23 (Phase 4).
 - drift's Imports have no `jsonlite` or `curl`. Both are already installed through rstac/httr.
 
 ## API
@@ -39,7 +39,7 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - [x] Tests: parse a fixture JSON with `wayback_get` mocked, covering release ids out of date order, a malformed title (abort) and a missing metadata URL (abort). One network test gated on `DRIFT_TEST_NETWORK`.
 
 ## Phase 2: Capture index
-- [x] `dft_wayback_captures()`: validate `zoom` (integer, within 10:23) and map each zoom to layer `23 - zoom` internally. Query the AOI's bbox in 4326, padded so a single point is not a degenerate envelope, with `geometryPrecision=1` and `outSR=3857`, paging on `exceededTransferLimit`.
+- [x] `dft_wayback_captures()`: validate `zoom` (integer, within 10:22 after Phase 4) and map each zoom to layer `23 - zoom` internally. Query the AOI's bbox in 4326, padded so a single point is not a degenerate envelope, with `geometryPrecision=1` and `outSR=3857`, paging on `exceededTransferLimit`.
 - [x] Cache each response (rds) under `cache_scheme_dir(cache_dir, "esri-wayback")/meta`. The key is the release, the layer and the hashed bbox via `cache_key_hash()`, and writes go through `cache_write_atomic()`. A past release's metadata is immutable, so the cache only refreshes on `force`.
 - [x] Join in 3857 with `st_intersects`, running `st_make_valid` on the copy used for the join only.
   - Points: the top DrawOrder wins, then the finer res.
@@ -62,16 +62,18 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - [x] Review G3/G4 folded in: release_id compared as a number; cover, earlier capture_date and source close the order; days_from_date signed. Mutation table (6 keys) all caught
 
 ## Phase 4: Fetch
-- [ ] Internal `wayback_wms_xml(release, zoom, cache)`, ported from `fp_acc_wayback_wms_xml` with `ZeroBlockHttpCodes 204,404` and the tile cache under `cache_scheme_dir(cache_dir, "esri-wayback")/tiles`.
-- [ ] `dft_wayback_fetch()`:
+- [x] Internal `wayback_wms_xml(release, zoom, cache)`, ported from `fp_acc_wayback_wms_xml` with `ZeroBlockHttpCodes 204,404` and the tile cache under `cache_scheme_dir(cache_dir, "esri-wayback")/tiles`.
+- [x] `dft_wayback_fetch()`:
   - CRS: `crs = NULL` → `auto_utm_epsg()`.
   - Resolution: `res = NULL` → the tile ground resolution at the AOI's latitude, rounded to 0.05 m.
   - Warp: `gdal_utils("warp", -te, -tr, -tap, -r bilinear)` to a tempfile, with `GDAL_PAM_ENABLED=NO`.
   - Clip: with `clip = TRUE`, mask to the polygon by cell centre (`touches = FALSE`), so adjacent AOIs such as Voronoi cells share no cell.
   - Nodata: a real 0 is moved to 1 and 0 becomes nodata. This is lossless DEFLATE plus nodata, not a mask, because a VRT ignores masks.
   - Cache: a COG keyed on the AOI's WKB, release, zoom, crs, res and clip, written through `cache_write_atomic()`.
-- [ ] Guards: abort with `drift_wayback_empty` when more than `empty_max` of the AOI came back empty (all three bands 0). A flat block is not a failure, because open water is flat. For GDAL warnings, first measure what a clean warp emits, then abort on any warning that is not on that list. Do not count them and continue, which is what floodplains does.
-- [ ] Tests: the WMS XML content, the res rule and the empty guard, using a local GTiff source in place of the WMS. One network test that fetches the NECR point 1 chip.
+- [x] Guards: abort with `drift_wayback_empty` when more than `empty_max` of the AOI came back empty (all three bands 0). A flat block is not a failure, because open water is flat. For GDAL warnings, first measure what a clean warp emits, then abort on any warning that is not on that list. Do not count them and continue, which is what floodplains does.
+- [x] Tests: the WMS XML content, the res rule and the empty guard, using a local GTiff source in place of the WMS. One network test that fetches the NECR point 1 chip.
+- [x] Measured changes to the plan: NO GDAL tile cache (with `<Cache>` every 404 tile raises two read errors on GDAL 3.13.0, values still zeros; without it, clean zeros), so only the finished chip is cached; `-ovr NONE` (a coarse `res` otherwise reads a shallower zoom from the WMS overviews, possibly another capture); zoom capped at 22 for captures and fetch (zoom 23 is 2^31 px wide, "Invalid dataset dimensions"); a GDAL error that raises is caught and classed with GDAL's message
+- [x] Review G2/G8/G10/G11/G12 folded in: polygons only for fetch, "covers no cell centre" guard; empty_max and fixed choices in the key; all-band-zero = nodata, lone zero band = 1; `wayback_source()` seam; PAM via `config_options`
 
 ## Phase 5: Docs, verification at scale, hand-off
 - [ ] roxygen with `\dontrun` examples covering the per-point pattern (one call per buffered point), then `devtools::document()`, `lintr`, `pkgdown::check_pkgdown()` and `devtools::test()`.

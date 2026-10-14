@@ -16,9 +16,11 @@ dft_wayback_captures(
 \item{aoi}{An \code{sf}, \code{sfc} or \code{terra::SpatVector} of \code{POINT}, \code{POLYGON} or
 \code{MULTIPOLYGON} features, in any CRS.}
 
-\item{zoom}{Integer vector of tile zoom levels, each in 10 to 23 (default
+\item{zoom}{Integer vector of tile zoom levels, each in 10 to 22 (default
 \code{17:19}; zoom 17 is about 0.7 m on the ground at 54 degrees north).
-Zoom 10 stands for every zoom at or below 10.}
+Zoom 10 stands for every zoom at or below 10. The metadata describes zoom
+23 too, but GDAL cannot open the tile service there (the world is 2^31
+pixels wide, one past its limit), so a capture at 23 could not be fetched.}
 
 \item{releases}{A release table from \code{\link[=dft_wayback_releases]{dft_wayback_releases()}}, possibly
 filtered, to search only some releases. When \code{NULL}, every release.}

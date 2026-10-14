@@ -41,9 +41,11 @@
 #'
 #' @param aoi An `sf`, `sfc` or `terra::SpatVector` of `POINT`, `POLYGON` or
 #'   `MULTIPOLYGON` features, in any CRS.
-#' @param zoom Integer vector of tile zoom levels, each in 10 to 23 (default
+#' @param zoom Integer vector of tile zoom levels, each in 10 to 22 (default
 #'   `17:19`; zoom 17 is about 0.7 m on the ground at 54 degrees north).
-#'   Zoom 10 stands for every zoom at or below 10.
+#'   Zoom 10 stands for every zoom at or below 10. The metadata describes zoom
+#'   23 too, but GDAL cannot open the tile service there (the world is 2^31
+#'   pixels wide, one past its limit), so a capture at 23 could not be fetched.
 #' @param releases A release table from [dft_wayback_releases()], possibly
 #'   filtered, to search only some releases. When `NULL`, every release.
 #' @param cache_dir Character. Cache directory. When `NULL`, uses
@@ -449,11 +451,11 @@ wayback_aoi_check <- function(aoi) {
 #' @noRd
 wayback_zoom_check <- function(zoom, scalar = FALSE) {
   ok <- is.numeric(zoom) && length(zoom) > 0 && !anyNA(zoom) &&
-    all(zoom == round(zoom)) && all(zoom >= 10 & zoom <= 23)
+    all(zoom == round(zoom)) && all(zoom >= 10 & zoom <= 22)
   if (ok && scalar) ok <- length(zoom) == 1L
   if (!ok) {
     cli::cli_abort(
-      "{.arg zoom} must be {if (scalar) 'one whole number' else 'whole numbers'} in 10 to 23."
+      "{.arg zoom} must be {if (scalar) 'one whole number' else 'whole numbers'} in 10 to 22."
     )
   }
   sort(unique(as.integer(zoom)))

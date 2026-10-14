@@ -86,7 +86,24 @@ Profile of the first: 58% `CPL_geos_binop` with the 21k patches as the prepared 
 in `CPL_crs_parameters` from sfc subsetting. All 197 releases at BULK scale is about 42 min compute plus the
 metadata fetch (about 30 s per release cold). Scripts: scratchpad `bulk_patches.R`, `bulk_captures.R`.
 
+## Fetch: GDAL WMS behaviour measured (2026-10-14, GDAL 3.13.0)
+
+- NECR point 107 (floodplains review_id 107, point 10_00001), release 60013, zoom 18, its Voronoi cell in
+  EPSG:3005 at res 0.35: drift's chip is on floodplains' grid exactly (858 x 619); 462,896 of 462,897 /
+  462,899 non-NA cells shared, max band difference 1 on shared cells, 99.9998% identical. 1.1-1.4 s cold,
+  0.04 s cache hit. No GDAL warnings on a clean warp.
+- Zoom 23: `Invalid dataset dimensions : -2147483648 x -2147483648` (2^23 x 256 = 2^31 px). Zoom 22 opens
+  (1,073,741,824 px square). Zoom capped at 22.
+- `<Cache>` + `ZeroBlockHttpCodes`: each 404 block emits `GDAL Error 4: <cache path>: No such file or
+  directory` and `GDALWMS: Unable to open downloaded block` as warnings; values are zeros anyway. Without
+  `<Cache>`: zeros, no warnings. floodplains counted warnings and ignored them, so it never surfaced.
+  Upstream report drafted, not posted.
+- gdalwarp at a `-tr` coarser than the zoom's ground res reads a WMS overview (a shallower zoom): with
+  `-tr 0.5` the z22 source returned real imagery from a shallower level. `-ovr NONE` forces the requested zoom.
+
 ## Errors Encountered
 
 | Error | Resolution |
 |-------|------------|
+| live z23 fetch: `gdal_utils warp: an error occured` (unclassed) | zoom capped at 22; GDAL errors caught and classed |
+| live z22 fetch: `Unable to open downloaded block` warnings | GDAL tile cache dropped (see above) |
