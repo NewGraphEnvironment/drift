@@ -784,9 +784,10 @@ cube_check_nonempty <- function(stk, collection, datetime, cached) {
 #' file's close (Rcpp's own header warns of exactly this). Other gdalcubes
 #' warnings pass through untouched.
 #'
-#' Not every failed merge reaches either signal: a worker chunk file the main
-#' process cannot open is skipped with status OK and no warning, a C++ stderr
-#' line only (round-2 review of #87; drift#99).
+#' Not every failed merge reaches either signal on gdalcubes 0.7.5: a worker
+#' chunk file the main process cannot open is skipped with status OK and no
+#' warning, a C++ stderr line only (round-2 review of #87). The
+#' NewGraphEnvironment/gdalcubes fix for drift#99 records it as ERROR.
 #' @noRd
 cube_write_ncdf <- function(cube, out) {
   unmerged <- character(0)
@@ -824,23 +825,26 @@ cube_write_ncdf <- function(cube, out) {
 #' INCOMPLETE, `128` UNKNOWN (gdalcubes 0.7.5, `src/gdalcubes/src/cube.cpp`). A
 #' worker carries the status to the main process inside its chunk file.
 #'
-#' **What it records is narrower than "the read failed".** Measured offline
-#' (#87): a band image that fails to OPEN marks its chunks INCOMPLETE, which is
-#' the expired or refused signed URL. A band image that opens and then fails
-#' mid-read (a corrupted tile here; a throttled range request on the network)
-#' leaves the status OK, and so does a mask (SCL) image that fails to open, which
-#' silently drops that scene. A mask image that opens and then fails mid-read is
-#' worse: the scene is used unmasked. gdalcubes sets the status only when a band
-#' image will not open; every other I/O step drops its return code, so none of
-#' these is visible to this check or to anything else R can see (drift#99;
-#' inst/notes/gdalcubes-pc-gotchas.md).
+#' **On gdalcubes 0.7.5 it records less than "the read failed".** Measured
+#' offline (#87, #99): a band image that fails to OPEN marks its chunks
+#' INCOMPLETE, which is the expired or refused signed URL. A deleted mask (SCL)
+#' image is caught the same way in drift's reads, because gdalcubes also reads
+#' the mask asset as a band there (no `select_bands()` before `apply_pixel()`).
+#' An image that opens and then fails mid-read (a corrupted tile here; a
+#' throttled range request on the network) leaves the status OK. For a band,
+#' the chunk is filled from the scenes that did read; for the mask, the scene
+#' is used UNMASKED, so cloud reaches the median. Neither is visible to this
+#' check or to anything else R can see on 0.7.5. The NewGraphEnvironment/gdalcubes
+#' fix for drift#99 records both, so this check then catches them unchanged
+#' (inst/notes/gdalcubes-pc-gotchas.md).
 #'
 #' **The netCDF integer fill value means no status was written for that id**,
 #' not that the chunk was empty: a worker skips writing a chunk that is OK and
 #' all-`NA` (no image, or fully masked), and a chunk whose merge threw keeps fill
 #' too. That second case raises an R warning, which cube_write_ncdf() turns into
 #' an abort, so fill is read as OK here. A worker chunk file the main process
-#' cannot open is recorded as OK, with neither signal (drift#99). Anything that is neither OK nor fill fails, so a
+#' cannot open is recorded as OK on 0.7.5, with neither signal, and as ERROR
+#' with the drift#99 fix. Anything that is neither OK nor fill fails, so a
 #' status code a later gdalcubes adds aborts rather than passes.
 #'
 #' For an open failure, this is the only check that sees it. A median over two
@@ -867,10 +871,12 @@ cube_check_chunks <- function(nc_file) {
   if (failed[["failed"]] == 0L) return(invisible(nc_file))
   cli::cli_abort(class = "drift_incomplete_cube", c(
     "gdalcubes could not read {failed[['failed']]} of {failed[['chunks']]} \\
-     chunk{?s}: an image would not open.",
+     chunk{?s}: an image would not open or read.",
     "x" = "Those cells are {.val NA}, or computed from only the scenes that \\
-           did open.",
-    "i" = "Usually an expired or refused signed URL. Nothing was cached.",
+           did read.",
+    "i" = "Usually an expired or refused signed URL; also a refused range \\
+           request mid-read, or a worker chunk file that could not be read \\
+           back (drift#99). Nothing was cached.",
     "i" = "Re-running signs the request again. If the same read fails every \\
            time, an asset may be missing from the catalogue."
   ))

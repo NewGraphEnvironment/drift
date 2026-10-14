@@ -14,3 +14,7 @@
   fixed + tested on the fork branch (fork commits 83eea4c..4175ee1, not yet pushed)
 - Phase 3: `stac_features_masked()` wired into `stac_cube_items()`; mutation (unwired) -> 5 fails
 - Fork `/code-check` round 1 running
+- Fork code-check round 1: 2 findings, both fixed (one inside the G1 fix); round 2 spawned
+- Phase 4: fixture writes DEFLATE COGs, can corrupt or delete B04 or SCL; lazy memoised probe at
+  parallel 1 and 2 with a forced override; gated tests + ungated production-shape mask-open test +
+  composite SCL test; abort text, roxygen and gotchas notes updated

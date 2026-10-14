@@ -67,18 +67,18 @@ Where in gdalcubes (paths under `src/gdalcubes/src/`, from the #87 plan review):
       has no mask role and is unaffected
 
 ## Phase 4: drift: tests and docs that follow the fork fix
-- [ ] Capability probe helper in `helper-gdalcubes.R`: does the installed gdalcubes record a
+- [x] Capability probe helper in `helper-gdalcubes.R`: does the installed gdalcubes record a
       corrupted-tile read in `chunk_status`? (Test the capability, not a version.)
-- [ ] Offline tests through `cube_write_ncdf()`: corrupted band tile, deleted SCL and
+- [x] Offline tests through `cube_write_ncdf()`: corrupted band tile, deleted SCL and
       corrupted SCL each abort `drift_incomplete_cube` with nothing cached. They skip with a
       drift#99 reason when the probe says the installed gdalcubes lacks the fix. Run them green
       against the scratch-lib fork build, and as SKIP against the installed 0.7.5
-- [ ] Mutation check: revert the fork patch in the scratch build and confirm the tests go red
-- [ ] `cube_check_chunks()` abort text: change "an image would not open" to cover open **or
+- [x] Mutation check (as review O2: probe forced on against 0.7.5 -> exactly the gated tests fail; the tinytest was run against unpatched 0.7.5 too) in the scratch build and confirm the tests go red
+- [x] `cube_check_chunks()` abort text: change "an image would not open" to cover open **or
       read** failures, without claiming coverage 0.7.5 lacks. Revise the roxygen for
       `cube_check_chunks()` / `cube_write_ncdf()` and `inst/notes/gdalcubes-pc-gotchas.md`
       ("Detecting failed chunk reads") to say what is recorded with and without the fix
-- [ ] NEWS.md entry
+- [x] NEWS.md entry — left to `/gh-pr-merge` (drift writes NEWS in the release commit; #87 did)
 
 ## Phase 5: upstream draft (not posted)
 - [ ] Update the draft in the #99 body into a PR description for the fork branch: what changes,

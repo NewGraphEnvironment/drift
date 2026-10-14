@@ -687,12 +687,14 @@ aoi_fixture_ext <- function(aoi) {
 # `break_dates` holds one entry per year: the dates to break in that year's
 # collection. Years are 2021, 2022, ...; each has scenes on 07-03 and 07-13.
 composite_on_fixture <- function(break_dates, tile_size = NULL, cache,
+                                 break_asset = "B04", break_mode = "delete",
                                  env = parent.frame()) {
   aoi <- aoi_pkg()
   years <- 2020 + seq_along(break_dates)
   cols <- lapply(seq_along(years), function(i) {
     chunk_fixture(paste0(years[i], c("-07-03", "-07-13")),
                   ext = aoi_fixture_ext(aoi), break_dates = break_dates[[i]],
+                  break_asset = break_asset, break_mode = break_mode,
                   envir = env)
   })
   year_now <- 0L
@@ -741,6 +743,18 @@ test_that("a composite over a readable collection is built and cached as before 
     expect_gt(sum(terra::global(out[[1]], "notNA")$notNA), 0)
     expect_length(list.files(cache, pattern = "\\.tif$", recursive = TRUE), 1L)
   }
+})
+
+test_that("a composite whose mask (SCL) read failed aborts and caches nothing (#99)", {
+  # On gdalcubes 0.7.5 the scene is used unmasked and the chunk is recorded OK.
+  skip_if_no_read_failure_status()
+  cache <- withr::local_tempdir()
+  expect_error(
+    suppressWarnings(composite_on_fixture(list("2021-07-13"), cache = cache,
+                                          break_asset = "SCL", break_mode = "corrupt")),
+    class = "drift_incomplete_cube"
+  )
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
 })
 
 test_that("a failed year is an abort, not a skipped year (#87)", {

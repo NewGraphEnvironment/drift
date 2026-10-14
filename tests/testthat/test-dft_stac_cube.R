@@ -1190,3 +1190,80 @@ test_that("stac_cube_items raises drift_no_items when no item has the mask asset
   expect_error(stac_items_mocked(feats), class = "drift_no_items")
   expect_error(stac_items_mocked(feats), "mask asset")
 })
+
+
+# --- #99: failed reads after open, and failed mask reads ---------------------
+#
+# gdalcubes 0.7.5 records only a band image that fails to OPEN. A read that fails
+# after the open, and a mask (SCL) image that fails to open or read, leave the
+# chunk OK; the fork fix records them (NewGraphEnvironment/gdalcubes). These tests
+# need it and skip without it (skip_if_no_read_failure_status(), helper-gdalcubes.R).
+
+scl_mask <- function() gdalcubes::image_mask("SCL", values = c(8, 9))
+
+test_that("a corrupted fixture tile opens and then fails to read (#99 premise)", {
+  # Without this, a 'read failure' test could be testing an open failure.
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_mode = "corrupt")
+  f <- file.path(attr(col, "fixture_dir"), "20210713_a_B04.tif")
+  expect_true(file.exists(f))
+  r <- terra::rast(f)                       # opens
+  expect_error(suppressWarnings(terra::values(r)))  # but its tile does not decode
+})
+
+test_that("the capability probe agrees with the installed gdalcubes's own record (#99)", {
+  # The probe runs the same corrupted-band read the tests below rely on; a
+  # forced answer is honoured, so the tests can be run against 0.7.5 on purpose.
+  skip_if_not_installed("gdalcubes")
+  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = "false")
+  expect_false(read_failures_recorded())
+  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = "true")
+  expect_true(read_failures_recorded())
+})
+
+test_that("a band read that fails after open aborts the chunk check (#99)", {
+  skip_if_no_read_failure_status()
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_mode = "corrupt")
+  for (p in c(1, 4)) {
+    nc <- suppressWarnings(chunk_fixture_write(col, parallel = p, mask = scl_mask()))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a mask image that fails to open aborts the chunk check, in drift's read shape (#99)", {
+  # Not gated: in drift's shape (production_pixel) gdalcubes also reads SCL as a
+  # band, so a deleted SCL fails a BAND open and 0.7.5 already records it. With
+  # select_bands() it would reach only the mask path, which the fork fix records.
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_asset = "SCL", break_mode = "delete")
+  for (p in c(1, 4)) {
+    nc <- suppressWarnings(chunk_fixture_write(col, parallel = p, mask = scl_mask(),
+                                               pixel = production_pixel))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a mask image that fails to read aborts the chunk check, in drift's read shape (#99)", {
+  # On 0.7.5 this scene is used UNMASKED with status OK, in this shape and with
+  # select_bands() alike.
+  skip_if_no_read_failure_status()
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_asset = "SCL", break_mode = "corrupt")
+  for (p in c(1, 4)) {
+    nc <- suppressWarnings(chunk_fixture_write(col, parallel = p, mask = scl_mask(),
+                                               pixel = production_pixel))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a clean masked read in drift's read shape passes the chunk check (#99 control)", {
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"))
+  for (p in c(1, 4)) {
+    nc <- chunk_fixture_write(col, parallel = p, mask = scl_mask(), pixel = production_pixel)
+    expect_silent(drift:::cube_check_chunks(nc))
+  }
+})

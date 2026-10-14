@@ -116,3 +116,37 @@ merged it as appelmar/gdalcubes#111 in two weeks. Same route here.
 - Repro scripts were scratch-only: `hang_main.R`/`hang_run.sh` (mid-write kill),
   `hang_early.R` + `worker_kill9.R` (startup kill). The startup case is now
   `inst/tinytest/test_worker_failure.R` on the fork branch.
+
+## drift's read shape decides which SCL failures 0.7.5 records (2026-10-14)
+
+Measured with `chunk_fixture()` (SCL broken on one of two dates, masked median), failed chunks:
+
+| SCL | shape | 0.7.5 | fork |
+|---|---|---|---|
+| deleted | `apply_pixel()` (drift's shape) | 9 | 9 |
+| deleted | `select_bands("B04")` | 0 | 9 |
+| corrupted | `apply_pixel()` | **0** | 9 |
+| corrupted | `select_bands("B04")` | 0 | 9 |
+
+With no `select_bands()`, gdalcubes reads the mask asset as a band too, so a deleted SCL fails a
+band open and is already recorded. The issue table's "mask fails to open -> OK" row holds only
+when the mask is selected away. The case drift actually misses on 0.7.5 is the corrupted (read
+failure) SCL, which leaves the scene unmasked. So the drift test for a deleted SCL runs ungated, in
+drift's shape; the corrupted-SCL and corrupted-band tests are gated.
+
+Drift test runs (`test-dft_stac_cube.R`, `test-dft_stac_composite.R`):
+- 0.7.5: gated tests SKIP "installed gdalcubes records a failed read after open as OK (drift#99)"
+- 0.7.5 with `DRIFT_TEST_ASSUME_READ_STATUS=true`: exactly the gated tests fail (cube 4 = 2 tests
+  x parallel 1/4; composite 2)
+- fork build (`R_LIBS=<scratch>/lib`): all pass
+
+## Fork code-check round 1 (review-fork-round1.md)
+
+- Bug inside the plan-review fix (G1): after a failed overview reopen, `in->GetRasterCount()`
+  dereferenced NULL before the new guard. Fixed by opening the overview into its own handle and
+  closing the source only on success (fork 7afdd3e).
+- Vacuous test: the reprojection control's extent missed the data (0 non-NA). Fixed.
+- Chasing the reviewer's repro (two-band COG, mask band 2) found it segfaults at full
+  resolution too, on 0.7.5 and the fork alike: the #92 two-band segfault, out of scope. lldb on a
+  worker (swap the worker command for `lldb -- bin/exec/R --file=worker.R --args`) ran clean, so
+  timing/layout dependent.

@@ -246,11 +246,27 @@ Measured on gdalcubes 0.7.5 (`appelmar/gdalcubes@ed68331`) with a local collecti
 - **The last row is why a pixel check cannot do this.** A median over two scenes where one failed fills every cell from the survivor, so the holed cube has no NA at all. The issue's third option (require data under every item footprint) would have passed it.
 - **Read it with ncdf4, not terra.** GDAL does not list a one-dimensional variable as a subdataset, so `terra::rast(f, subds = "chunk_status")` errors; the `NETCDF:"f":chunk_status` form opens but prints a stray `R_nc4_open` error line. ncdf4 is a gdalcubes import.
 - **The `[WARNING]` line is C++ stdio**, so neither an R handler nor `capture.output()` silences it, even at `parallel = 1`.
-- **Only one failure is recorded: a band image that fails to open.** gdalcubes sets `chunk_status` in six places, all in `image_collection_cube::read_chunk()`, and only band `GDALOpen` returning NULL can fire in practice; every other I/O step between `GDALOpen` and the final `nc_close` drops its return code or warns and continues. A code-check enumeration of the write pipeline (#87, round 3, `planning/archive/2026-10-issue-87-silent-chunk-read-failures/review-round3.md`) found 38 failure paths: 25 detected by drift (13 through `chunk_status` or the merge warning, 12 as an R error before anything is cached), 13 not. The ones that matter:
-  - a band image that opens then fails mid-read: status OK, cells filled from the scenes that read;
-  - **a mask (SCL) image that opens then fails mid-read: the scene is used UNMASKED** — cloud values in the median, not NA (measured: an all-cloud scene gave 1600 of 1600 cells, status OK);
-  - a mask image that fails to open, or a scene with no mask asset: dropped, or used unmasked;
-  - a worker that writes no chunk file, or a partial or unreadable one: status OK or fill, no R warning;
-  - a worker killed by a signal: `write_ncdf()` hangs.
-  These are drift#99. A chunk whose merge throws keeps fill and raises an R warning (`Chunk N could not be added to output`), which drift does catch.
+- **On 0.7.5 only one failure is recorded: a band image that fails to open.** gdalcubes sets `chunk_status` in six places, all in `image_collection_cube::read_chunk()`, and only band `GDALOpen` returning NULL can fire in practice; every other I/O step between `GDALOpen` and the final `nc_close` drops its return code or warns and continues. A code-check enumeration of the write pipeline (#87, round 3, `planning/archive/2026-10-issue-87-silent-chunk-read-failures/review-round3.md`) found 38 failure paths: 25 detected by drift (13 through `chunk_status` or the merge warning, 12 as an R error before anything is cached), 13 not. Which of them the drift#99 fork fix closes is in the next section.
 - `cube_write_ncdf()` is drift's one `write_ncdf()` call, in `stac_cube_assemble()` and `fetch_extent_to()`. It notes the merge warning, lets gdalcubes return (aborting from inside an `Rcpp::warning()` handler would skip its C++ cleanup), then aborts on it or on `chunk_status`, so a failed read aborts before anything is cached. Before it, the offline fixture showed both `dft_stac_composite()` and `dft_stac_fetch()` caching the holed result, tiled and untiled.
+
+## Failed reads after open, mask failures, worker deaths (#99, 2026-10-14)
+
+Fixed on `NewGraphEnvironment/gdalcubes`, branch `99-chunk-status-read-failures` (off `ed68331`), for upstream. drift keeps `Remotes: appelmar/gdalcubes`; its tests for these cases skip with a drift#99 reason until the installed gdalcubes records them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`).
+
+| case | 0.7.5 | fork branch |
+|---|---|---|
+| band image opens, then a tile fails to decode | OK; chunk filled from the scenes that read | INCOMPLETE |
+| mask (SCL) opens, then fails to read | OK; **scene used unmasked** (the cloud value reaches the output) | INCOMPLETE; scene dropped |
+| mask fails to open, `select_bands()` before the write | OK; scene dropped | INCOMPLETE |
+| mask fails to open, **drift's read shape** (`apply_pixel()`, no `select_bands()`) | INCOMPLETE already: SCL is read as a band too, and its band open fails | INCOMPLETE |
+| main process cannot open / read back a worker chunk file | OK, C++ stderr only | ERROR |
+| worker dies before writing its log (signal at startup) | `write_ncdf()` spins forever at 100% CPU | raises in under a second |
+| worker killed mid-computation | raises (`worker process #0 returned 9`) | raises |
+| item with no mask asset in the STAC listing | used unmasked, status OK | unchanged; **drift drops the item** (`stac_features_masked()`) |
+
+- **The cause was one unchecked return.** `gdalwarp_client::warp_simple()` (every image with a geotransform) ignored `ChunkAndWarpImage()` and returned the `INIT_DEST=nan` output as data. Returning nullptr reaches `read_chunk()`'s existing `!gdal_out` branches, for band and mask alike.
+- **The hang was the log printer, not the supervision loop.** That loop breaks on exit 9 as it should. Then `while (!wlogf.eof()) getline(...)` reads each worker's log, and a worker killed at startup never created one: a failed `ifstream` never reaches `eof()`. Sampled while hung: no worker children, main thread hot in `chunk_processor_multiprocess::apply()`. The #87 round-1 hang was this case; a worker killed mid-write, after its log exists, always raised.
+- **A fixture that fails to read but still opens** needs the IFD intact. A GDAL GTiff keeps its IFD at the END, so overwriting the tail tests an open failure; a COG keeps it first, but its tail is the DEFLATE trailer and still decoded. Overwrite the first tile at its `TileOffsets` entry: `tif_corrupt_tile()` in the helper, giving `ZIPDecode ... incorrect header check`.
+- **Still unrecorded with the fix:** a worker that cannot create or move its chunk file (`nc_create` / `CPLMoveFile` unchecked in `exec()`) leaves fill and no warning; an `sqlite3_step` error truncates a chunk's image list.
+- **Separate, pre-existing:** a two-band image with the mask in band 2 segfaults a worker, at full resolution and through overviews alike, on 0.7.5 too (#92 hit it with `one_band_per_file = FALSE`). drift's Sentinel-2 assets are single-band.
+
