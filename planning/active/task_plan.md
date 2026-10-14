@@ -76,18 +76,18 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - [x] Review G2/G8/G10/G11/G12 folded in: polygons only for fetch, "covers no cell centre" guard; empty_max and fixed choices in the key; all-band-zero = nodata, lone zero band = 1; `wayback_source()` seam; PAM via `config_options`
 
 ## Phase 5: Docs, verification at scale, hand-off
-- [ ] roxygen with `\dontrun` examples covering the per-point pattern (one call per buffered point), then `devtools::document()`, `lintr`, `pkgdown::check_pkgdown()` and `devtools::test()`.
-- [ ] Equivalence on NECR: run drift's captures (`zoom = 17:19`) and pick (`date = as.Date("<endpoint>-07-01")`) on `reference/necr/sample.gpkg`, and diff against `wayback.csv`. Report the agreement count. Each disagreement must be explained by the dropped whole-year banding. Any other disagreement is a defect.
-- [ ] Scale runs under `/usr/bin/time -l`, with the numbers going into the PR body:
+- [x] roxygen with `\dontrun` examples covering the per-point pattern (one call per buffered point), then `devtools::document()`, `lintr`, `pkgdown::check_pkgdown()` and `devtools::test()`.
+- [x] Equivalence on NECR: run drift's captures (`zoom = 17:19`) and pick (`date = as.Date("<endpoint>-07-01")`) on `reference/necr/sample.gpkg`, and diff against `wayback.csv`. Report the agreement count. Each disagreement must be explained by the dropped whole-year banding. Any other disagreement is a defect.
+- [x] Scale runs under `/usr/bin/time -l`, with the numbers going into the PR body:
   - captures over the NECR sample bbox;
   - fetch for about 20 chips;
   - (BULK polygon cover path: done in Phase 2)
-- [ ] CLAUDE.md: a Wayback block in Core Pipeline, including the release-vs-capture trap. NEWS entry.
+- [x] CLAUDE.md: a Wayback block in Core Pipeline, including the release-vs-capture trap. (NEWS is written at merge by `/gh-pr-merge`, as for v0.23.0; draft text in the PR body.)
 - [ ] File a floodplains issue to convert `wayback_index-capture.R` and `wayback_build-chips.R` into thin drivers over `dft_wayback_*`. Note that the whole-year banding now lives in the driver, as the date it passes.
 
 ## Validation
-- [ ] Tests pass
-- [ ] `/code-check` clean (each commit, or once over the branch with `/code-check branch`)
+- [x] Tests pass
+- [x] `/code-check` clean (each commit, or once over the branch with `/code-check branch`)
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
 
@@ -95,7 +95,7 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - New: one file per export (`R/dft_wayback_releases.R`, `_captures`, `_pick`, `_fetch`), plus `tests/testthat/test-dft_wayback_*.R`
 - Reuse: `cache_scheme_dir()`/`dft_cache_path()` (`R/dft_cache.R`), `cache_key_hash()`, `cache_write_atomic()` and `auto_utm_epsg()` (`R/dft_stac_fetch.R`)
 - Edit: `DESCRIPTION`, `CLAUDE.md`, `NEWS.md`
-- Source to port: `~/Projects/repo/floodplains/scripts/landcover_accuracy/{wayback_index-capture.R,wayback_build-chips.R,fp_accuracy.R}`
+- Source to port: floodplains `scripts/landcover_accuracy/{wayback_index-capture.R,wayback_build-chips.R,fp_accuracy.R}`
 
 ## Verification
 `devtools::test()`; `DRIFT_TEST_NETWORK=true` for the live tests; the NECR equivalence diff against `wayback.csv`; and the `/usr/bin/time -l` peak RSS for the scale runs.

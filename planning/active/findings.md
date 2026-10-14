@@ -111,6 +111,21 @@ Fix: `valid_linework`; the cache now holds the raw answer and parses on read (ke
 change never strands cached geometry. Cost at BULK: cached run 12.7 s -> 18.7 s per release, peak RSS
 0.82 -> 1.43 GB; same 21,878 rows for release 2026-09-24.
 
+## NECR equivalence (2026-10-14)
+
+`dft_wayback_captures(sample, zoom = 17:19, releases = <the 197 released by 2026-10-08>)` then
+`dft_wayback_pick(cap, as.Date(c("2017-07-01", "2023-07-01")))`, diffed against floodplains'
+`reference/necr/wayback.csv` on release_id, capture_date, zoom, resolution and source. Run with the
+default-make_valid parse that floodplains also uses (before round 2's fix), so it tests everything else:
+
+- 90,538 capture rows over 480 of 480 points; 960 of 960 (point, endpoint) picks identical. The
+  whole-year banding drift drops changed no pick on NECR.
+- 20 random built chips re-fetched on floodplains' Voronoi cells (EPSG:3005, each chip's own res): all
+  on the same grid; 99.998-100% of shared cells identical, max band difference 1; NA counts within 6
+  cells of 1.3k-322k. 27.7 s for the 20 (cold).
+- 39.9 min wall, network-bound (362 s user), peak RSS 1.81 GB. Metadata requests slowed from about
+  2.6 s per release (first 50) to about 23 s per release (releases 50-100).
+
 ## Errors Encountered
 
 | Error | Resolution |
