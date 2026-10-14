@@ -33,10 +33,10 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 ```
 
 ## Phase 1: Release list + HTTP helper
-- [ ] `R/dft_wayback_releases.R` with internal `wayback_get()`: `curl::curl_fetch_memory`, with the status read from curl, 3 tries and a 120 s timeout. It raises a classed `drift_wayback_http` error with the URL and status.
-- [ ] `dft_wayback_releases()`: parse `waybackconfig.json`. Abort if any release lacks a parseable date or a metadata URL. Sort with radix on the date.
-- [ ] Add `curl` and `jsonlite` to Imports in DESCRIPTION.
-- [ ] Tests: parse a fixture JSON with `wayback_get` mocked, covering release ids out of date order, a malformed title (abort) and a missing metadata URL (abort). One network test gated on `DRIFT_TEST_NETWORK`.
+- [x] `R/dft_wayback_releases.R` with internal `wayback_get()`: `curl::curl_fetch_memory`, with the status read from curl, 3 tries and a 120 s timeout. It raises a classed `drift_wayback_http` error with the URL and status.
+- [x] `dft_wayback_releases()`: parse `waybackconfig.json`. Abort if any release lacks a parseable date or a metadata URL. Sort with radix on the date.
+- [x] Add `curl` and `jsonlite` to Imports in DESCRIPTION.
+- [x] Tests: parse a fixture JSON with `wayback_get` mocked, covering release ids out of date order, a malformed title (abort) and a missing metadata URL (abort). One network test gated on `DRIFT_TEST_NETWORK`.
 
 ## Phase 2: Capture index
 - [ ] `dft_wayback_captures()`: validate `zoom` (integer, within 10:23) and map each zoom to layer `23 - zoom` internally. Query the AOI's bbox in 4326, padded so a single point is not a degenerate envelope, with `geometryPrecision=1` and `outSR=3857`, paging on `exceededTransferLimit`.
