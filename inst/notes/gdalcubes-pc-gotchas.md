@@ -254,15 +254,15 @@ Measured on gdalcubes 0.7.5 (`appelmar/gdalcubes@ed68331`) with a local collecti
 
 ## Failed reads after open, mask failures, worker deaths (#99, 2026-10-14)
 
-Fixed on `NewGraphEnvironment/gdalcubes`, branch `99-chunk-status-read-failures` (off `ed68331`), proposed upstream as appelmar/gdalcubes#114 and merged into the fork's `newgraph`, which drift's `Remotes:` names from #104. drift's tests for these cases still skip with a drift#99 reason wherever the installed gdalcubes does not record them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`), so an install of upstream 0.7.5 stays green.
+Fixed on `NewGraphEnvironment/gdalcubes`, first on branch `99-chunk-status-read-failures` (fork PR #2, closed) and then split. Branch `chunk-status-read-failures` (fork PR #3) is proposed upstream as appelmar/gdalcubes#114 and is merged into the fork's `newgraph`, which drift's `Remotes:` names from #104. The split left out PR #2's `chunk_data::read_ncdf()` changes, so the worker-chunk read-back row below is ERROR only on the closed branch, not on `newgraph` (measured: `cube.cpp`, tip to tip, 2026-10-14). drift's tests for these cases still skip with a drift#99 reason wherever the installed gdalcubes does not record them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`), so an install of upstream 0.7.5 stays green.
 
-| case | 0.7.5 | fork branch |
+| case | 0.7.5 | `newgraph` |
 |---|---|---|
 | band image opens, then a tile fails to decode | OK; chunk filled from the scenes that read | INCOMPLETE |
 | mask (SCL) opens, then fails to read | OK; **scene used unmasked** (the cloud value reaches the output) | INCOMPLETE; scene dropped |
 | mask fails to open, `select_bands()` before the write | OK; scene dropped | INCOMPLETE |
 | mask fails to open, **drift's read shape** (`apply_pixel()`, no `select_bands()`) | INCOMPLETE already: SCL is read as a band too, and its band open fails | INCOMPLETE |
-| main process cannot open / read back a worker chunk file | OK, C++ stderr only | ERROR |
+| main process cannot open / read back a worker chunk file | OK, C++ stderr only | OK, C++ stderr only (ERROR on the closed fork PR #2 only) |
 | worker dies before writing its log (signal at startup) | `write_ncdf()` spins forever at 100% CPU | raises in under a second |
 | worker killed mid-computation | raises (`worker process #0 returned 9`) | raises |
 | item with no mask asset in the STAC listing | used unmasked, status OK | unchanged; **drift drops the item** (`stac_features_masked()`) |

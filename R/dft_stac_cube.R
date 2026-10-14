@@ -786,8 +786,9 @@ cube_check_nonempty <- function(stk, collection, datetime, cached) {
 #'
 #' Not every failed merge reaches either signal on gdalcubes 0.7.5: a worker
 #' chunk file the main process cannot open is skipped with status OK and no
-#' warning, a C++ stderr line only (round-2 review of #87). The
-#' NewGraphEnvironment/gdalcubes fix for drift#99 records it as ERROR.
+#' warning, a C++ stderr line only (round-2 review of #87). The closed
+#' NewGraphEnvironment/gdalcubes PR #2 recorded it as ERROR; the
+#' `newgraph` build drift pins (#104) and upstream PR #114 do not.
 #' @noRd
 cube_write_ncdf <- function(cube, out) {
   unmerged <- character(0)
@@ -843,8 +844,8 @@ cube_write_ncdf <- function(cube, out) {
 #' all-`NA` (no image, or fully masked), and a chunk whose merge threw keeps fill
 #' too. That second case raises an R warning, which cube_write_ncdf() turns into
 #' an abort, so fill is read as OK here. A worker chunk file the main process
-#' cannot open is recorded as OK on 0.7.5, with neither signal, and as ERROR
-#' with the drift#99 fix. Anything that is neither OK nor fill fails, so a
+#' cannot open is recorded as OK on 0.7.5 and on the pinned `newgraph` build,
+#' with neither signal (#104). Anything that is neither OK nor fill fails, so a
 #' status code a later gdalcubes adds aborts rather than passes.
 #'
 #' For an open failure, this is the only check that sees it. A median over two
@@ -875,8 +876,7 @@ cube_check_chunks <- function(nc_file) {
     "x" = "Those cells are {.val NA}, or computed from only the scenes that \\
            did read.",
     "i" = "Usually an expired or refused signed URL; also a refused range \\
-           request mid-read, or a worker chunk file that could not be read \\
-           back (drift#99). Nothing was cached.",
+           request mid-read (drift#99). Nothing was cached.",
     "i" = "Re-running signs the request again. If the same read fails every \\
            time, an asset may be missing from the catalogue."
   ))
