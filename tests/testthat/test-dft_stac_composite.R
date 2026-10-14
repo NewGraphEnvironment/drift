@@ -160,6 +160,30 @@ test_that("composite_layers_order selects layers by name, not position", {
                "do not match")
 })
 
+test_that("a year with no masked scene is skipped for that reason, not as 'no scenes' (#99)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- aoi_pkg()
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) {
+      rlang::abort("2 STAC items found for sentinel-2-l2a, but none has the mask asset 'SCL'",
+                   class = c("drift_no_mask_items", "drift_no_items"))
+    }
+  )
+  w <- character(0)
+  expect_error(
+    withCallingHandlers(
+      suppressMessages(dft_stac_composite(aoi, years = 2017, cache_dir = withr::local_tempdir())),
+      warning = function(cnd) {
+        w <<- c(w, conditionMessage(cnd))
+        invokeRestart("muffleWarning")
+      }
+    ),
+    "the warnings say why"
+  )
+  expect_true(any(grepl("no scene has the cloud-mask asset", w, fixed = TRUE)))
+  expect_false(any(grepl(": no scenes.", w, fixed = TRUE)))
+})
+
 test_that("an empty year is dropped with a warning and the others are kept", {
   skip_if_not_installed("gdalcubes")
   aoi <- aoi_pkg()
@@ -687,12 +711,14 @@ aoi_fixture_ext <- function(aoi) {
 # `break_dates` holds one entry per year: the dates to break in that year's
 # collection. Years are 2021, 2022, ...; each has scenes on 07-03 and 07-13.
 composite_on_fixture <- function(break_dates, tile_size = NULL, cache,
+                                 break_asset = "B04", break_mode = "delete",
                                  env = parent.frame()) {
   aoi <- aoi_pkg()
   years <- 2020 + seq_along(break_dates)
   cols <- lapply(seq_along(years), function(i) {
     chunk_fixture(paste0(years[i], c("-07-03", "-07-13")),
                   ext = aoi_fixture_ext(aoi), break_dates = break_dates[[i]],
+                  break_asset = break_asset, break_mode = break_mode,
                   envir = env)
   })
   year_now <- 0L
@@ -741,6 +767,33 @@ test_that("a composite over a readable collection is built and cached as before 
     expect_gt(sum(terra::global(out[[1]], "notNA")$notNA), 0)
     expect_length(list.files(cache, pattern = "\\.tif$", recursive = TRUE), 1L)
   }
+})
+
+test_that("a composite whose mask (SCL) image is gone aborts and caches nothing (#99)", {
+  # Not gated: through drift's own read path (stac_cube_assemble(), no
+  # select_bands() before the pixel function) gdalcubes also reads SCL as a band,
+  # so 0.7.5 records the failed open. If drift ever selected bands first, the
+  # scene would be dropped silently on 0.7.5, and this would fail.
+  skip_if_not_installed("gdalcubes")
+  cache <- withr::local_tempdir()
+  expect_error(
+    suppressWarnings(composite_on_fixture(list("2021-07-13"), cache = cache,
+                                          break_asset = "SCL", break_mode = "delete")),
+    class = "drift_incomplete_cube"
+  )
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
+})
+
+test_that("a composite whose mask (SCL) read failed aborts and caches nothing (#99)", {
+  # On gdalcubes 0.7.5 the scene is used unmasked and the chunk is recorded OK.
+  skip_if_no_read_failure_status()
+  cache <- withr::local_tempdir()
+  expect_error(
+    suppressWarnings(composite_on_fixture(list("2021-07-13"), cache = cache,
+                                          break_asset = "SCL", break_mode = "corrupt")),
+    class = "drift_incomplete_cube"
+  )
+  expect_length(list.files(cache, recursive = TRUE, all.files = TRUE), 0L)
 })
 
 test_that("a failed year is an abort, not a skipped year (#87)", {

@@ -313,6 +313,10 @@ dft_stac_composite <- function(aoi,
     # it, keeping the years already built (and cached) before it.
     tryCatch(
       build(),
+      # before drift_no_items, which it subclasses: more months cannot fix it
+      drift_no_mask_items = function(e) {
+        composite_skip(label, "no scene has the cloud-mask asset")
+      },
       drift_no_items = function(e) composite_skip(label, "no scenes"),
       drift_empty_cube = function(e) composite_skip(label, "no clear pixels")
     )
@@ -322,8 +326,9 @@ dft_stac_composite <- function(aoi,
   if (!length(out)) {
     cli::cli_abort(c(
       "No year produced a composite.",
-      "i" = "Every window had no scenes or no clear pixels; try more \\
-             {.arg months} or a higher {.arg cloud_cover_max}."
+      "i" = "Every window was skipped; the warnings say why. For no scenes or \\
+             no clear pixels, try more {.arg months} or a higher \\
+             {.arg cloud_cover_max}."
     ))
   }
   out

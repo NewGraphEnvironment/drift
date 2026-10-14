@@ -1117,3 +1117,175 @@ test_that("a failed read on the post-boundary side of an offset split aborts (#8
   # both sides were built: the abort is the post side's, not a short-circuit
   expect_equal(calls, 2L)
 })
+
+
+# --- #99: an item with no mask asset is dropped, not read unmasked -----------
+
+# gdalcubes warns "Missing mask band for image ..., mask will be ignored" and
+# uses such a scene UNMASKED, so clouds reach the median with the chunk status OK.
+mask_feature <- function(id, assets = c("B04", "SCL"), datetime = "2023-07-01T00:00:00Z") {
+  list(id = id, properties = list(datetime = datetime),
+       assets = stats::setNames(lapply(assets, function(a) list(href = a)), assets))
+}
+
+test_that("stac_features_masked drops only the features without the mask asset", {
+  feats <- list(mask_feature("a"), mask_feature("no_scl_item", "B04"), mask_feature("c"))
+  # the id is distinctive so the match cannot land in the message's fixed text
+  expect_message(out <- drift:::stac_features_masked(feats, "SCL"),
+                 "1 item.*SCL.*no_scl_item")
+  expect_equal(vapply(out, `[[`, "", "id"), c("a", "c"))
+})
+
+test_that("stac_features_masked passes everything through when nothing is missing", {
+  feats <- list(mask_feature("a"), mask_feature("c"))
+  expect_no_message(out <- drift:::stac_features_masked(feats, "SCL"))
+  expect_identical(out, feats)
+})
+
+test_that("stac_features_masked is a no-op for a source with no mask role", {
+  feats <- list(mask_feature("a", "B04"))
+  expect_identical(drift:::stac_features_masked(feats, NULL), feats)
+  expect_identical(drift:::stac_features_masked(list(), "SCL"), list())
+})
+
+test_that("stac_features_masked matches the asset name exactly, not by prefix", {
+  # `$` would partial-match SCL_20m for SCL; the asset must exist under its own name
+  feats <- list(mask_feature("a", c("B04", "SCL_20m")))
+  expect_message(out <- drift:::stac_features_masked(feats, "SCL"), "1 item")
+  expect_length(out, 0)
+})
+
+# rstac mocked as test-dft_stac_fetch.R does, so stac_cube_items() runs for real
+stac_items_mocked <- function(feats, months = NULL) {
+  testthat::local_mocked_bindings(
+    stac = function(...) list(),
+    stac_search = function(q, ...) q,
+    ext_filter = function(q, ...) q,
+    post_request = function(q, ...) list(type = "FeatureCollection", features = feats),
+    items_fetch = function(items, ...) items,
+    items_sign = function(items, ...) items,
+    .package = "rstac"
+  )
+  aoi <- sf::st_as_sf(sf::st_sfc(sf::st_point(c(-126, 54)), crs = 4326))
+  suppressMessages(drift:::stac_cube_items(
+    drift::dft_stac_config("sentinel-2-l2a"), aoi, "2021-01-01/2023-12-31",
+    cloud_cover_max = 20, months = months, sign_fn = function(x) x
+  ))
+}
+
+test_that("stac_cube_items drops items without the mask asset, keeping is_pre aligned", {
+  feats <- list(
+    mask_feature("pre_ok",  datetime = "2021-07-01T00:00:00Z"),
+    mask_feature("pre_bad", "B04", datetime = "2021-08-01T00:00:00Z"),
+    mask_feature("post_ok", datetime = "2023-07-01T00:00:00Z")
+  )
+  out <- stac_items_mocked(feats)
+  expect_equal(vapply(out$features, `[[`, "", "id"), c("pre_ok", "post_ok"))
+  expect_equal(out$is_pre, c(TRUE, FALSE))
+  # the re-sign source carries the same features as the read
+  expect_equal(vapply(out$items$features, `[[`, "", "id"), c("pre_ok", "post_ok"))
+})
+
+test_that("stac_cube_items raises drift_no_items when no item has the mask asset", {
+  feats <- list(mask_feature("a", "B04"), mask_feature("b", "B04"))
+  expect_error(stac_items_mocked(feats), class = "drift_no_items")
+  # its own subclass, so a composite does not report it as "no scenes"
+  expect_error(stac_items_mocked(feats), class = "drift_no_mask_items")
+  expect_error(stac_items_mocked(feats), "mask asset")
+})
+
+
+# --- #99: failed reads after open, and failed mask reads ---------------------
+#
+# gdalcubes 0.7.5 records only a band image that fails to OPEN. A read that fails
+# after the open, and a mask (SCL) image that fails to open or read, leave the
+# chunk OK; the fork fix records them (NewGraphEnvironment/gdalcubes). These tests
+# need it and skip without it (skip_if_no_read_failure_status(), helper-gdalcubes.R).
+
+scl_mask <- function() gdalcubes::image_mask("SCL", values = c(8, 9))
+
+test_that("a corrupted fixture tile opens and then fails to read (#99 premise)", {
+  # Without this, a 'read failure' test could be testing an open failure.
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_mode = "corrupt")
+  f <- file.path(attr(col, "fixture_dir"), "20210713_a_B04.tif")
+  expect_true(file.exists(f))
+  r <- terra::rast(f)                       # opens
+  expect_error(suppressWarnings(terra::values(r)))  # but its tile does not decode
+})
+
+test_that("the capability probe agrees with an independent read failure (#99)", {
+  # Not gated, and asked without the override: the probe (a corrupted BAND)
+  # must give the same answer as a corrupted MASK read in drift's shape, so a
+  # probe that wrongly says FALSE on a fixed gdalcubes fails here instead of
+  # silently skipping the tests below.
+  skip_if_not_installed("gdalcubes")
+  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = NA)
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_asset = "SCL", break_mode = "corrupt")
+  nc <- suppressWarnings(chunk_fixture_write(col, parallel = 2, mask = scl_mask(),
+                                             pixel = production_pixel))
+  expect_identical(read_failures_recorded(),
+                   drift:::chunk_status_failed(nc)[["failed"]] > 0)
+})
+
+test_that("the capability probe honours a forced answer (#99)", {
+  skip_if_not_installed("gdalcubes")
+  for (v in c("true", "TRUE", "1")) {
+    withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = v)
+    expect_true(read_failures_recorded())
+  }
+  for (v in c("false", "0")) {
+    withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = v)
+    expect_false(read_failures_recorded())
+  }
+  withr::local_envvar(DRIFT_TEST_ASSUME_READ_STATUS = "yes")
+  expect_error(read_failures_recorded(), "true or false")
+})
+
+test_that("a band read that fails after open aborts the chunk check (#99)", {
+  skip_if_no_read_failure_status()
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_mode = "corrupt")
+  for (p in c(1, 4)) {
+    nc <- suppressWarnings(chunk_fixture_write(col, parallel = p, mask = scl_mask()))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a mask image that fails to open aborts the chunk check, in drift's read shape (#99)", {
+  # Not gated: in drift's shape (production_pixel) gdalcubes also reads SCL as a
+  # band, so a deleted SCL fails a BAND open and 0.7.5 already records it. With
+  # select_bands() it would reach only the mask path, which the fork fix records.
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_asset = "SCL", break_mode = "delete")
+  for (p in c(1, 4)) {
+    nc <- suppressWarnings(chunk_fixture_write(col, parallel = p, mask = scl_mask(),
+                                               pixel = production_pixel))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a mask image that fails to read aborts the chunk check, in drift's read shape (#99)", {
+  # On 0.7.5 this scene is used UNMASKED with status OK, in this shape and with
+  # select_bands() alike.
+  skip_if_no_read_failure_status()
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"), break_dates = "2021-07-13",
+                       break_asset = "SCL", break_mode = "corrupt")
+  for (p in c(1, 4)) {
+    nc <- suppressWarnings(chunk_fixture_write(col, parallel = p, mask = scl_mask(),
+                                               pixel = production_pixel))
+    expect_error(drift:::cube_check_chunks(nc), class = "drift_incomplete_cube")
+  }
+})
+
+test_that("a clean masked read in drift's read shape passes the chunk check (#99 control)", {
+  skip_if_not_installed("gdalcubes")
+  col <- chunk_fixture(c("2021-07-03", "2021-07-13"))
+  for (p in c(1, 4)) {
+    nc <- chunk_fixture_write(col, parallel = p, mask = scl_mask(), pixel = production_pixel)
+    expect_silent(drift:::cube_check_chunks(nc))
+  }
+})
