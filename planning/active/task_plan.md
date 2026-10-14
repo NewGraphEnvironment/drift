@@ -39,17 +39,19 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - [x] Tests: parse a fixture JSON with `wayback_get` mocked, covering release ids out of date order, a malformed title (abort) and a missing metadata URL (abort). One network test gated on `DRIFT_TEST_NETWORK`.
 
 ## Phase 2: Capture index
-- [ ] `dft_wayback_captures()`: validate `zoom` (integer, within 10:23) and map each zoom to layer `23 - zoom` internally. Query the AOI's bbox in 4326, padded so a single point is not a degenerate envelope, with `geometryPrecision=1` and `outSR=3857`, paging on `exceededTransferLimit`.
-- [ ] Cache each response (rds) under `cache_scheme_dir(cache_dir, "esri-wayback")/meta`. The key is the release, the layer and the hashed bbox via `cache_key_hash()`, and writes go through `cache_write_atomic()`. A past release's metadata is immutable, so the cache only refreshes on `force`.
-- [ ] Join in 3857 with `st_intersects`, running `st_make_valid` on the copy used for the join only.
+- [x] `dft_wayback_captures()`: validate `zoom` (integer, within 10:23) and map each zoom to layer `23 - zoom` internally. Query the AOI's bbox in 4326, padded so a single point is not a degenerate envelope, with `geometryPrecision=1` and `outSR=3857`, paging on `exceededTransferLimit`.
+- [x] Cache each response (rds) under `cache_scheme_dir(cache_dir, "esri-wayback")/meta`. The key is the release, the layer and the hashed bbox via `cache_key_hash()`, and writes go through `cache_write_atomic()`. A past release's metadata is immutable, so the cache only refreshes on `force`.
+- [x] Join in 3857 with `st_intersects`, running `st_make_valid` on the copy used for the join only.
   - Points: the top DrawOrder wins, then the finer res.
   - Polygons: distinct captures with `cover` taken from the intersection area.
   - For both, keep the deepest zoom per (feature, release).
   - Rows with a null `SRC_DATE` are dropped, because they are base layers and not captures.
-- [ ] `releases =` accepts a filtered `dft_wayback_releases()` table, so a caller can query a subset of releases.
-- [ ] Tests:
+- [x] `releases =` accepts a filtered `dft_wayback_releases()` table, so a caller can query a subset of releases.
+- [x] Tests:
   - Synthetic capture polygons, with `wayback_get` mocked to return ArcGIS JSON. Cover the layer↔zoom mapping, deepest wins, the DrawOrder tie, `cover` on polygons, null `SRC_DATE`, paging and a cache hit.
   - One network test.
+- [x] Plan review (review-plan.md) folded in: polygon cover is the VISIBLE share (DrawOrder occlusion, B3); per (feature, release) the deepest zoom covering the feature whole, else the zoom of greatest cover (G1); OBJECTID-ordered paging with dedup and JSON-error retry (G6); salted metadata key (G8)
+- [x] BULK scale run of the polygon cover path, moved here from Phase 5 (review O1)
 
 ## Phase 3: Pick
 - [ ] `dft_wayback_pick(captures, date)`: `date` is a `Date` vector, and the result has one row per (feature, date) for every feature that has a capture. The ranking order is in the API block above, and it is a total order. Drop NA capture dates.
@@ -76,7 +78,7 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
 - [ ] Scale runs under `/usr/bin/time -l`, with the numbers going into the PR body:
   - captures over the NECR sample bbox;
   - fetch for about 20 chips;
-  - captures over the BULK change patches (21,701 polygons) for one release, to bound the polygon `cover` path.
+  - (BULK polygon cover path: done in Phase 2)
 - [ ] CLAUDE.md: a Wayback block in Core Pipeline, including the release-vs-capture trap. NEWS entry.
 - [ ] File a floodplains issue to convert `wayback_index-capture.R` and `wayback_build-chips.R` into thin drivers over `dft_wayback_*`. Note that the whole-year banding now lives in the driver, as the date it passes.
 

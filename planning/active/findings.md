@@ -64,6 +64,28 @@ _Body edited 2026-10-14: signatures revised (`zoom` for `layers`, a target `Date
 - floodplains pick ranks whole years from the endpoint, then days from 1 July; drift ranks days from a target
   Date (issue decision). Equivalence run in Phase 5 measures where those differ.
 
+## Plan review (2026-10-14)
+
+Triage table in `review-plan.md`. Probed for A1/G6: releases 2014_r01, 2014_r03, 2016_r11, 2019_r11 all have
+14 metadata layers; layer 5 supports pagination and orderBy, maxRecordCount 1000; SRC_DATE is
+esriFieldTypeInteger (YYYYMMDD), NICE_DESC and NICE_NAME both exist.
+
+## Scale: captures over BULK change patches (2026-10-14)
+
+21,701 patches (`dft_transition_vectors(changes_only = TRUE)` on the BULK 2017/2023 pair), one release
+(2026-09-24), zoom 17:19. All 21,701 patches have a capture, 21,878 rows, all at zoom 18; covers per patch sum
+to exactly 1 (min, median, max).
+
+| version | cached run per release | peak RSS |
+|---|---|---|
+| first (features prepared, CRS on every subset) | 36.2 s (66.5 s cold) | 1.31 GB |
+| footprints prepared (`st_intersects(m, feat)`, `st_covers(v, feat)`) | 17.3 s (profiled) | - |
+| + CRS dropped inside the join (all 3857) | 12.7 s | 0.82 GB |
+
+Profile of the first: 58% `CPL_geos_binop` with the 21k patches as the prepared side; then 31% of the second
+in `CPL_crs_parameters` from sfc subsetting. All 197 releases at BULK scale is about 42 min compute plus the
+metadata fetch (about 30 s per release cold). Scripts: scratchpad `bulk_patches.R`, `bulk_captures.R`.
+
 ## Errors Encountered
 
 | Error | Resolution |
