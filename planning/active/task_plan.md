@@ -83,7 +83,7 @@ dft_wayback_fetch(aoi, release, zoom, crs = NULL, res = NULL, clip = TRUE, empty
   - fetch for about 20 chips;
   - (BULK polygon cover path: done in Phase 2)
 - [x] CLAUDE.md: a Wayback block in Core Pipeline, including the release-vs-capture trap. (NEWS is written at merge by `/gh-pr-merge`, as for v0.23.0; draft text in the PR body.)
-- [ ] File a floodplains issue to convert `wayback_index-capture.R` and `wayback_build-chips.R` into thin drivers over `dft_wayback_*`. Note that the whole-year banding now lives in the driver, as the date it passes.
+- [x] File a floodplains issue to convert `wayback_index-capture.R` and `wayback_build-chips.R` into thin drivers over `dft_wayback_*`. Note that the whole-year banding now lives in the driver, as the date it passes. Filed as floodplains#134.
 
 ## Validation
 - [x] Tests pass
