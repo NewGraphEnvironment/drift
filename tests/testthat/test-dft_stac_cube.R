@@ -1129,9 +1129,10 @@ mask_feature <- function(id, assets = c("B04", "SCL"), datetime = "2023-07-01T00
 }
 
 test_that("stac_features_masked drops only the features without the mask asset", {
-  feats <- list(mask_feature("a"), mask_feature("b", "B04"), mask_feature("c"))
+  feats <- list(mask_feature("a"), mask_feature("no_scl_item", "B04"), mask_feature("c"))
+  # the id is distinctive so the match cannot land in the message's fixed text
   expect_message(out <- drift:::stac_features_masked(feats, "SCL"),
-                 "1 item.*SCL.*b")
+                 "1 item.*SCL.*no_scl_item")
   expect_equal(vapply(out, `[[`, "", "id"), c("a", "c"))
 })
 
