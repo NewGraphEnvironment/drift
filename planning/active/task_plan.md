@@ -26,37 +26,42 @@ Where in gdalcubes (paths under `src/gdalcubes/src/`, from the #87 plan review):
 
 
 ## Phase 1: gdalcubes fork fix (NewGraphEnvironment/gdalcubes)
-- [ ] Clone the fork to `~/Projects/repo/gdalcubes` (no local clone exists). Branch
+- [x] Clone the fork to `~/Projects/repo/gdalcubes` (no local clone exists). Branch
       `99-chunk-status-read-failures` off **upstream** `appelmar/master` (`ed68331`), kept clean of
       CLAUDE.md/planning so it can go upstream as is, the same way #111 was
-- [ ] Write the failing tinytest first: `inst/tinytest/test_chunk_status.R`, a local-GeoTIFF
+- [x] Write the failing tinytest first: `inst/tinytest/test_chunk_status.R`, a local-GeoTIFF
       collection (port of drift's `chunk_fixture()`). It covers (a) a band file whose tile data is
       corrupted with the IFD intact, (b) a deleted SCL, (c) an SCL with corrupted tiles. Each must
       give `chunk_status != 0` in `write_ncdf()` output, at `parallel` 1 and 2
-- [ ] `warp.cpp`: on a failed `ChunkAndWarpImage`, warn, clean up (close `out`, free warp options), and
+- [x] `warp.cpp`: on a failed `ChunkAndWarpImage`, warn, clean up (close `out`, free warp options), and
       return nullptr in both warp overloads (`:256` and `:650`)
-- [ ] `image_collection_cube.cpp`: a mask that fails to open sets INCOMPLETE before `continue`. The
+- [x] `image_collection_cube.cpp`: a mask that fails to open sets INCOMPLETE before `continue`. The
       `_strict` branch sets ERROR, like the band path
-- [ ] `cube.cpp` `chunk_data::read_ncdf()`: set ERROR on `nc_open` / missing dim / missing var
+- [x] `cube.cpp` `chunk_data::read_ncdf()`: set ERROR on `nc_open` / missing dim / missing var
       failure and check `nc_get_var_double`'s return. The legitimate empty-chunk return stays OK
-- [ ] Build into a scratch library (`R CMD INSTALL -l <scratch>/lib`), so the machine's
+- [x] Build into a scratch library (`R CMD INSTALL -l <scratch>/lib`), so the machine's
       installed gdalcubes is untouched. tinytest green, existing gdalcubes tests green
 - [ ] Commit, push the branch to the fork, and open a PR **within the fork** (as fork PR #1 was)
 
+- [x] Plan-review folds (review-plan.md): Initialize/overview-reopen failures, nc_inq_dimlen,
+      clean controls (other CRS, partial footprint, overviews), cloud value visible, strict branch
+- [ ] `/code-check` on the fork branch; sync fork `master` with upstream; PR into fork `master`
+      after Phase 2 (review G3/O1)
+
 ## Phase 2: worker-crash hang (time-boxed diagnosis)
-- [ ] Reproduce with the scratch-lib build: SIGKILL one worker mid-`write_ncdf()` at `parallel = 2`
+- [x] Reproduce with the scratch-lib build: SIGKILL one worker mid-`write_ncdf()` at `parallel = 2`
       with an external deadline (`timeout`/`with_deadline`). Find where the main process blocks: the
       `multiprocess.cpp` loop, `kill(true)` on the siblings, the TinyProcess destructor, or the
       sh-wrapper pid vs. the R pid
-- [ ] If the fix is contained, add it with a test to the fork branch. If not, record the mechanism
+- [x] If the fix is contained, add it with a test to the fork branch. If not, record the mechanism
       and repro in findings and file a drift issue for it
 - [ ] Either way, record the outcome in `inst/notes/gdalcubes-pc-gotchas.md`
 
 ## Phase 3: drift: drop items without a mask asset
-- [ ] Failing test first, in `test-dft_stac_cube.R`. A feature list where one item lacks the
+- [x] Failing test first, in `test-dft_stac_cube.R`. A feature list where one item lacks the
       mask asset: the item is dropped and the message gives the count. Cover all items lacking it
       (that leaves nothing to read, so expect a legible error, not an empty cube)
-- [ ] Implement it in `stac_cube_assemble()` (`R/dft_stac_cube.R`, before
+- [x] Implement it in `stac_cube_items()` (moved there by plan review B2; was `stac_cube_assemble()`) (`R/dft_stac_cube.R`, before
       `stac_image_collection()`) or wherever `fetched$features` is built, keeping `is_pre`
       aligned. This covers both `dft_stac_cube()` and `dft_stac_composite()`; `dft_stac_fetch()`
       has no mask role and is unaffected

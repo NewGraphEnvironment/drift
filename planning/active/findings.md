@@ -78,3 +78,41 @@ merged it as appelmar/gdalcubes#111 in two weeks. Same route here.
 
 | Error | Resolution |
 |-------|------------|
+
+## Fixture: corrupting a tile with the IFD intact (2026-10-14)
+
+- A plain GTiff written by GDAL puts its IFD at the END of the file, so overwriting the tail
+  corrupts the header and tests an OPEN failure. The first probe did exactly that and reported
+  band-read failure as INCOMPLETE on unpatched 0.7.5, contradicting #87's measurement.
+- COG layout puts the IFDs first. Overwriting the last 30 bytes of a 1391-byte COG still
+  decoded (the bytes hit the DEFLATE tail and the COG trailer). What works: parse
+  `TileOffsets` (tag 324) from the first IFD and overwrite 64 bytes at the tile start, giving
+  `ZIPDecode ... incorrect header check` on read while `gdalinfo` still opens the file.
+- `write_tif()` returns every file in the directory with the prefix, not just the ones it
+  wrote; two calls with one prefix gave duplicate paths and `cannot add dataset to gdalrefs`.
+- tinyexpr in `apply_pixel` has no `t` variable; build each date from its own dummy cube.
+
+## Measurement: gdalcubes fork, branch 99-chunk-status-read-failures
+
+| run | 0.7.5 (`ed68331`) | fork branch |
+|---|---|---|
+| `test_chunk_status.R`, 30 assertions | 10 fail: band_read / mask_open / mask_read status OK, mask_read lets the cloud value 900 through, strict mask_open not ERROR (each at parallel 1 and 2) | 30 pass |
+| `test_worker_failure.R` | both fail at the 120 s `system2` timeout | pass in 0.9 s |
+| full tinytest suite | — | 157 / 157 |
+
+## Worker-crash hang: mechanism (2026-10-14)
+
+- Killing a worker MID-write (SIGKILL or SIGSEGV, both builds, parallel 2) raised promptly:
+  `[ERROR] worker process #0 returned 9`, then `one or more worker processes failed`, ~6 s.
+- Killing a worker at STARTUP (a swapped worker script that SIGKILLs worker 1 before
+  `gc_exec_worker()`, the #87 round-1 shape) hung to the 60 s deadline on both builds. Control
+  (passthrough worker script): returned in 0.7 s.
+- `sample` of the hung main process: no worker children left, state R (100% CPU), hot in
+  `chunk_processor_multiprocess::apply()`. The supervision loop had already broken on exit 9.
+  The spin is the log printer: `while (!wlogf.eof()) getline(...)` on a worker log that was never
+  created; a failed ifstream never reaches eof. The "returned 9" line was buffered and only
+  appeared once SIGTERM ended the process.
+- Fix: `while (std::getline(wlogf, msg))`. Startup kill now raises in 0.4 s.
+- Repro scripts were scratch-only: `hang_main.R`/`hang_run.sh` (mid-write kill),
+  `hang_early.R` + `worker_kill9.R` (startup kill). The startup case is now
+  `inst/tinytest/test_worker_failure.R` on the fork branch.

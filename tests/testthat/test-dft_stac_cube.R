@@ -1117,3 +1117,76 @@ test_that("a failed read on the post-boundary side of an offset split aborts (#8
   # both sides were built: the abort is the post side's, not a short-circuit
   expect_equal(calls, 2L)
 })
+
+
+# --- #99: an item with no mask asset is dropped, not read unmasked -----------
+
+# gdalcubes warns "Missing mask band for image ..., mask will be ignored" and
+# uses such a scene UNMASKED, so clouds reach the median with the chunk status OK.
+mask_feature <- function(id, assets = c("B04", "SCL"), datetime = "2023-07-01T00:00:00Z") {
+  list(id = id, properties = list(datetime = datetime),
+       assets = stats::setNames(lapply(assets, function(a) list(href = a)), assets))
+}
+
+test_that("stac_features_masked drops only the features without the mask asset", {
+  feats <- list(mask_feature("a"), mask_feature("b", "B04"), mask_feature("c"))
+  expect_message(out <- drift:::stac_features_masked(feats, "SCL"),
+                 "1 item.*SCL.*b")
+  expect_equal(vapply(out, `[[`, "", "id"), c("a", "c"))
+})
+
+test_that("stac_features_masked passes everything through when nothing is missing", {
+  feats <- list(mask_feature("a"), mask_feature("c"))
+  expect_no_message(out <- drift:::stac_features_masked(feats, "SCL"))
+  expect_identical(out, feats)
+})
+
+test_that("stac_features_masked is a no-op for a source with no mask role", {
+  feats <- list(mask_feature("a", "B04"))
+  expect_identical(drift:::stac_features_masked(feats, NULL), feats)
+  expect_identical(drift:::stac_features_masked(list(), "SCL"), list())
+})
+
+test_that("stac_features_masked matches the asset name exactly, not by prefix", {
+  # `$` would partial-match SCL_20m for SCL; the asset must exist under its own name
+  feats <- list(mask_feature("a", c("B04", "SCL_20m")))
+  expect_message(out <- drift:::stac_features_masked(feats, "SCL"), "1 item")
+  expect_length(out, 0)
+})
+
+# rstac mocked as test-dft_stac_fetch.R does, so stac_cube_items() runs for real
+stac_items_mocked <- function(feats, months = NULL) {
+  testthat::local_mocked_bindings(
+    stac = function(...) list(),
+    stac_search = function(q, ...) q,
+    ext_filter = function(q, ...) q,
+    post_request = function(q, ...) list(type = "FeatureCollection", features = feats),
+    items_fetch = function(items, ...) items,
+    items_sign = function(items, ...) items,
+    .package = "rstac"
+  )
+  aoi <- sf::st_as_sf(sf::st_sfc(sf::st_point(c(-126, 54)), crs = 4326))
+  suppressMessages(drift:::stac_cube_items(
+    drift::dft_stac_config("sentinel-2-l2a"), aoi, "2021-01-01/2023-12-31",
+    cloud_cover_max = 20, months = months, sign_fn = function(x) x
+  ))
+}
+
+test_that("stac_cube_items drops items without the mask asset, keeping is_pre aligned", {
+  feats <- list(
+    mask_feature("pre_ok",  datetime = "2021-07-01T00:00:00Z"),
+    mask_feature("pre_bad", "B04", datetime = "2021-08-01T00:00:00Z"),
+    mask_feature("post_ok", datetime = "2023-07-01T00:00:00Z")
+  )
+  out <- stac_items_mocked(feats)
+  expect_equal(vapply(out$features, `[[`, "", "id"), c("pre_ok", "post_ok"))
+  expect_equal(out$is_pre, c(TRUE, FALSE))
+  # the re-sign source carries the same features as the read
+  expect_equal(vapply(out$items$features, `[[`, "", "id"), c("pre_ok", "post_ok"))
+})
+
+test_that("stac_cube_items raises drift_no_items when no item has the mask asset", {
+  feats <- list(mask_feature("a", "B04"), mask_feature("b", "B04"))
+  expect_error(stac_items_mocked(feats), class = "drift_no_items")
+  expect_error(stac_items_mocked(feats), "mask asset")
+})

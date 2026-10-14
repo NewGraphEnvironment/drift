@@ -6,3 +6,11 @@
 - Created branch `99-gdalcubes-read-failures-after-open-mask` off main
 - Scaffolded PWF baseline from issue #99 with approved phases
 - Next: start Phase 1 (gdalcubes fork fix)
+- Plan review (Plan agent) returned: 3 blockers (1 already handled, 2 adopted), gaps folded
+  into the fork patch; written to `review-plan.md`
+- Phase 1: fork cloned, branch `99-chunk-status-read-failures` off upstream `ed68331`; patch +
+  tinytest (30 assertions, 10 fail on 0.7.5, all pass patched); 157/157 suite
+- Phase 2: hang reproduced only for a worker killed at startup; mechanism = log-printing loop;
+  fixed + tested on the fork branch (fork commits 83eea4c..4175ee1, not yet pushed)
+- Phase 3: `stac_features_masked()` wired into `stac_cube_items()`; mutation (unwired) -> 5 fails
+- Fork `/code-check` round 1 running

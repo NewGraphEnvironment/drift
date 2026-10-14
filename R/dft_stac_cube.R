@@ -524,6 +524,13 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
     rlang::abort(paste0("No STAC items found for ", cfg$collection),
                  class = "drift_no_items")
   }
+  # Before is_pre, so the offset split is computed on the features that are read.
+  items$features <- stac_features_masked(items$features, cfg$roles$mask)
+  if (length(items$features) == 0) {
+    rlang::abort(paste0(n_items, " STAC items found for ", cfg$collection,
+                        ", but none has the mask asset '", cfg$roles$mask, "'"),
+                 class = "drift_no_items")
+  }
 
   # Baseline-conditional offset: split items at the boundary so each side is
   # corrected with its own offset. The split is by item date, so it is the same
@@ -543,6 +550,33 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
   }
   list(features = items$features, is_pre = is_pre, items = items,
        sign_fn = sign_fn)
+}
+
+
+#' Drop STAC features that have no mask asset
+#'
+#' gdalcubes uses an image whose mask band is missing from the collection
+#' UNMASKED: it warns `Missing mask band for image ..., mask will be ignored`
+#' from C++ and records the chunk as OK (drift#99), so clouds reach a median with
+#' nothing R can see. Such a feature is dropped here, before the collection is
+#' built, and the drop is announced, so the read has fewer scenes rather than
+#' unmasked ones: the same outcome as a scene the mask removes entirely.
+#'
+#' `mask_asset` `NULL` (a source with no mask role) keeps everything. The asset
+#' is matched by its exact name: `[[` on the assets list, never `$`, which would
+#' partial-match `SCL_20m` for `SCL`.
+#' @noRd
+stac_features_masked <- function(features, mask_asset) {
+  if (is.null(mask_asset) || length(features) == 0) return(features)
+  has_mask <- vapply(features, function(f) !is.null(f$assets[[mask_asset]]), logical(1))
+  if (all(has_mask)) return(features)
+  n <- sum(!has_mask) # nolint: object_usage_linter. used in the cli template
+  ids <- vapply(features[!has_mask], function(f) f$id %||% NA_character_, "") # nolint: object_usage_linter.
+  cli::cli_inform(c(
+    "i" = "Dropped {n} item{?s} with no {.val {mask_asset}} mask asset, which \
+           gdalcubes would read unmasked: {.val {ids}}."
+  ))
+  features[has_mask]
 }
 
 
