@@ -28,7 +28,7 @@ shared one mechanism: a sentence describing what the code meant to produce rathe
   0.023-0.030 in the other years), so not all of its pale ground is new.
 - A wrong turn: a crude test on the post's own composites could not place the change at all. 2019, 2023 and
   2025 brighten across the whole scene, and the 2022 offset made 2022 look 99% "new bright" until removed.
-- Committed artifacts 3.6 MB; body prose 1,030 words.
+- Committed artifacts 3.6 MB; body prose 1,083 words.
 
 ## Evidence
 
