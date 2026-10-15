@@ -87,6 +87,20 @@ chips <- lapply(seq_len(nrow(buf)), \(i) dft_stac_composite(buf[i, ], years = 20
 n  <- dft_stac_composite(aoi, years = 2017:2023, months = 7, bands = "red", aggregation = "count")
 ```
 
+Sub-metre dated imagery from Esri Wayback (#101, from floodplains#115). **A release date is not a
+capture date**: a release mosaics captures of many years, so choose by capture, never by release:
+
+```r
+cap  <- dft_wayback_captures(pts)                       # per (feature, release): capture_date, res_m, zoom, cover
+pick <- dft_wayback_pick(cap, as.Date("2017-07-01"))    # nearest capture; release_id + zoom to fetch
+chip <- dft_wayback_fetch(buf[pick$feature[1], ], pick$release_id[1], pick$zoom[1],
+                          crs = "EPSG:3005", res = 0.35)  # one call per buffered point; same crs/res to mosaic
+```
+
+zoom is 10-22 (GDAL cannot open 23), a polygon's `cover` is the share where that capture is drawn on top,
+and no GDAL tile cache (with one, every 404 tile raises read errors on GDAL 3.13.0). Chips and metadata
+responses are cached (metadata never expires: `force = TRUE` re-reads it); tiles are not.
+
 Accuracy and error-adjusted area (#81; Olofsson et al. 2014, Stehman 2014). Mapped area is
 biased wherever the map is wrong. These correct it from reference labels at stratified random points:
 
@@ -167,6 +181,7 @@ Tag PR bodies with `Relates to NewGraphEnvironment/sred-2025-2026#16` (the issue
   sliver-settles-less result in 6 of 8 bands. Neither geometric leg generalises.
 - [`inst/notes/temporal-qa-groups.md`](inst/notes/temporal-qa-groups.md) — `dft_rast_break_class()` across the four published seven-year groups (#62): sustained-break share 20-31% of 2017-2023 change, flicker 40-49%, 2017 the odd endpoint everywhere; the shape proxies and why the per-stream segment layer was rejected. Q6 (#73) adds distance from permanent water: the gradient is real, the null does not separate it from any other class boundary, the near-band `stable` share is biased down by construction because the reference excises the permanent-water pixels, and `break_year` runs the opposite way to a migrating bank. Read before quoting a `transition_2017_2023` hectare as change.
 - [`inst/notes/temporal-qa-disturbance.md`](inst/notes/temporal-qa-disturbance.md) — does dated fire/harvest corroborate the temporal QA (#67): the published `transition_vector.gpkg` is drift's own change layer after a 1 ha class-agnostic sieve and a sub-basin clip, reproduced exactly in all four groups (0 of 53/44/41/46 classes differ), which closes the two-totals problem; `break_year` lands at lag 0 or +1 for 86% of discriminating fire patches that broke and 72% of harvest (70.7% / 58.4% of all tagged), mode +1; flicker is LOWER in disturbed patches, so it does not read as succession. Read before treating drift's patch count and the published one as the same population.
+- [`research/esri-wayback.md`](research/esri-wayback.md) — Esri Wayback (#101): release vs capture, the metadata service's layer-for-zoom rule and quirks, and three GDAL 3.13.0 behaviours over the tiles that shaped `dft_wayback_fetch()` (no zoom 23, `<Cache>` turns 404s into read errors, overviews unless `-ovr NONE`), plus sf's default `st_make_valid()` dropping touching footprint parts. Read before changing the `dft_wayback_*` read path.
 - [`inst/notes/gdalcubes-pc-gotchas.md`](inst/notes/gdalcubes-pc-gotchas.md) — non-obvious gdalcubes 0.7.3 + Planetary Computer Sentinel-2 gotchas (filter_geom segfault, reduce_time worker closures, terra↔gdalcubes NetCDF round-trip, the S2 +1000 DN offset boundary at 2022-01-25, PC pagination, and what `chunk_status` does and does not record about a failed read, #87/#99). Read before touching the continuous pipeline.
 
 

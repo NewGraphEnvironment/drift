@@ -23,14 +23,16 @@ Depends:
     R (>= 4.1)
 Imports:
     cli,
+    curl,
     digest,
     dplyr,
+    jsonlite,
     mapaccuracy,
     parallel,
     rappdirs,
     rlang,
     rstac,
-    sf,
+    sf (>= 1.0-8),
     terra (>= 1.8-10),
     tibble
 Suggests:
