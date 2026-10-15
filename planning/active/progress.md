@@ -26,3 +26,8 @@
   against the cached metadata: all 54 releases from 2022-05-18 show 2020-09-18; the 2016 releases draw 2014 on
   the other 19%; warm captures 32 s. The hand-typed 57% now comes from `captures.csv` (`cover_last`).
   Body prose 1,030 words, file 290 lines.
+- Phase 4: `pkgdown::check_pkgdown()` no problems; `devtools::test()` FAIL 0 | PASS 1709 | SKIP 19; 0 footnote-ref,
+  0 `\@ref`; the 4 printed code blocks are the eval = FALSE workflow chunks, so the render needs no network.
+- `/code-check branch`: 4 rounds (+1 plan review = 5 reviewer agents). r1 6 findings fixed; r2 clean; r3 2 findings
+  (display chunks echoed hidden-helper code; clipped floodplain drawn along the box frame), neither inside an
+  earlier fix, fixed; r4 clean. Loop ended on a clean round with no inside-a-fix finding.

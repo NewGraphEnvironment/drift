@@ -74,16 +74,16 @@ A reader who wants to see what happened on the ground between two years has no w
 
 ## Phase 4: verify
 
-- [ ] `pkgdown::build_article("articles/wayback-change")` renders; read every figure at delivered width
+- [x] `pkgdown::build_article("articles/wayback-change")` renders; read every figure at delivered width
       against `writing.md` (one-sentence, look-alike) and `cartography.md` "Does it communicate?"
-- [ ] Render with network off (or confirm no evaluated chunk calls a `dft_` fetch) — what CI will do
-- [ ] `pkgdown::check_pkgdown()`; `grep -c footnote-ref` = 0 in the built HTML
-- [ ] Body-prose word count recorded for the PR (`data-raw/README.md` documents only the quotes, so the
+- [x] Render with network off (or confirm no evaluated chunk calls a `dft_` fetch) — what CI will do
+- [x] `pkgdown::check_pkgdown()`; `grep -c footnote-ref` = 0 in the built HTML
+- [x] Body-prose word count recorded for the PR (`data-raw/README.md` documents only the quotes, so the
       script's header is its documentation; review 1 G5)
 
 ## Validation
 
-- [ ] Tests pass
-- [ ] `/code-check` clean (each commit, or once over the branch with `/code-check branch`)
-- [ ] PWF checkboxes match landed work
+- [x] Tests pass
+- [x] `/code-check` clean (each commit, or once over the branch with `/code-check branch`)
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
