@@ -72,9 +72,9 @@
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"NewGraphEnvironment/drift"</span><span class="op">)</span></span></code></pre></div>
-<p>The STAC fetch and cube functions (<code><a href="reference/dft_stac_fetch.html">dft_stac_fetch()</a></code>, <code><a href="reference/dft_stac_cube.html">dft_stac_cube()</a></code>) also need <a href="https://github.com/appelmar/gdalcubes" class="external-link">gdalcubes</a>, which was archived on CRAN on 2026-09-16. Install it from GitHub until it is back:</p>
+<p>The STAC fetch and cube functions (<code><a href="reference/dft_stac_fetch.html">dft_stac_fetch()</a></code>, <code><a href="reference/dft_stac_cube.html">dft_stac_cube()</a></code>) also need <a href="https://github.com/appelmar/gdalcubes" class="external-link">gdalcubes</a>, which was archived on CRAN on 2026-09-16. Install it from the <code>newgraph</code> branch of NewGraphEnvironment’s fork, which is upstream plus read-failure fixes proposed upstream (#104). It is a suggested package, so installing drift does not bring it. Run this even if gdalcubes is already installed, because it replaces an upstream copy, which does not report a failed cloud-mask read:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"appelmar/gdalcubes"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"NewGraphEnvironment/gdalcubes@newgraph"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
