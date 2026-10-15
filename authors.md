@@ -10,7 +10,7 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/NewGraphEnvironment/drift/blob/v0.24.1/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/NewGraphEnvironment/drift/blob/main/DESCRIPTION)
 
 Irvine A (2026). *drift: Detecting Riparian and Inland Floodplain
 Transitions*. R package version 0.24.1,
