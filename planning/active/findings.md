@@ -79,3 +79,17 @@ the whole scene (median red 576 in 2019 vs ~290 either side), which is haze or c
 
 | Error | Resolution |
 |-------|------------|
+| A cover >= 0.5 filter still picked the 2014 capture from release 16245 (2022-04-27), where it covers 57% of the box and 2016 is drawn on the rest | Keep, per capture, only the releases where its cover equals its maximum over the box (2014 → release 26751, cover 1) |
+| `rgb_domain()` stretches each band apart: true-colour forest came out neon green and bare ground pink | Pool the low and high across the three bands as well as the four years |
+
+## The box, as fetched (UTM 9N rectangle, releases 2015-01-21 to 2026-09-24, zoom 16:18)
+
+- 182 releases searched of 197. Dated captures: 2009-01-15 SPOT 5 2.5 m (base era, 47 releases), and the three
+  sub-metre captures 2014-06-01 WV02 0.50 m (81 releases, cover 1), 2016-09-11 WV03 0.31 m (33, max cover 0.811),
+  2020-09-18 GE01 0.46 m (54, cover 1, still current). 2016 has cloud and cloud shadow over the box's south-centre.
+- Picks: 2018 → 2016-09-11 (-658 d), 2022 → 2020-09-18 (-651 d), 2023 → 2020-09-18 (-1016 d).
+- Window 683750-684750 E, 6028350-6029350 N: forest in 2014 and 2016; by 2020 a cut block with a spur road, and a
+  new road along the river. Each capture is drawn over the whole window in its picked release (checked).
+- S2 Jun-Jul medians (red): 2018 0.030, 2020 0.023, 2022 0.026, 2023 0.038. 2023 is brighter across the box; the
+  2023 panel also shows large new bare areas along the valley floor, so not all of that is haze.
+- Committed artifacts 3.6 MB; a warm-cache rerun reproduces every file byte for byte (md5).
