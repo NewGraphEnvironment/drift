@@ -10,11 +10,14 @@ Provenance, because it is now mixed: the #30-era bullets were verified on
 (`8bad203`), which is 0.7.4 plus the `filter_geom` segfault fix — with terra
 1.9.34. Each bullet says which.
 
-**Where gdalcubes comes from now (#80, 2026-09-28).** gdalcubes was archived on
-CRAN on 2026-09-16. drift lists `appelmar/gdalcubes` in `Remotes:` with no suffix,
-and upstream master (0.7.5, `ed68331`) has merged the `filter_geom` fix (their
-PR #111), so the `NewGraphEnvironment/gdalcubes@newgraph` fork is no longer needed.
-Do not install the fork over 0.7.5.
+**Where gdalcubes comes from now (#104, 2026-10-14).** gdalcubes was archived on
+CRAN on 2026-09-16. Upstream master (0.7.5, `ed68331`) merged the `filter_geom` fix
+(their PR #111), and from #80 to #104 drift listed `appelmar/gdalcubes`. drift now
+lists `NewGraphEnvironment/gdalcubes@newgraph`: upstream master plus the #99
+read-failure, worker-log-hang and overview fixes (appelmar/gdalcubes#113, #114,
+#115), nothing behind. flooded pins the same, because two sources for one package
+make pak fail when both install together. When those three PRs merge upstream,
+revert both to `appelmar/gdalcubes`.
 
 - **`gdalcubes::filter_geom()` is not worth using — now for measured reasons, not
   because it crashes (#47).** The original defect was a segfault in the compute
@@ -43,9 +46,9 @@ Do not install the fork over 0.7.5.
     max abs diff 0) — it is the footprint that moves, silently. Any future
     adoption must hand `filter_geom` a polygon buffered by `>= res*sqrt(2)/2`
     and KEEP the `terra::mask()`, so the footprint does not move.
-  - Upstream `appelmar/gdalcubes#110` is open and the fix PR #111 unmerged, so
-    CRAN 0.7.4 still segfaults — and reports the **same version string** as the
-    fork, so no version check can tell them apart.
+  - The fix is upstream since 0.7.5 (`appelmar/gdalcubes#111`, merged). CRAN
+    0.7.4 still segfaults, and the fork at the time reported the **same version
+    string**, so no version check could tell them apart.
 
   Use the AOI bbox in `cube_view(extent=)` and
   `terra::mask()` afterward, as `dft_stac_fetch()` does. **Resolved (#32):**
@@ -251,15 +254,15 @@ Measured on gdalcubes 0.7.5 (`appelmar/gdalcubes@ed68331`) with a local collecti
 
 ## Failed reads after open, mask failures, worker deaths (#99, 2026-10-14)
 
-Fixed on `NewGraphEnvironment/gdalcubes`, branch `99-chunk-status-read-failures` (off `ed68331`), for upstream. drift keeps `Remotes: appelmar/gdalcubes`; its tests for these cases skip with a drift#99 reason until the installed gdalcubes records them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`).
+Fixed on `NewGraphEnvironment/gdalcubes`, first on branch `99-chunk-status-read-failures` (fork PR #2, closed) and then split. Branch `chunk-status-read-failures` (fork PR #3) is proposed upstream as appelmar/gdalcubes#114 and is merged into the fork's `newgraph`, which drift's `Remotes:` names from #104. The split left out PR #2's `chunk_data::read_ncdf()` changes, so the worker-chunk read-back row below is ERROR only on the closed branch, not on `newgraph` (measured: `cube.cpp`, tip to tip, 2026-10-14). drift's tests for these cases still skip with a drift#99 reason wherever the installed gdalcubes does not record them (`skip_if_no_read_failure_status()`, `tests/testthat/helper-gdalcubes.R`), so an install of upstream 0.7.5 stays green.
 
-| case | 0.7.5 | fork branch |
+| case | 0.7.5 | `newgraph` |
 |---|---|---|
 | band image opens, then a tile fails to decode | OK; chunk filled from the scenes that read | INCOMPLETE |
 | mask (SCL) opens, then fails to read | OK; **scene used unmasked** (the cloud value reaches the output) | INCOMPLETE; scene dropped |
 | mask fails to open, `select_bands()` before the write | OK; scene dropped | INCOMPLETE |
 | mask fails to open, **drift's read shape** (`apply_pixel()`, no `select_bands()`) | INCOMPLETE already: SCL is read as a band too, and its band open fails | INCOMPLETE |
-| main process cannot open / read back a worker chunk file | OK, C++ stderr only | ERROR |
+| main process cannot open / read back a worker chunk file | OK, C++ stderr only | OK, C++ stderr only (ERROR on the closed fork PR #2 only) |
 | worker dies before writing its log (signal at startup) | `write_ncdf()` spins forever at 100% CPU | raises in under a second |
 | worker killed mid-computation | raises (`worker process #0 returned 9`) | raises |
 | item with no mask asset in the STAC listing | used unmasked, status OK | unchanged; **drift drops the item** (`stac_features_masked()`) |

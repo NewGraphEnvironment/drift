@@ -57,7 +57,7 @@ Suggests:
     tidyterra,
     tmap
 Remotes:
-    appelmar/gdalcubes,
+    NewGraphEnvironment/gdalcubes@newgraph,
     bhaskarvk/leaflet.extras,
     NewGraphEnvironment/flooded,
     NewGraphEnvironment/gq
