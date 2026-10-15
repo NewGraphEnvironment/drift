@@ -30,6 +30,9 @@ pk$capture_date <- as.Date(pk$capture_date)
 sub <- cap[cap$sub_metre, ]
 win <- unlist(meta[c("win_xmin", "win_xmax", "win_ymin", "win_ymax")])
 win_km <- (win[["win_xmax"]] - win[["win_xmin"]]) / 1000
+# ground size of a tile pixel at the box's latitude
+zoom_m <- function(z) round(156543.03392 / 2^z * cos(meta$box_lat * pi / 180), 2)
+own <- pk[match(sub$capture_date, pk$capture_date), ]
 
 fmt <- function(x) format(as.Date(x), "%Y-%m-%d")
 wb <- lapply(fmt(sub$capture_date), function(x) rast(d(paste0("wb_", x, "_window.tif"))))
@@ -78,7 +81,7 @@ coho-accessible stream network), which covers `r fpc$area_ha` ha of the box.
 
 ## What changed between 2014 and 2020?
 
-```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", drawn at 0.5 m. Forest covers the centre in the first two; by the third a clearing with a spur road has opened there, and a bare track runs along the edge of the valley floor at the bottom. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
+```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", read from tiles of ", paste(zoom_m(own$zoom), collapse = ", "), " m and drawn on one 0.5 m grid. Forest covers the centre in the first two; by the third a clearing with a spur road has opened there, and a bare track runs along the edge of the valley floor at the bottom. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
 op <- par(mfrow = c(1, 3), mar = c(0.2, 0.2, 0.2, 0.2), bg = "white")
 for (i in seq_along(wb)) {
   plotRGB(wb[[i]], scale = 255, mar = NA, axes = FALSE)
@@ -138,8 +141,8 @@ rel <- rel[rel$release_date >= as.Date("2015-01-01"), ]
 cap <- dft_wayback_captures(aoi, zoom = 16:18, releases = rel)
 ```
 
-Reading the metadata of every release is network time, a quarter of an hour
-here. After that it is cached, and a rerun takes under a minute.
+Reading the metadata of every release is network time, up to a quarter of an
+hour here. After that it is cached, and a rerun takes under a minute.
 
 ```{r captures-table}
 knitr::kable(
@@ -216,7 +219,7 @@ chips <- lapply(seq_len(nrow(pick)), function(i) {
 A fetch over a polygon shows whatever its release draws there, so a panel
 labelled with one capture shows that capture only where it is the one on top.
 In each capture's release, that capture is the one drawn over the whole square
-of the first figure; the data-raw script checks this.
+of the first figure.
 
 ```{r fig-overview, fig.width = 4.2, fig.height = 4.1, fig.cap = paste0("The whole box in the ", fmt(sub$capture_date[nrow(sub)]), " capture, at 5 m. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
 ov <- rast(d("wb_overview.tif"))
@@ -235,14 +238,14 @@ Sentinel-2 images the box every few days. `dft_stac_composite()` masks cloud
 in each scene and takes the median of what is left over a window of months, so
 it gives one image a year built from the clear days. A June–July composite shows the ground as it was in
 those two months, so a change that first appears in one panel happened after
-the previous panel's window and before this one's.
+the start of the previous panel's window and before the end of this one's.
 
 ```{r composite-code, eval = FALSE}
 s2 <- dft_stac_composite(aoi, years = c(2018, 2020, 2022, 2023), months = 6:7,
                          crs = "EPSG:32609")
 ```
 
-```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the ground and not in the display. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
+```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the data and not in the display. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
 op <- par(mfrow = c(2, 2), mar = c(0.3, 0.3, 0.3, 0.3), bg = "white")
 for (i in seq_along(s2)) {
   plotRGB(s2[[i]], scale = 255, mar = NA, axes = FALSE)
@@ -258,7 +261,7 @@ par(op)
 
 The centre of the square is still forest in the 2018 composite and bare in 2020. So the
 clearing that Wayback shows between `r fmt(sub$capture_date[2])` and
-`r fmt(sub$capture_date[3])` was cut between July 2018 and July 2020. By 2022 it
+`r fmt(sub$capture_date[3])` was cut between June 2018 and July 2020. By 2022 it
 is greening, and a new bare patch has opened just south-west of it. The 2023
 composite shows the largest change of the four. Pale ground covers much of the
 floodplain's valley floor across the south of the box, and new bare strips run
@@ -279,8 +282,12 @@ or 2023 change.
   different sun and view angles, so colour, shadow and leaf-out differ between
   them as well as the ground, and they are not co-registered to one another.
 - The `r fmt(sub$capture_date[3])` capture is lower in contrast than the two before it.
+- The first two captures are read from zoom `r own$zoom[1]` tiles
+  (`r zoom_m(own$zoom[1])` m) and the third from zoom `r own$zoom[3]`
+  (`r zoom_m(own$zoom[3])` m), the deepest zoom covering the whole box in each
+  release, so part of the difference in sharpness is the zoom.
 - Sentinel-2 at 10 m does not resolve single trees, and a composite dates a
-  change only to the gap between two windows.
+  change only to the span from the start of one window to the end of the next.
 - The 2023 composite is brighter across the whole box (median red reflectance
   `r s2s$red[s2s$year == 2023]`, against `r min(s2s$red[s2s$year != 2023])` to
   `r max(s2s$red[s2s$year != 2023])` in the other years), so not all of its pale

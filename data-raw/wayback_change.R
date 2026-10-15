@@ -120,6 +120,7 @@ meta <- data.frame(
   box_xmin = sf::st_bbox(aoi)[["xmin"]], box_ymin = sf::st_bbox(aoi)[["ymin"]],
   box_xmax = sf::st_bbox(aoi)[["xmax"]], box_ymax = sf::st_bbox(aoi)[["ymax"]],
   box_km2 = round(as.numeric(sf::st_area(aoi)) / 1e6, 2),
+  box_lat = round(mean(bbox_ll[c("ymin", "ymax")]), 4),
   win_xmin = window[["xmin"]], win_ymin = window[["ymin"]],
   win_xmax = window[["xmax"]], win_ymax = window[["ymax"]]
 )
@@ -166,7 +167,9 @@ utils::write.csv(s2_stats, file.path(out_dir, "s2.csv"), row.names = FALSE)
 
 # Written so a rerun reproduces the bytes: no tempfile names in the metadata, no
 # time (which makes terra write a .aux.json), no statistics sidecar. Values are
-# 1-255 and 0 is nodata, as in a Wayback chip.
+# 1-255. A lossless raster keeps 0 as nodata, as in a Wayback chip; a JPEG one
+# has no nodata, because JPEG moves a dark 1 to 0, and the window and overview
+# hold no empty cell (the window's cover is checked below).
 write_rgb <- function(r, f, jpeg = TRUE) {
   names(r) <- c("red", "green", "blue")
   terra::time(r) <- NULL
@@ -175,7 +178,7 @@ write_rgb <- function(r, f, jpeg = TRUE) {
   opts <- if (jpeg) c("COMPRESS=JPEG", "JPEG_QUALITY=85", "PHOTOMETRIC=YCBCR")
           else "COMPRESS=DEFLATE"
   terra::writeRaster(r, f, datatype = "INT1U", overwrite = TRUE,
-                     gdal = c(opts, "TFW=NO"), NAflag = 0)
+                     gdal = c(opts, "TFW=NO"), NAflag = if (jpeg) NA else 0)
   unlink(paste0(f, c(".aux.xml", ".aux.json")))
   invisible(f)
 }
