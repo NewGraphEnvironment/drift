@@ -1,3 +1,12 @@
+# drift 0.24.0
+
+- **Esri Wayback imagery at the capture nearest a date (#101).** Four new functions find, per point or patch, which capture each Wayback release actually shows; a release date is not a capture date. They pick the capture nearest a target date and fetch it as a local cached COG, which QGIS can draw where the Wayback service cannot. Promoted from floodplains#115; on its NECR sample they reproduce every pick (960 of 960) and every re-fetched chip.
+  - `dft_wayback_releases()` lists the releases, sorted by date.
+  - `dft_wayback_captures(aoi, zoom = 17:19)` gives one row per (feature, release, capture). A polygon's `cover` is the share where that capture is drawn on top.
+  - `dft_wayback_pick(captures, date)` picks the nearest capture. `dft_wayback_fetch(aoi, release, zoom)` warps it to a nodata-masked RGB COG, and aborts on empty (404) imagery or any GDAL warning.
+  - **Measured GDAL behaviour shaped the fetch:** zoom stops at 22 (GDAL cannot open 23), GDAL's own tile cache is not used (on GDAL 3.13.0 it turns each 404 tile into read errors), and `-ovr NONE` is passed (otherwise a coarse resolution reads a shallower zoom). Footprints parse with `st_make_valid(geos_method = "valid_linework")`, because sf's default drops touching parts of multi-part footprints. See `research/esri-wayback.md`.
+  - New Imports: curl, jsonlite. sf is now `>= 1.0-8`.
+
 # drift 0.23.0
 
 - **Cloud-mask failures can no longer put unmasked scenes into a cube or composite without a word (#99).**
