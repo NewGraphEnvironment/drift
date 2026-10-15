@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.24.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.24.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,9 +34,16 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/v0.24.1/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.24.1" id="drift-0241">drift 0.24.1<a class="anchor" aria-label="anchor" href="#drift-0241"></a></h2>
+<ul><li>
+<strong>gdalcubes now comes from <code>NewGraphEnvironment/gdalcubes@newgraph</code> (<a href="https://github.com/NewGraphEnvironment/drift/issues/104" class="external-link">#104</a>).</strong> That build is upstream 0.7.5 plus the fixes proposed as appelmar/gdalcubes#113-115, so a read that fails after the image opens (including a failed cloud-mask read) and a worker that dies early are caught (<a href="https://github.com/NewGraphEnvironment/drift/issues/99" class="external-link">#99</a>). gdalcubes is a suggested package, so installing drift neither brings it nor replaces an upstream copy: run <code>pak::pak("NewGraphEnvironment/gdalcubes@newgraph")</code>. <code>Remotes:</code> and the install hints revert to <code>appelmar/gdalcubes</code> when those three merge upstream.
+<ul><li>One <a href="https://github.com/NewGraphEnvironment/drift/issues/99" class="external-link">#99</a> case is still not recorded on this build: a worker chunk file the main process cannot read back. <code>inst/notes/gdalcubes-pc-gotchas.md</code> says so.</li>
+</ul></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.24.0" id="drift-0240">drift 0.24.0<a class="anchor" aria-label="anchor" href="#drift-0240"></a></h2>
 <ul><li>
