@@ -1,6 +1,7 @@
 # Esri World Imagery Wayback: what the service and GDAL actually do
 
-**Verified:** 2026-10-14 · **Issues:** drift#101 (from floodplains#115), floodplains#134 ·
+**Verified:** 2026-10-14; "Picking for a polygon" 2026-10-15 · **Issues:** drift#101 (from floodplains#115),
+floodplains#134, drift#108 ·
 **Produced by:** live probes of `waybackconfig.json`, the per-release metadata MapServers and the tile
 service, and the NECR equivalence run recorded in
 `planning/archive/2026-10-issue-101-wayback/` (README, `findings.md`) · **drift:** `dft_wayback_*`
@@ -56,3 +57,18 @@ service, and the NECR equivalence run recorded in
 - **Cost:** about 40-50 min for 480 points over 197 releases, all of it network time (the service
   slowed from about 2.6 s to about 30 s per release mid-run). Over the BULK floodplain's 21,701 change
   patches, captures cost about 19 s per release once the metadata is cached.
+
+## Picking for a polygon (drift#108, 2026-10-15)
+
+- **A capture keeps being served, at a shrinking cover, by releases that have drawn a newer capture over part
+  of the area.** Over the drift#108 box (10.6 km², 182 releases 2015-01-21 to 2026-09-24), 2014-06-01 covers
+  the whole box in its early releases and 57% in the last one serving it, where 2016-09-11 is drawn on the rest.
+- **So an unfiltered `dft_wayback_pick()` over a polygon fetches a mosaic of the wrong capture.** It prefers the
+  later release among equally near captures, and cover is only a tiebreak: the 2014 pick went to that 57%
+  release. Keeping, per capture, only the releases where its cover equals its maximum
+  (`cover >= ave(cover, capture_date, FUN = max) - 0.001`) picked a release with the 2014 capture on all of it.
+  A fixed threshold does not do this: `cover >= 0.5` still let the 57% release through.
+- **A capture's maximum cover can be under 1 everywhere.** 2016-09-11 never covers more than 81% of that box;
+  every release serving it draws 2014-06-01 on the remainder. Check the capture is drawn over the part you
+  display (`dft_wayback_captures()` on the display window, at the fetch zoom, on the picked release).
+- Produced by `data-raw/wayback_change.R`; run record in `planning/archive/2026-10-issue-108-wayback-change/`.
