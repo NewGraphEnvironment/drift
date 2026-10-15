@@ -1,3 +1,8 @@
+# drift 0.24.1
+
+- **gdalcubes now comes from `NewGraphEnvironment/gdalcubes@newgraph` (#104).** That build is upstream 0.7.5 plus the fixes proposed as appelmar/gdalcubes#113-115, so a read that fails after the image opens (including a failed cloud-mask read) and a worker that dies early are caught (#99). gdalcubes is a suggested package, so installing drift neither brings it nor replaces an upstream copy: run `pak::pak("NewGraphEnvironment/gdalcubes@newgraph")`. `Remotes:` and the install hints revert to `appelmar/gdalcubes` when those three merge upstream.
+  - One #99 case is still not recorded on this build: a worker chunk file the main process cannot read back. `inst/notes/gdalcubes-pc-gotchas.md` says so.
+
 # drift 0.24.0
 
 - **Esri Wayback imagery at the capture nearest a date (#101).** Four new functions find, per point or patch, which capture each Wayback release actually shows; a release date is not a capture date. They pick the capture nearest a target date and fetch it as a local cached COG, which QGIS can draw where the Wayback service cannot. Promoted from floodplains#115; on its NECR sample they reproduce every pick (960 of 960) and every re-fetched chip.
