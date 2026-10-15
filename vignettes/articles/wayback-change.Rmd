@@ -1,0 +1,290 @@
+---
+title: "Watching Forest Change with Esri Wayback and Sentinel-2"
+output: bookdown::html_document2
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  dpi = 150
+)
+```
+
+```{r load, include = FALSE}
+# Data from data-raw/wayback_change.R; the article itself makes no network call.
+library(terra)
+d <- function(f) file.path("wayback-change", f)
+
+meta <- utils::read.csv(d("meta.csv"))
+cap <- utils::read.csv(d("captures.csv"))
+pk <- utils::read.csv(d("picks.csv"))
+s2s <- utils::read.csv(d("s2.csv"))
+
+cap$capture_date <- as.Date(cap$capture_date)
+pk$date <- as.Date(pk$date)
+pk$capture_date <- as.Date(pk$capture_date)
+sub <- cap[cap$sub_metre, ]
+win <- unlist(meta[c("win_xmin", "win_xmax", "win_ymin", "win_ymax")])
+win_km <- (win[["win_xmax"]] - win[["win_xmin"]]) / 1000
+
+fmt <- function(x) format(as.Date(x), "%Y-%m-%d")
+wb <- lapply(fmt(sub$capture_date), function(x) rast(d(paste0("wb_", x, "_window.tif"))))
+s2_years <- s2s$year
+s2 <- lapply(s2_years, function(y) rast(d(paste0("s2_", y, ".tif"))))
+
+fpc <- utils::read.csv(d("floodplain.csv"))
+fp <- vect(fpc$wkt, crs = "EPSG:32609")
+# the outline colour comes from the gq registry's floodplain style, so no hex
+# literal appears in this article; the white beneath it is a halo over imagery
+fp_col <- gq::gq_reg_main()$layers$floodplains$fill$color
+draw_fp <- function(lwd = 1.5) {
+  lines(fp, col = "white", lwd = lwd + 1.5)
+  lines(fp, col = fp_col, lwd = lwd)
+}
+
+# Picks for the key years that have no capture of their own
+key <- pk[!format(pk$date, "%Y") %in% format(sub$capture_date, "%Y"), ]
+key_days <- function(y) {
+  r <- key[format(key$date, "%Y") == y, ]
+  paste0(fmt(r$capture_date), ", ", abs(r$days_from_date), " days ",
+         if (r$days_from_date < 0) "before" else "after", " ", y, "-07-01")
+}
+
+panel_label <- function(lab) {
+  u <- par("usr")
+  text(u[1] + 0.03 * (u[2] - u[1]), u[4] - 0.06 * (u[4] - u[3]), lab,
+       adj = c(0, 1), font = 2, col = "white", cex = 0.9)
+}
+```
+
+Esri Wayback keeps the past versions of the World Imagery basemap, so the
+sub-metre satellite images of a place can be looked at in the order they were
+taken. drift reads them with `dft_wayback_releases()`, `dft_wayback_captures()`,
+`dft_wayback_pick()` and `dft_wayback_fetch()`. Wayback images are sharp enough to
+show single trees, but a place is often imaged only every few years. Where that leaves
+gaps, `dft_stac_composite()` adds a 10 m Sentinel-2 image for every summer.
+
+This article follows one `r meta$box_km2` km² box of forest and river valley in
+northern British Columbia, the area of the New Graph post
+[Sentinel-2 Ortho Mosaics with STAC and gdalcubes](https://www.newgraphenvironment.com/new_graphiti/posts/2026-01-08-stac-ortho-mosaics/).
+Looking through those mosaics by hand puts the main changes to forest cover in
+2018, 2020, 2022 and 2023. The maps outline the published floodplain of the
+Bulkley River watershed group (`co_ff04`, the functional floodplain on the
+coho-accessible stream network), which covers `r fpc$area_ha` ha of the box.
+
+## What changed between 2014 and 2020?
+
+```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", drawn at 0.5 m. Forest covers the centre in the first two; by the third a clearing with a spur road has opened there, and a bare track runs along the edge of the valley floor at the bottom. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
+op <- par(mfrow = c(1, 3), mar = c(0.2, 0.2, 0.2, 0.2), bg = "white")
+for (i in seq_along(wb)) {
+  plotRGB(wb[[i]], scale = 255, mar = NA, axes = FALSE)
+  draw_fp(1.2)
+  panel_label(fmt(sub$capture_date[i]))
+  if (i == 1) sbar(200, "bottomleft", type = "bar", divs = 2, below = "", label = "",
+                   col = "white", lwd = 1)
+}
+par(op)
+```
+
+In the first two images the centre of the square is forest. By the third, a
+clearing with a spur road has opened there, between two arms of the floodplain
+and outside both, and a bare track runs along the edge of the valley floor at
+the bottom. Between the second and third images there are four years, and
+Wayback holds nothing in between to say when the cutting happened. The
+Sentinel-2 composites below narrow that down.
+
+## When was a Wayback image taken?
+
+A Wayback **release** is the World Imagery basemap as Esri published it on one
+date. Each release is a mosaic of **captures**, single satellite images taken
+on their own dates, often years apart. So a release date says only that its
+captures are older than that date. To look at a place in a given year, choose
+the capture, not the release.
+
+Over this box, the `r meta$releases_searched` releases from
+`r fmt(meta$release_from)` to `r fmt(meta$release_to)` draw from just
+`r nrow(cap)` dated captures, and `r nrow(sub)` of them are sub-metre. The
+`r fmt(sub$capture_date[1])` capture was still in the release of
+`r fmt(sub$release_last[1])`. All `r sub$n_releases[nrow(sub)]` releases from
+`r fmt(sub$release_first[nrow(sub)])` on show the
+`r fmt(sub$capture_date[nrow(sub)])` capture, so the newest release, of
+`r fmt(meta$release_to)`, shows the ground as it was in
+`r format(sub$capture_date[nrow(sub)], "%Y")`.
+
+## Which captures image this area?
+
+`dft_wayback_captures()` reads each release's metadata and returns the
+captures it draws over the area. Over a polygon a release can draw more than
+one capture, so each row also carries `cover`, the share of the polygon where
+that capture is the one on top.
+
+```{r captures-code, eval = FALSE}
+library(drift)
+
+bbox <- c(xmin = -126.17545, ymin = 54.36161, xmax = -126.12615, ymax = 54.38908)
+aoi <- sf::st_bbox(bbox, crs = 4326) |>
+  sf::st_as_sfc() |>
+  sf::st_transform(32609) |>   # the box's UTM rectangle, so rasters are full rectangles
+  sf::st_bbox() |>
+  sf::st_as_sfc() |>
+  sf::st_as_sf()
+
+rel <- dft_wayback_releases()
+rel <- rel[rel$release_date >= as.Date("2015-01-01"), ]
+cap <- dft_wayback_captures(aoi, zoom = 16:18, releases = rel)
+```
+
+Reading the metadata of every release is network time, a quarter of an hour
+here. After that it is cached, and a rerun takes under a minute.
+
+```{r captures-table}
+knitr::kable(
+  data.frame(
+    Taken = fmt(cap$capture_date),
+    Source = cap$source,
+    `Resolution (m)` = cap$res_m,
+    `Largest cover` = sprintf("%.0f%%", 100 * cap$cover_max),
+    Releases = cap$n_releases,
+    `First release` = fmt(cap$release_first),
+    `Last release` = fmt(cap$release_last),
+    check.names = FALSE
+  ),
+  caption = paste0("Every dated capture drawn over the box by the ",
+                   meta$releases_searched, " releases searched. Largest cover is ",
+                   "the largest share of the box the capture is drawn on in any one release.")
+)
+```
+
+The `r fmt(sub$capture_date[2])` capture never covers more than
+`r sprintf("%.0f%%", 100 * sub$cover_max[2])` of the box. Its releases draw the
+older capture on the rest.
+
+## Which capture is nearest each year?
+
+`dft_wayback_pick()` returns, for each target date, the capture taken nearest
+to it, and the release and zoom to fetch it from. When several releases serve a
+capture, the pick prefers the newest. Over a polygon that release may show the
+capture on only part of the area: in the last release serving the
+`r fmt(sub$capture_date[1])` capture, it covers
+`r sprintf("%.0f%%", 100 * sub$cover_last[1])` of the box. Keeping, for
+each capture, only the releases where it covers the most of the box avoids
+that.
+
+```{r pick-code, eval = FALSE}
+cap <- cap[cap$res_m < 1, ]
+cap <- cap[cap$cover >= ave(cap$cover, cap$capture_date, FUN = max) - 0.001, ]
+pick <- dft_wayback_pick(cap, as.Date(c("2014-07-01", "2016-07-01", "2018-07-01",
+                                        "2020-07-01", "2022-07-01", "2023-07-01")))
+```
+
+```{r picks-table}
+knitr::kable(
+  data.frame(
+    Target = fmt(pk$date),
+    Capture = fmt(pk$capture_date),
+    `Days from target` = pk$days_from_date,
+    Release = pk$release_id,
+    `Release date` = fmt(pk$release_date),
+    Zoom = pk$zoom,
+    check.names = FALSE
+  ),
+  caption = "The capture picked for each target date. Negative days are a capture before the target."
+)
+```
+
+None of 2018, 2022 or 2023 has a capture of its own. 2018 gets
+`r key_days("2018")`. 2022 gets `r key_days("2022")`, and 2023 gets
+`r key_days("2023")`.
+
+## How are the captures fetched so they line up?
+
+`dft_wayback_fetch()` reads one release's tiles at one zoom and returns a
+three-band raster, cached as a Cloud Optimized GeoTIFF. Giving every call the
+same `crs` and `res` puts the captures on one grid, so they can be compared cell
+for cell.
+
+```{r fetch-code, eval = FALSE}
+chips <- lapply(seq_len(nrow(pick)), function(i) {
+  dft_wayback_fetch(aoi, pick$release_id[i], pick$zoom[i], crs = "EPSG:32609", res = 0.5)
+})
+```
+
+A fetch over a polygon shows whatever its release draws there, so a panel
+labelled with one capture shows that capture only where it is the one on top.
+In each capture's release, that capture is the one drawn over the whole square
+of the first figure; the data-raw script checks this.
+
+```{r fig-overview, fig.width = 4.2, fig.height = 4.1, fig.cap = paste0("The whole box in the ", fmt(sub$capture_date[nrow(sub)]), " capture, at 5 m. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
+ov <- rast(d("wb_overview.tif"))
+op <- par(mar = c(0.2, 0.2, 0.2, 0.2), bg = "white")
+plotRGB(ov, scale = 255, mar = NA, axes = FALSE)
+draw_fp()
+rect(win[["win_xmin"]], win[["win_ymin"]], win[["win_xmax"]], win[["win_ymax"]],
+     border = "white", lwd = 2)
+sbar(1000, "bottomleft", type = "bar", divs = 2, below = "", label = "", col = "white")
+par(op)
+```
+
+## What happened after 2020?
+
+Sentinel-2 images the box every few days. `dft_stac_composite()` masks cloud
+in each scene and takes the median of what is left over a window of months, so
+it gives one image a year built from the clear days. A June–July composite shows the ground as it was in
+those two months, so a change that first appears in one panel happened after
+the previous panel's window and before this one's.
+
+```{r composite-code, eval = FALSE}
+s2 <- dft_stac_composite(aoi, years = c(2018, 2020, 2022, 2023), months = 6:7,
+                         crs = "EPSG:32609")
+```
+
+```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the ground and not in the display. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
+op <- par(mfrow = c(2, 2), mar = c(0.3, 0.3, 0.3, 0.3), bg = "white")
+for (i in seq_along(s2)) {
+  plotRGB(s2[[i]], scale = 255, mar = NA, axes = FALSE)
+  draw_fp(1.2)
+  rect(win[["win_xmin"]], win[["win_ymin"]], win[["win_xmax"]], win[["win_ymax"]],
+       border = "white", lwd = 1.5)
+  panel_label(paste(s2_years[i], "Jun–Jul"))
+  if (i == 1) sbar(1000, "bottomleft", type = "bar", divs = 2, below = "", label = "",
+                   col = "white")
+}
+par(op)
+```
+
+The centre of the square is still forest in the 2018 composite and bare in 2020. So the
+clearing that Wayback shows between `r fmt(sub$capture_date[2])` and
+`r fmt(sub$capture_date[3])` was cut between July 2018 and July 2020. By 2022 it
+is greening, and a new bare patch has opened just south-west of it. The 2023
+composite shows the largest change of the four. Pale ground covers much of the
+floodplain's valley floor across the south of the box, and new bare strips run
+east from it through the forest. No release up to `r fmt(meta$release_to)` has a sub-metre capture of the 2022
+or 2023 change.
+
+## What are the limits?
+
+- Over this box, sub-metre captures are years apart and the newest was taken on
+  `r fmt(sub$capture_date[nrow(sub)])`, so Wayback shows nothing after it.
+- A fetch over a polygon is a mosaic of whatever its release draws: the release
+  picked for `r fmt(sub$capture_date[2])` shows that capture on
+  `r sprintf("%.0f%%", 100 * sub$cover_max[2])` of the box and the
+  `r fmt(sub$capture_date[1])` capture on the rest.
+- The `r fmt(sub$capture_date[2])` capture has cloud and cloud shadow over the
+  south-centre of the box.
+- The three captures come from different sensors, in June and September, at
+  different sun and view angles, so colour, shadow and leaf-out differ between
+  them as well as the ground, and they are not co-registered to one another.
+- The `r fmt(sub$capture_date[3])` capture is lower in contrast than the two before it.
+- Sentinel-2 at 10 m does not resolve single trees, and a composite dates a
+  change only to the gap between two windows.
+- The 2023 composite is brighter across the whole box (median red reflectance
+  `r s2s$red[s2s$year == 2023]`, against `r min(s2s$red[s2s$year != 2023])` to
+  `r max(s2s$red[s2s$year != 2023])` in the other years), so not all of its pale
+  ground is new.
+
+The rasters and tables here come from
+[`data-raw/wayback_change.R`](https://github.com/NewGraphEnvironment/drift/blob/main/data-raw/wayback_change.R).

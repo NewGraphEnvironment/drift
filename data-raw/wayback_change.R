@@ -25,6 +25,8 @@
 #   wb_<date>_window.tif - each sub-metre capture over the zoom window, 0.5 m, 8-bit
 #   wb_overview.tif   - the newest capture over the whole box, 5 m, 8-bit
 #   s2_<year>.tif     - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one shared stretch
+#   floodplain.csv    - the published Bulkley co_ff04 floodplain clipped to the box, as
+#                       WKT in UTM 9N (a GeoPackage stores a timestamp and churns)
 
 suppressMessages({
   library(sf)
@@ -80,7 +82,9 @@ captures <- do.call(rbind, lapply(split(cap, cap$capture_date), function(d) {
     cover_max = round(max(d$cover), 3),
     n_releases = length(unique(d$release_id)),
     release_first = min(d$release_date),
-    release_last = max(d$release_date)
+    release_last = max(d$release_date),
+    # share of the box it is drawn on in the last release serving it
+    cover_last = round(max(d$cover[d$release_date == max(d$release_date)]), 3)
   )
 }))
 captures$sub_metre <- captures$res_m < 1
@@ -212,6 +216,26 @@ if (!anyNA(window)) {
     write_rgb(w, file.path(out_dir, paste0("wb_", d, "_window.tif")))
   }
 }
+
+# -- Floodplain: the published Bulkley ff04 layer -------------------------------
+
+# The functional floodplain (flood depth four times bankfull) on the coho-accessible
+# network, from the stac-floodplains-bc item for the Bulkley watershed group. Its
+# GeoPackage also holds ff02 and ff06, and st_read() without a layer takes ff02.
+fp_url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/floodplain.gpkg"
+fp_file <- tempfile(fileext = ".gpkg")
+resp <- curl::curl_fetch_disk(fp_url, fp_file)
+if (resp$status_code != 200) stop("Floodplain download returned HTTP ", resp$status_code)
+fp <- sf::st_read(fp_file, layer = "co_ff04", quiet = TRUE) |>
+  sf::st_geometry() |>
+  sf::st_transform(crs) |>
+  sf::st_intersection(sf::st_geometry(aoi)) |>
+  sf::st_collection_extract("POLYGON") |>
+  sf::st_union()
+fp_ha <- round(as.numeric(sf::st_area(fp)) / 1e4, 1)
+utils::write.csv(data.frame(layer = "co_ff04", source = fp_url, area_ha = fp_ha,
+                            wkt = sf::st_as_text(fp, digits = 9)),
+                 file.path(out_dir, "floodplain.csv"), row.names = FALSE)
 
 print(captures)
 print(picks)

@@ -17,3 +17,12 @@
 - Phases 1-2: `data-raw/wayback_change.R` written and run (fetch 22:08Z cold, reruns ~1 min warm). Two fixes found
   by looking (findings "Errors Encountered"): best-cover picks, and one stretch across bands. Window chosen from
   previews. Artifacts 3.6 MB, rerun byte-identical.
+- User asked (mid-run) for the ff04 floodplain on the maps. Taken from the published stac-floodplains-bc item, not
+  rebuilt with flooded: of the two items whose bbox holds the box, `bulk_co_ff04` covers 359.7 ha of it and
+  `fran_ch_ff04` none. Written as WKT in `floodplain.csv` (a gpkg would churn); outline colour from gq's
+  `floodplains` style with a white halo.
+- Phase 3: `vignettes/articles/wayback-change.Rmd` written and rendered with `pkgdown::build_article()`.
+  Figures read at page width; fixed a black (transparent) background and clipped panel labels. Claims checked
+  against the cached metadata: all 54 releases from 2022-05-18 show 2020-09-18; the 2016 releases draw 2014 on
+  the other 19%; warm captures 32 s. The hand-typed 57% now comes from `captures.csv` (`cover_last`).
+  Body prose 1,030 words, file 290 lines.

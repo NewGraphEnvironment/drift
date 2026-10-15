@@ -59,17 +59,17 @@ A reader who wants to see what happened on the ground between two years has no w
 
 ## Phase 3: article
 
-- [ ] `vignettes/articles/wayback-change.Rmd`, `bookdown::html_document2`, setup like
+- [x] `vignettes/articles/wayback-change.Rmd`, `bookdown::html_document2`, setup like
       `temporal-composition.Rmd`; API calls shown as `eval = FALSE` chunks; evaluated chunks only read
       the artifacts and plot (`terra::plotRGB`, no title, scale bar, capture date as label)
-- [ ] Sections per #108, headings as the reader's questions and "capture" defined before the lead figure
+- [x] Sections per #108, headings as the reader's questions and "capture" defined before the lead figure
       uses it (review 1 C1): what changed (lead figure: three captures over the window) → a release is not a
       capture (own section, this box's counts) → which captures image this area (captures table) →
       picking a capture per year (picks table; 2018/2022/2023 have none of their own) → fetching on one
       grid (overview of one capture with the window outlined) → the years Wayback doesn't have (four S2
       panels, window outlined) → limits (one sentence each)
-- [ ] Every date, count and share in the prose computed from `captures.csv` / `picks.csv` inline
-- [ ] No footnotes and no `\@ref()` (pkgdown drops both); S2 composites date a change as between July of
+- [x] Every date, count and share in the prose computed from `captures.csv` / `picks.csv` inline
+- [x] No footnotes and no `\@ref()` (pkgdown drops both); S2 composites date a change as between July of
       Y-1 and July of Y, and the prose says so (review 1 A3)
 
 ## Phase 4: verify
