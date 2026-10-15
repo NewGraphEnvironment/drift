@@ -7,6 +7,7 @@ output: bookdown::html_document2
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
+  echo = FALSE,
   message = FALSE,
   warning = FALSE,
   fig.width = 7,
@@ -40,7 +41,8 @@ s2_years <- s2s$year
 s2 <- lapply(s2_years, function(y) rast(d(paste0("s2_", y, ".tif"))))
 
 fpc <- utils::read.csv(d("floodplain.csv"))
-fp <- vect(fpc$wkt, crs = "EPSG:32609")
+fp_ha <- fpc$area_ha[fpc$part == "area"]
+fp <- vect(fpc$wkt[fpc$part == "edge"], crs = "EPSG:32609")
 # the outline colour comes from the gq registry's floodplain style, so no hex
 # literal appears in this article; the white beneath it is a halo over imagery
 fp_col <- gq::gq_reg_main()$layers$floodplains$fill$color
@@ -77,7 +79,7 @@ northern British Columbia, the area of the New Graph post
 Looking through those mosaics by hand puts the main changes to forest cover in
 2018, 2020, 2022 and 2023. The maps outline the published floodplain of the
 Bulkley River watershed group (`co_ff04`, the functional floodplain on the
-coho-accessible stream network), which covers `r fpc$area_ha` ha of the box.
+coho-accessible stream network), which covers `r fp_ha` ha of the box.
 
 ## What changed between 2014 and 2020?
 
@@ -125,7 +127,7 @@ captures it draws over the area. Over a polygon a release can draw more than
 one capture, so each row also carries `cover`, the share of the polygon where
 that capture is the one on top.
 
-```{r captures-code, eval = FALSE}
+```{r captures-code, eval = FALSE, echo = TRUE}
 library(drift)
 
 bbox <- c(xmin = -126.17545, ymin = 54.36161, xmax = -126.12615, ymax = 54.38908)
@@ -177,7 +179,7 @@ capture on only part of the area: in the last release serving the
 each capture, only the releases where it covers the most of the box avoids
 that.
 
-```{r pick-code, eval = FALSE}
+```{r pick-code, eval = FALSE, echo = TRUE}
 cap <- cap[cap$res_m < 1, ]
 cap <- cap[cap$cover >= ave(cap$cover, cap$capture_date, FUN = max) - 0.001, ]
 pick <- dft_wayback_pick(cap, as.Date(c("2014-07-01", "2016-07-01", "2018-07-01",
@@ -210,7 +212,7 @@ three-band raster, cached as a Cloud Optimized GeoTIFF. Giving every call the
 same `crs` and `res` puts the captures on one grid, so they can be compared cell
 for cell.
 
-```{r fetch-code, eval = FALSE}
+```{r fetch-code, eval = FALSE, echo = TRUE}
 chips <- lapply(seq_len(nrow(pick)), function(i) {
   dft_wayback_fetch(aoi, pick$release_id[i], pick$zoom[i], crs = "EPSG:32609", res = 0.5)
 })
@@ -240,7 +242,7 @@ it gives one image a year built from the clear days. A June–July composite sho
 those two months, so a change that first appears in one panel happened after
 the start of the previous panel's window and before the end of this one's.
 
-```{r composite-code, eval = FALSE}
+```{r composite-code, eval = FALSE, echo = TRUE}
 s2 <- dft_stac_composite(aoi, years = c(2018, 2020, 2022, 2023), months = 6:7,
                          crs = "EPSG:32609")
 ```

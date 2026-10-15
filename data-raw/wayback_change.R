@@ -25,8 +25,11 @@
 #   wb_<date>_window.tif - each sub-metre capture over the zoom window, 0.5 m, 8-bit
 #   wb_overview.tif   - the newest capture over the whole box, 5 m, 8-bit
 #   s2_<year>.tif     - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one shared stretch
-#   floodplain.csv    - the published Bulkley co_ff04 floodplain clipped to the box, as
-#                       WKT in UTM 9N (a GeoPackage stores a timestamp and churns)
+#   floodplain.csv    - the published Bulkley co_ff04 floodplain in the box, as WKT in
+#                       UTM 9N (a GeoPackage stores a timestamp and churns): the polygon
+#                       clipped to the box (part "area", for its hectares) and its edge
+#                       (part "edge", for drawing), which stops at the box rather than
+#                       running along it where the floodplain continues outside
 
 suppressMessages({
   library(sf)
@@ -229,16 +232,25 @@ fp_url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/f
 fp_file <- tempfile(fileext = ".gpkg")
 resp <- curl::curl_fetch_disk(fp_url, fp_file)
 if (resp$status_code != 200) stop("Floodplain download returned HTTP ", resp$status_code)
-fp <- sf::st_read(fp_file, layer = "co_ff04", quiet = TRUE) |>
+# Cropped to a margin around the box first, so the edge is taken from the
+# floodplain's own boundary and not from the cut.
+fp_near <- sf::st_read(fp_file, layer = "co_ff04", quiet = TRUE) |>
   sf::st_geometry() |>
   sf::st_transform(crs) |>
-  sf::st_intersection(sf::st_geometry(aoi)) |>
+  sf::st_crop(sf::st_bbox(sf::st_buffer(aoi, 500)))
+fp <- sf::st_intersection(fp_near, sf::st_geometry(aoi)) |>
   sf::st_collection_extract("POLYGON") |>
   sf::st_union()
+fp_edge <- sf::st_boundary(fp_near) |>
+  sf::st_intersection(sf::st_geometry(aoi)) |>
+  sf::st_collection_extract("LINESTRING") |>
+  sf::st_union()
 fp_ha <- round(as.numeric(sf::st_area(fp)) / 1e4, 1)
-utils::write.csv(data.frame(layer = "co_ff04", source = fp_url, area_ha = fp_ha,
-                            wkt = sf::st_as_text(fp, digits = 9)),
-                 file.path(out_dir, "floodplain.csv"), row.names = FALSE)
+utils::write.csv(data.frame(layer = "co_ff04", source = fp_url, part = c("area", "edge"),
+                            area_ha = c(fp_ha, NA),
+                            wkt = c(sf::st_as_text(fp, digits = 9),
+                                    sf::st_as_text(fp_edge, digits = 9))),
+                 file.path(out_dir, "floodplain.csv"), row.names = FALSE, na = "")
 
 print(captures)
 print(picks)
