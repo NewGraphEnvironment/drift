@@ -1,0 +1,315 @@
+---
+title: "When Did the Floodplain Change? Dating Detected Change with Sentinel-2 and Esri Wayback"
+output: bookdown::html_document2
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  fold = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  dpi = 150
+)
+# Fold every chunk's code under a "Code" toggle. pkgdown ignores
+# `code_folding: hide`, so the toggle is a <details> block around the source.
+src_hook <- knitr::knit_hooks$get("source")
+knitr::knit_hooks$set(source = function(x, options) {
+  out <- src_hook(x, options)
+  if (!isTRUE(options$fold)) return(out)
+  paste0("\n<details><summary>Code</summary>\n\n", paste(out, collapse = "\n"),
+         "\n\n</details>\n")
+})
+# The fetch code is shown from the data-raw script, so what is shown is what ran:
+# from_script("label") is the block between "## ---- label" and the next "## ----".
+script <- readLines(file.path("..", "..", "data-raw", "floodplain_change_dating.R"))
+from_script <- function(label) {
+  marks <- grep("^## ----", script)
+  i <- match(paste("## ----", label), script)
+  if (is.na(i)) stop("No block '", label, "' in the data-raw script")
+  end <- marks[marks > i][1] - 1
+  script[(i + 1):end]
+}
+```
+
+
+```{r data, include = FALSE}
+# Everything below reads the files data-raw/floodplain_change_dating.R wrote;
+# nothing here goes to the network.
+library(terra)
+d <- function(f) file.path("floodplain-change-dating", f)
+crs <- "EPSG:32609"
+
+item <- utils::read.csv(d("item.csv"))
+summ <- utils::read.csv(d("summary.csv"))
+areas <- utils::read.csv(d("areas.csv"), na.strings = "")
+caps <- utils::read.csv(d("captures.csv"))
+caps$capture_date <- as.Date(caps$capture_date)
+sharp <- caps[caps$res_m < 1, ]
+newest <- max(sharp$capture_date)
+newest_first <- as.Date(sharp$release_first[sharp$capture_date == newest])
+newest_last <- as.Date(sharp$release_last[sharp$capture_date == newest])
+fmt <- function(x) format(as.Date(x), "%Y-%m-%d")
+yr <- function(x) format(as.Date(x), "%Y")
+
+change <- rast(d("change.tif"))
+box_km <- round(c(xmax(change) - xmin(change), ymax(change) - ymin(change)) / 1000, 1)
+asp <- (ymax(change) - ymin(change)) / (xmax(change) - xmin(change))
+years <- 2017:2023
+s2 <- setNames(lapply(years, function(y) rast(d(paste0("s2_", y, ".tif")))), years)
+
+fpc <- utils::read.csv(d("floodplain.csv"))
+fp_edge <- vect(fpc$wkt[fpc$part == "edge"], crs = crs)
+area_v <- vect(areas$wkt, crs = crs)
+
+# What the imagery shows in each area was read off the panels below. It is tied
+# to the areas it was read for, so a rerun that changes them stops the build
+# rather than putting a verdict on the wrong area.
+seen_by_eye <- data.frame(
+  key = c("A 2018 Crops Rangeland", "B 2018 Rangeland Trees", "C 2019 Trees Rangeland",
+          "D 2020 Crops Rangeland", "E 2020 Crops Rangeland", "F 2021 Trees Rangeland",
+          "G 2022 Trees Rangeland", "H 2022 Trees Crops", "I 2023 Trees Rangeland",
+          "J 2023 Trees Rangeland"),
+  shows = c("The same open field before and after",
+            "The same stand of trees before and after",
+            "Creekside forest opened up, with new trails",
+            "The same open field; striped by cutting or tilling in 2016, grassed in 2020",
+            "The same open field before and after",
+            "Forest in 2020, then brightens in 2021",
+            "Forest in 2020; a pale strip along the channel by 2022",
+            "Forest in 2020, then brightens in 2022",
+            "Forest in 2020, then opens to bare ground in 2023",
+            "Forest in 2020, then opens to bare ground in 2023")
+)
+if (!identical(paste(areas$id, areas$year, areas$from, areas$to), seen_by_eye$key)) {
+  stop("areas.csv has changed: look at the panels again before reusing the verdicts")
+}
+areas$shows <- seen_by_eye$shows
+
+# Sentinel-2 brightening: each area's mean display value in its year less the
+# year before, against the same for the whole box. Forest is dark, so a patch
+# opened to grass or bare ground brightens more than the box does.
+s2_grey <- lapply(s2, mean)
+box_mean <- vapply(s2_grey, function(r) global(r, "mean")[[1]], 1)
+areas$rise <- vapply(seq_len(nrow(areas)), function(a) {
+  m <- vapply(as.character(areas$year[a] - 1:0), function(k) {
+    extract(s2_grey[[k]], area_v[a], fun = mean)[1, 2]
+  }, 1)
+  m[2] - m[1]
+}, 1)
+areas$rise_box <- box_mean[as.character(areas$year)] - box_mean[as.character(areas$year - 1)]
+areas$brightens <- areas$rise > areas$rise_box
+
+seen <- which(!is.na(areas$wb_before) & !is.na(areas$wb_after))
+s2_only <- which(is.na(areas$wb_after) & !is.na(areas$wb_before))
+stopifnot(all(areas$brightens[s2_only]), areas$brightens[areas$id == "A"],
+          all(areas$cutblock_share[areas$id != "I"] < 0.1))
+
+# Colours: the floodplain edge from the gq registry's floodplain style, and one
+# colour per change year; grey is change that never settled.
+reg <- gq::gq_reg_main()
+fp_col <- reg$layers$floodplains$fill$color
+yr_set <- 2018:2023
+yr_col <- setNames(hcl.colors(length(yr_set), "Plasma", rev = TRUE), yr_set)
+grey_col <- grey(0.55)
+
+draw_fp <- function(lwd = 1.5) {
+  lines(fp_edge, col = "white", lwd = lwd + 1.5)
+  lines(fp_edge, col = fp_col, lwd = lwd)
+}
+draw_area <- function(a, lwd = 1.5) {
+  lines(area_v[a], col = "white", lwd = lwd + 1.5)
+  lines(area_v[a], col = yr_col[as.character(areas$year[a])], lwd = lwd)
+}
+# white text on a dark band, so it reads over pale ground too
+panel_label <- function(lab, right = FALSE, cex = 0.8) {
+  u <- par("usr")
+  pad <- 0.02 * (u[2] - u[1])
+  x <- if (right) u[2] - 2 * pad else u[1] + 2 * pad
+  y <- u[4] - 2 * pad
+  w <- strwidth(lab, cex = cex, font = 2)
+  h <- strheight(lab, cex = cex, font = 2)
+  x0 <- if (right) x - w else x
+  rect(x0 - pad, y - h - pad, x0 + w + pad, y + pad, col = adjustcolor("black", 0.45),
+       border = NA)
+  text(x0, y, lab, adj = c(0, 1), font = 2, col = "white", cex = cex)
+}
+view_ext <- function(a) {
+  ext(unlist(areas[a, c("view_xmin", "view_xmax", "view_ymin", "view_ymax")]))
+}
+wb_view <- function(a, date) rast(d(paste0("wb_", areas$id[a], "_", date, ".tif")))
+
+# One row of panels per area: each panel is the area's view in one image
+area_rows <- function(rows, panels) {
+  op <- par(mfrow = c(length(rows), length(panels)), mar = c(0.2, 0.2, 0.2, 0.2),
+            bg = "white")
+  on.exit(par(op))
+  for (a in rows) {
+    for (k in seq_along(panels)) {
+      plotRGB(panels[[k]]$img(a), scale = 255, mar = NA, axes = FALSE, ext = view_ext(a))
+      draw_area(a)
+      panel_label(panels[[k]]$label(a), right = TRUE, cex = 0.7)
+      if (k == 1) panel_label(areas$id[a], cex = 1)
+    }
+  }
+}
+s2_panel <- function(offset) {
+  list(img = function(a) s2[[as.character(areas$year[a] + offset)]],
+       label = function(a) paste("Sentinel-2", areas$year[a] + offset))
+}
+wb_panel <- function(which) {
+  list(img = function(a) wb_view(a, areas[[which]][a]),
+       label = function(a) paste("Wayback", areas[[which]][a]))
+}
+```
+
+drift finds where a floodplain's land cover changed, and dates it. This article
+follows that change through one `r box_km[1]` × `r box_km[2]` km box of the
+Bulkley River floodplain in northern British Columbia. It then looks at each
+change with drift's two imagery tools: sharp Esri Wayback images where they
+exist, and a Sentinel-2 image of every summer. The sharp images say what
+changed; here they stop in `r yr(newest)`, so the later changes are dated by
+Sentinel-2 alone.
+
+## What changed in this floodplain, and when?
+
+The floodplain and its land cover are a published STAC item, `r item$item`
+(processed `r substr(item$processed, 1, 10)` with drift `r item$drift` and flooded
+`r item$flooded`): the floodplain polygon, and Impact Observatory's 10 m land
+cover for every year from 2017 to 2023, clipped to it. `dft_rast_break_class()`
+reads the seven years in each cell and finds the year its class switched, and
+`dft_rast_break_category()` says whether the switch held.
+
+```{r fetch-landcover, eval = FALSE, code = c(from_script("aoi"), "", from_script("stac-item"), "", from_script("floodplain"), "", from_script("landcover"), "", from_script("dates"))}
+```
+
+```{r fig-lead, fig.height = 7 * asp, fig.cap = paste0("Floodplain cells by the year their land cover switched and stayed switched, over the ", years[length(years)], " Sentinel-2 image. Grey cells changed but never settled on one class. Ground outside the floodplain is dimmed. Letters name the change areas of 1 ha or more. The blue line is the edge of the floodplain; the scale bar is 500 m.")}
+op <- par(mar = c(0, 0, 0, 0), bg = "white")
+plotRGB(s2[[length(s2)]], scale = 255, mar = NA, axes = FALSE)
+# ground outside the floodplain is dimmed, so the floodplain reads as the subject
+outside <- ifel(is.na(change), 1, NA)
+plot(outside, add = TRUE, col = "white", alpha = 0.45, legend = FALSE, axes = FALSE)
+# change.tif stores a switch year less 2000, 1 for never settled, 0 and 2 for
+# no lasting change, and NA outside the floodplain
+yr_layer <- classify(change, rbind(c(0, NA), c(2, NA)))
+coltab(yr_layer) <- data.frame(value = c(1, yr_set - 2000), col = c(grey_col, yr_col))
+plot(yr_layer, add = TRUE, legend = FALSE, axes = FALSE, alpha = 0.85)
+draw_fp(1.2)
+text(vect(cbind(areas$lab_x, areas$lab_y), crs = crs), areas$id,
+     col = "black", font = 2, cex = 0.8, halo = TRUE, hc = "white")
+sbar(500, "topleft", type = "bar", divs = 2, below = "", label = "", col = "white")
+legend("bottomright", legend = c(yr_set, "never settled"), fill = c(yr_col, grey_col),
+       border = NA, bg = "white", cex = 0.75, ncol = 2, inset = 0.02)
+par(op)
+```
+
+Grey is the land-cover map flickering between classes, and this article sets it
+aside. The coloured cells switched once and stayed, which gives each a date. A
+date from a 10 m map is a place to look, though, not yet a change on the
+ground, so each lettered area is looked at below.
+
+## What does drift give us to look with?
+
+```{r tools, echo = FALSE}
+knitr::kable(data.frame(
+  Tool = c("`dft_rast_break_class()`, `dft_rast_break_category()`",
+           "`dft_stac_composite()`",
+           "`dft_wayback_captures()`, `dft_wayback_pick()`, `dft_wayback_fetch()`"),
+  `What it gives` = c("The year each cell's land cover switched, and whether it held",
+                      "A cloud-free Sentinel-2 image of every summer, at 10 m",
+                      "Sharp (under 1 m) images, but only from the days Esri's providers imaged the place"),
+  check.names = FALSE
+), caption = "drift's tools for dating change and looking at it.")
+```
+
+`dft_stac_composite()` reads Sentinel-2 from Microsoft's Planetary Computer.
+For each summer it takes the June and July scenes, masks cloud and snow, and
+keeps the median of each band. The panels share one display stretch, so a
+panel that looks brighter is brighter on the ground.
+
+```{r fetch-composites, eval = FALSE, code = from_script("composites")}
+```
+
+Esri Wayback keeps every past version of Esri's World Imagery basemap. Each
+version, a *release*, is a mosaic of images taken on many days, so drift reads
+which *capture* (the day an image was taken) each release draws over the box,
+then picks and fetches by capture.
+
+```{r fetch-wayback, eval = FALSE, code = c(from_script("wayback"), "", from_script("wayback-fetch"))}
+```
+
+## What do the sharp images show?
+
+For the `r length(seen)` areas dated `r min(areas$year[seen])` to
+`r max(areas$year[seen])`, Wayback has a sharp image from before the change
+(`r fmt(areas$wb_before[seen[1]])`) and from after it (`r fmt(newest)`).
+
+```{r fig-seen, fig.height = 7 / 4 * length(seen), fig.cap = paste0("Areas dated ", min(areas$year[seen]), " to ", max(areas$year[seen]), ", one per row: Wayback before and after the change, then Sentinel-2 the summer before and the summer of the change. The outline is the area, in the colour of its year.")}
+area_rows(seen, list(wb_panel("wb_before"), wb_panel("wb_after"), s2_panel(-1), s2_panel(0)))
+```
+
+Only C is a change on the ground. The forest along the creek has opened up by
+`r yr(newest)`, with new trails through it. A, D and E are the same open field in
+both images, which the land-cover map moved from Crops to Rangeland; at D the
+field was striped by cutting or tilling in 2016 and grassed over by
+`r yr(newest)`, a change of use at most. B is the same stand of trees in both.
+Sentinel-2 alone would not have shown this: in its year A brightens more than the
+box as a whole does, just as a cleared patch would.
+
+## What changed after `r yr(newest)`?
+
+For the `r length(s2_only)` areas dated `r min(areas$year[s2_only])` to
+`r max(areas$year[s2_only])`, the last sharp image is the one from
+`r fmt(newest)`, and it shows each of them as forest.
+
+```{r fig-s2only, fig.height = 7 / 3 * length(s2_only), fig.cap = paste0("Areas dated ", min(areas$year[s2_only]), " to ", max(areas$year[s2_only]), ", one per row: the last sharp Wayback image (", fmt(newest), "), then Sentinel-2 the summer before and the summer of the change.")}
+area_rows(s2_only, list(wb_panel("wb_before"), s2_panel(-1), s2_panel(0)))
+```
+
+Sentinel-2 dates each of them: in its year, each area brightens more than the box
+as a whole does, as forest does when it opens to grass or bare ground. Part of I
+lies in a cutblock the province records as harvested from
+`r areas$cutblock_year[areas$id == "I"]`, and none of the others lies mostly in
+one. What happened in F, G, H and J cannot be told at 10 m: a cut, a slide and
+a channel moving would all look alike.
+
+## Why do the sharp images stop in `r yr(newest)`?
+
+Wayback can show only what Esri's providers imaged and Esri released. Over this
+box it holds `r nrow(sharp)` sharp captures, from `r paste(fmt(sharp$capture_date), collapse = ", ")`.
+The newest is still the one drawn by every release from `r fmt(newest_first)` to
+`r fmt(newest_last)`, the latest. Nothing sharper or newer has been released
+here, so a change after `r yr(newest)` has no sharp image yet. Sentinel-2 images
+every summer, but at 10 m.
+
+## The numbers
+
+```{r numbers, echo = FALSE}
+fp_ha <- function(w) round(summ$ha[summ$what == w], 1)
+knitr::kable(data.frame(
+  Area = areas$id, Year = areas$year,
+  `Land cover` = paste(areas$from, "to", areas$to),
+  ha = areas$ha,
+  `What the imagery shows` = areas$shows,
+  Cutblock = ifelse(areas$cutblock_share >= 0.1,
+                    paste0(round(100 * areas$cutblock_share), "% in a ", areas$cutblock_year, " block"), ""),
+  check.names = FALSE
+), caption = paste0("The change areas. Cutblock is the share of the area inside a BC consolidated cutblock, with the block's harvest start year, where that is 10% or more. Across the box, the floodplain's 10 m cells hold ",
+  fp_ha("Stable"), " ha with no change, ", fp_ha("Changed once, and stayed"), " ha that switched once and stayed, ",
+  fp_ha("Changed, never settled"), " ha that changed and never settled, and ", fp_ha("Flickered and came back"),
+  " ha that flickered and came back to its first class."))
+```
+
+## Limits
+
+- A clean switch is a date to look at, not a confirmed change: the land-cover
+  map moves unchanged ground between similar classes, as it moved three fields
+  here from Crops to Rangeland.
+- A switch in 2018 or 2023 rests on a single year of land cover on one side of it.
+- Wayback shows only what Esri has released, and here nothing after
+  `r fmt(newest)`; the `r fmt(sharp$capture_date[sharp$cover_max < 0.99])` capture covers only part
+  of the box.
+- Sentinel-2 at 10 m dates a change and shows that ground opened up or greened,
+  not what did it. A summer with few clear scenes leaves haze, and the 2019 image
+  is pale across the whole box.

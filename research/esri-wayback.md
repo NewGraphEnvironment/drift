@@ -71,4 +71,4 @@ service, and the NECR equivalence run recorded in
 - **A capture's maximum cover can be under 1 everywhere.** 2016-09-11 never covers more than 81% of that box;
   every release serving it draws 2014-06-01 on the remainder. Check the capture is drawn over the part you
   display (`dft_wayback_captures()` on the display window, at the fetch zoom, on the picked release).
-- Produced by `data-raw/wayback_change.R`; run record in `planning/archive/2026-10-issue-108-wayback-change/`.
+- Produced by `data-raw/wayback_change.R` (since replaced by `data-raw/floodplain_change_dating.R`, which applies the same filter); run record in `planning/archive/2026-10-issue-108-wayback-change/`.

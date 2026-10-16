@@ -16,21 +16,22 @@ keep numbers to one table, fold all code.
 - [x] `## ----` sections for every block the article shows; deterministic writes; warm rerun byte-identical
 
 ## Phase 2: article
-- [ ] `vignettes/articles/floodplain-change-dating.Rmd`: folded code via a source hook; fetch code read from
+- [x] `vignettes/articles/floodplain-change-dating.Rmd`: folded code via a source hook; fetch code read from
       the script
-- [ ] Sections: what changed and when (lead map) -> what drift gives us (one table) -> the changes Wayback
+- [x] Sections: what changed and when (lead map) -> what drift gives us (one table) -> the changes Wayback
       can show -> the changes only Sentinel-2 can show -> why (Esri has released nothing newer than 2020
       here) -> the numbers (one table) -> limits
-- [ ] Remove `wayback-change.Rmd`, its data dir, `data-raw/wayback_change.R`; update `.gitignore`,
+- [x] Remove `wayback-change.Rmd`, its data dir, `data-raw/wayback_change.R`; update `.gitignore`,
       `data-raw/README.md`, `research/esri-wayback.md` references
+      (data-raw/README.md never named the old script; nothing to change there)
 
 ## Phase 3: verify
-- [ ] `pkgdown::build_article()` offline; figures read at page width; code folds
-- [ ] `pkgdown::check_pkgdown()`; no footnotes
+- [x] `pkgdown::build_article()` offline; figures read at page width; code folds
+- [x] `pkgdown::check_pkgdown()`; no footnotes
 - [ ] `/code-check branch`
 
 ## Validation
-- [ ] Tests pass (no `R/` changes)
+- [x] Tests pass (no `R/` changes)
 - [ ] `/code-check` clean
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion (into the existing #108 archive)
