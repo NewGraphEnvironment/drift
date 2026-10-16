@@ -120,7 +120,7 @@ coho-accessible stream network), which covers `r fp_ha` ha of the box.
 
 ## What changed between 2014 and 2020?
 
-```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", read from tiles of ", paste(zoom_m(own$zoom), collapse = ", "), " m and drawn on one 0.5 m grid. In the first two, forest covers the north of the square and the valley floor in the south is open ground along the river. By the third, a clearing with a spur road has opened in the forest, a road runs along the edge of the floodplain, and the south-west of the valley floor is bare. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
+```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", read from tiles of ", paste(zoom_m(own$zoom), collapse = ", "), " m and drawn on one 0.5 m grid. In the first two, forest covers the north of the square, and the valley floor in the south is open meadow along the river with stands of forest at its south-west end and beside the river. By the third, a clearing with a spur road has opened in the northern forest, a road runs along the edge of the floodplain, and the forest at the south-west end of the valley floor has been cut. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
 op <- par(mfrow = c(1, 3), mar = c(0.2, 0.2, 0.2, 0.2), bg = "white")
 for (i in seq_along(wb)) {
   plotRGB(wb[[i]], scale = 255, mar = NA, axes = FALSE)
@@ -133,10 +133,11 @@ par(op)
 ```
 
 In the first two images the north of the square is forest, and the valley
-floor to the south is open ground with scattered trees along the river. By the
-third, a clearing with a spur road has opened in the forest, between two arms of
-the floodplain and outside both. A road now runs along the edge of the
-floodplain, and the south-west of the valley floor is bare. Between the second
+floor to the south is open meadow along the river, with stands of forest at its
+south-west end and beside the river. By the third, a clearing with a spur road
+has opened in the northern forest, between two arms of the floodplain and
+outside both. A road now runs along the edge of the floodplain, and the forest
+at the south-west end of the valley floor has been cut. Between the second
 and third images there are four years, and Wayback holds nothing in between to
 say when the cutting happened. The Sentinel-2 composites below narrow that down.
 
@@ -314,8 +315,8 @@ Where the clearing is, the 2018 composite still shows forest and the 2020 one
 bare ground. So the clearing that Wayback shows between `r fmt(sub$capture_date[2])` and
 `r fmt(sub$capture_date[3])` was cut between June 2018 and July 2020, and the
 cutblock layer has its harvest starting in 2020. By 2022 it is greening. A second
-2020 cutblock lies on the valley floor to its south-west, the bare ground in the
-south-west of the `r fmt(sub$capture_date[3])` capture. The 2023 cutblocks
+2020 cutblock is the forest cut at the south-west end of the valley floor in
+the `r fmt(sub$capture_date[3])` capture. The 2023 cutblocks
 (`r cb_ha(2023)` ha) are bare in the 2023 composite: the largest runs east
 through the forest outside the floodplain, two smaller ones sit on the valley
 floor along the river, and a fourth lies in the forest in the north-west. No release up to `r fmt(meta$release_to)` has a sub-metre
