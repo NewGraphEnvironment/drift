@@ -45,10 +45,27 @@ fp_ha <- fpc$area_ha[fpc$part == "area"]
 fp <- vect(fpc$wkt[fpc$part == "edge"], crs = "EPSG:32609")
 # the outline colour comes from the gq registry's floodplain style, so no hex
 # literal appears in this article; the white beneath it is a halo over imagery
-fp_col <- gq::gq_reg_main()$layers$floodplains$fill$color
+reg <- gq::gq_reg_main()
+fp_col <- reg$layers$floodplains$fill$color
 draw_fp <- function(lwd = 1.5) {
   lines(fp, col = "white", lwd = lwd + 1.5)
   lines(fp, col = fp_col, lwd = lwd)
+}
+
+# Tree loss in the published change layer, and the part of it inside dated harvest
+tl <- utils::read.csv(d("treeloss.csv"))
+tl_h <- tl[tl$in_harvest, ]
+tl_v <- vect(tl_h$wkt, crs = "EPSG:32609")
+hv_col <- reg$layers$harvest_area$stroke$color
+hv_ha <- function(y) round(sum(tl_h$area_ha[tl_h$harvest_year == y]), 1)
+draw_harvest <- function(lwd = 1.2, labels = FALSE) {
+  lines(tl_v, col = "white", lwd = lwd + 1.5)
+  lines(tl_v, col = hv_col, lwd = lwd)
+  if (labels) {
+    big <- tl_h$area_ha >= 1
+    text(tl_h$lab_x[big], tl_h$lab_y[big], tl_h$harvest_year[big],
+         col = "white", font = 2, cex = 0.75)
+  }
 }
 
 # Picks for the key years that have no capture of their own
@@ -59,10 +76,11 @@ key_days <- function(y) {
          if (r$days_from_date < 0) "before" else "after", " ", y, "-07-01")
 }
 
-panel_label <- function(lab) {
+panel_label <- function(lab, right = FALSE) {
   u <- par("usr")
-  text(u[1] + 0.03 * (u[2] - u[1]), u[4] - 0.06 * (u[4] - u[3]), lab,
-       adj = c(0, 1), font = 2, col = "white", cex = 0.9)
+  x <- if (right) u[2] - 0.03 * (u[2] - u[1]) else u[1] + 0.03 * (u[2] - u[1])
+  text(x, u[4] - 0.06 * (u[4] - u[3]), lab,
+       adj = c(as.numeric(right), 1), font = 2, col = "white", cex = 0.9)
 }
 ```
 
@@ -83,24 +101,25 @@ coho-accessible stream network), which covers `r fp_ha` ha of the box.
 
 ## What changed between 2014 and 2020?
 
-```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", read from tiles of ", paste(zoom_m(own$zoom), collapse = ", "), " m and drawn on one 0.5 m grid. Forest covers the centre in the first two; by the third a clearing with a spur road has opened there, and a bare track runs along the edge of the valley floor at the bottom. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
+```{r fig-window, fig.height = 2.38, fig.cap = paste0("One ", win_km, " km square of the box in the three sub-metre Wayback images, taken ", paste(fmt(sub$capture_date), collapse = ", "), ", read from tiles of ", paste(zoom_m(own$zoom), collapse = ", "), " m and drawn on one 0.5 m grid. In the first two, forest covers the north of the square and the valley floor in the south is open ground along the river. By the third, a clearing with a spur road has opened in the forest, a road runs along the edge of the floodplain, and the south-west of the valley floor is bare. The blue line is the edge of the floodplain. The scale bar is 200 m.")}
 op <- par(mfrow = c(1, 3), mar = c(0.2, 0.2, 0.2, 0.2), bg = "white")
 for (i in seq_along(wb)) {
   plotRGB(wb[[i]], scale = 255, mar = NA, axes = FALSE)
   draw_fp(1.2)
-  panel_label(fmt(sub$capture_date[i]))
+  panel_label(fmt(sub$capture_date[i]), right = TRUE)
   if (i == 1) sbar(200, "bottomleft", type = "bar", divs = 2, below = "", label = "",
                    col = "white", lwd = 1)
 }
 par(op)
 ```
 
-In the first two images the centre of the square is forest. By the third, a
-clearing with a spur road has opened there, between two arms of the floodplain
-and outside both, and a bare track runs along the edge of the valley floor at
-the bottom. Between the second and third images there are four years, and
-Wayback holds nothing in between to say when the cutting happened. The
-Sentinel-2 composites below narrow that down.
+In the first two images the north of the square is forest, and the valley
+floor to the south is open ground with scattered trees along the river. By the
+third, a clearing with a spur road has opened in the forest, between two arms of
+the floodplain and outside both. A road now runs along the edge of the
+floodplain, and the south-west of the valley floor is bare. Between the second
+and third images there are four years, and Wayback holds nothing in between to
+say when the cutting happened. The Sentinel-2 composites below narrow that down.
 
 ## When was a Wayback image taken?
 
@@ -242,16 +261,25 @@ it gives one image a year built from the clear days. A June–July composite sho
 those two months, so a change that first appears in one panel happened after
 the start of the previous panel's window and before the end of this one's.
 
+The brown outlines on these maps come from the published change layer for the
+same floodplain: drift's patches of change between the 2017 and 2023 Impact
+Observatory 10 m land-cover maps, each tagged with the dated provincial harvest
+it falls in, if any. The layer covers only the floodplain. In the box,
+`r round(sum(tl$area_ha), 1)` ha of it changed from trees to another class, and the
+outlines are the `r round(sum(tl_h$area_ha), 1)` ha of that inside a dated harvest. The
+2018 panel labels each with the year its harvest started.
+
 ```{r composite-code, eval = FALSE, echo = TRUE}
 s2 <- dft_stac_composite(aoi, years = c(2018, 2020, 2022, 2023), months = 6:7,
                          crs = "EPSG:32609")
 ```
 
-```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the data and not in the display. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
+```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the data and not in the display. Brown outlines are tree loss in the published change layer inside a dated harvest, labelled on the first panel with the year the harvest started. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
 op <- par(mfrow = c(2, 2), mar = c(0.3, 0.3, 0.3, 0.3), bg = "white")
 for (i in seq_along(s2)) {
   plotRGB(s2[[i]], scale = 255, mar = NA, axes = FALSE)
   draw_fp(1.2)
+  draw_harvest(1, labels = i == 1)
   rect(win[["win_xmin"]], win[["win_ymin"]], win[["win_xmax"]], win[["win_ymax"]],
        border = "white", lwd = 1.5)
   panel_label(paste(s2_years[i], "Jun–Jul"))
@@ -261,14 +289,18 @@ for (i in seq_along(s2)) {
 par(op)
 ```
 
-The centre of the square is still forest in the 2018 composite and bare in 2020. So the
-clearing that Wayback shows between `r fmt(sub$capture_date[2])` and
-`r fmt(sub$capture_date[3])` was cut between June 2018 and July 2020. By 2022 it
-is greening, and a new bare patch has opened just south-west of it. The 2023
-composite shows the largest change of the four. Pale ground covers much of the
-floodplain's valley floor across the south of the box, and new bare strips run
-east from it through the forest. No release up to `r fmt(meta$release_to)` has a sub-metre capture of the 2022
-or 2023 change.
+Where the clearing is, the 2018 composite still shows forest and the 2020 one
+bare ground. So the clearing that Wayback shows between `r fmt(sub$capture_date[2])` and
+`r fmt(sub$capture_date[3])` was cut between June 2018 and July 2020, and by 2022
+it is greening. Across the floodplain from it, the harvest that started in 2020
+(`r hv_ha(2020)` ha) is opening in the 2020 composite, as the bare south-west of
+the `r fmt(sub$capture_date[3])` capture shows too, and much of it is bare by
+2022. The harvest that started in 2023 (`r hv_ha(2023)` ha), east of it along
+the river, is still green in 2022 and bare in 2023. So much of the pale valley
+floor in the 2023 composite lies inside dated harvest. New bare strips also run east from it
+through the forest outside the floodplain, where the change layer has nothing.
+No release up to `r fmt(meta$release_to)` has a sub-metre capture of the 2022 or
+2023 change.
 
 ## What are the limits?
 
@@ -288,6 +320,8 @@ or 2023 change.
   (`r zoom_m(own$zoom[1])` m) and the third from zoom `r own$zoom[3]`
   (`r zoom_m(own$zoom[3])` m), the deepest zoom covering the whole box in each
   release, so part of the difference in sharpness is the zoom.
+- The change layer covers only the floodplain, so cutting outside it, such as
+  the clearing in the first figure, has no outline.
 - Sentinel-2 at 10 m does not resolve single trees, and a composite dates a
   change only to the span from the start of one window to the end of the next.
 - The 2023 composite is brighter across the whole box (median red reflectance
