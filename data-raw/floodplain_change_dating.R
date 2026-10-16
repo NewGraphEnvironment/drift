@@ -7,8 +7,8 @@
 #
 # Every call goes to the network the first time and to drift's cache after it
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
-# except the STAC item, its rasters, the Wayback release list and the BC
-# cutblocks, which are read live.
+# except the STAC item, its rasters, the Wayback release list, the BC
+# cutblocks and watershed group, and the topographic tiles, which are read live.
 # A warm rerun must leave the committed files unchanged unless the published
 # item or the cutblock layer changed. Only small display files are committed;
 # the article reads them and makes no network call.
@@ -35,6 +35,11 @@
 #   s2_<year>.tif   - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one stretch
 #   wb_<area>_<date>.tif - sub-metre Wayback view of a change area, 0.5 m, 8-bit
 #   wb_box_<date>.tif - the newest sub-metre capture over the whole box, 2 m, 8-bit
+#   topo_bulk.tif   - Esri World Topographic Map over the Bulkley watershed group,
+#                     zoom 9, Web Mercator, 8-bit
+#   context.csv     - outlines for the context map, as simplified WKT with their
+#                     CRS: the watershed group, its floodplain, the box, and BC
+#   topo_credit.txt - the basemap's attribution
 
 suppressMessages({
   library(sf)
@@ -68,6 +73,16 @@ href <- function(asset) item$assets[[asset]]$href
 ## ---- floodplain
 fp <- sf::st_read(href("floodplain"), layer = "all_ff04", quiet = TRUE) |>
   sf::st_transform(crs)
+
+## ---- context
+# Where the box lies: the Bulkley watershed group over Esri's topographic map
+bulk <- bcdata::bcdc_query_geodata("WHSE_BASEMAPPING.FWA_WATERSHED_GROUPS_POLY") |>
+  dplyr::filter(WATERSHED_GROUP_CODE == "BULK") |>
+  dplyr::collect() |>
+  sf::st_transform(3857)
+around <- sf::st_as_sfc(sf::st_bbox(sf::st_buffer(bulk, 4000)))
+topo <- maptiles::get_tiles(around, provider = "Esri.WorldTopoMap", zoom = 9, crop = TRUE)
+bc_outline <- bcmaps::bc_bound()
 
 ## ---- landcover
 years <- 2017:2023
@@ -355,6 +370,22 @@ if (cap_tab$cover_max[format(cap_tab$capture_date) == newest_d] < 0.999) {
 }
 ov <- round(terra::aggregate(chips[[newest_d]], fact = 4, fun = "mean", na.rm = TRUE))
 write_8bit(ov, file.path(out_dir, paste0("wb_box_", newest_d, ".tif")), rgb, jpeg = TRUE)
+
+# The context map: outlines simplified for drawing at the watershed-group scale
+simple <- function(x, part, tol) {
+  g <- sf::st_simplify(sf::st_union(sf::st_geometry(x)), dTolerance = tol)
+  data.frame(part = part, crs = paste0("EPSG:", sf::st_crs(g)$epsg), wkt = sf::st_as_text(g[[1]], digits = 7))
+}
+context <- rbind(
+  simple(bulk, "bulk", 100),
+  simple(sf::st_transform(fp, 3857), "floodplain", 120),
+  simple(sf::st_transform(aoi, 3857), "box", 0),
+  simple(bc_outline, "bc", 2000),
+  simple(sf::st_transform(bulk, 3005), "bulk_bc", 2000)
+)
+utils::write.csv(context, file.path(out_dir, "context.csv"), row.names = FALSE)
+write_8bit(topo[[1:3]], file.path(out_dir, "topo_bulk.tif"), rgb, jpeg = TRUE)
+writeLines(maptiles::get_credit("Esri.WorldTopoMap"), file.path(out_dir, "topo_credit.txt"))
 
 print(read.csv(file.path(out_dir, "summary.csv")))
 print(areas[, c("id", "year", "from", "to", "ha", "cutblock_year", "cutblock_share",
