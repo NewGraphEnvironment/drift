@@ -252,7 +252,7 @@ plot(ctx_v("bulk_bc"), add = TRUE, col = "red", border = NA)
 par(op)
 ```
 
-```{r fig-box, fig.height = 7 * asp, fig.cap = paste0("The box, in the sharp Esri Wayback image of ", fmt(newest), ". The blue line is the edge of the floodplain, and the gold outlines are the ", nrow(areas), " areas of 1 ha or more whose land cover switched once and stayed. The scale bar is 500 m.")}
+```{r fig-box, fig.height = 7 * asp, fig.cap = paste0("The box, in the sharp Esri Wayback image of ", fmt(newest), ". The blue line is the edge of the floodplain, and the gold outlines are the ", nrow(areas), " areas of 1 ha or more whose land cover switched once and stayed. Ground outside the floodplain is dimmed. The scale bar is 500 m.")}
 op <- par(mar = c(0, 0, 0, 0), bg = "white")
 plotRGB(wb_box, scale = 255, mar = NA, axes = FALSE)
 plot(outside, add = TRUE, col = "white", alpha = 0.35, legend = FALSE, axes = FALSE)
@@ -270,7 +270,7 @@ areas, and show only `r paste(by_ground("Change"), collapse = ", ")` as a change
 `r paste(by_ground("Class error"), collapse = ", ")` are class errors, where the
 land-cover map gave the same ground a different class. The
 `r length(c(by_ground("Likely change"), by_ground("Unclear")))` areas dated after
-`r yr(newest)` are seen only in Sentinel-2:
+`r yr(newest)` have no sharp image after their change, only Sentinel-2:
 `r paste(by_ground("Likely change"), collapse = ", ")` look like forest opening up,
 and `r paste(by_ground("Unclear"), collapse = ", ")` is unclear.
 
@@ -359,7 +359,7 @@ or, for the areas dated `r yr(newest)`, late in its year.
 Each row below is one area: Wayback before the change and at its end or after
 it, then Sentinel-2 the summer before and the summer of the change. The outline
 is the area, in the colour of its year, and the link above each row opens
-Google's current satellite image of it.
+Google's satellite image of it, which Google does not date.
 
 ```{r fig-seen, results = "asis", fig.height = 7 / 4}
 area_rows(seen, list(wb_panel("wb_before"), wb_panel("wb_after"), s2_panel(-1), s2_panel(0)))
