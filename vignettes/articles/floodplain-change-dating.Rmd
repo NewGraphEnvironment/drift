@@ -71,13 +71,13 @@ seen_by_eye <- data.frame(
           "D 2020 Crops Rangeland", "E 2020 Crops Rangeland", "F 2021 Trees Rangeland",
           "G 2022 Trees Rangeland", "H 2022 Trees Crops", "I 2023 Trees Rangeland",
           "J 2023 Trees Rangeland"),
-  shows = c("Part of one open meadow, the same before and after",
+  shows = c("Part of one open meadow; its western arm crosses the strip mown in 2016",
             "The same stand of trees before and after",
-            "Creekside forest opened up, with new trails",
+            "Creekside forest opened up",
             "Part of the same meadow; mown in 2016, grassed in 2020",
             "Part of the same meadow, running into a farmyard; the same before and after",
             "Forest in 2020, then brightens in 2021",
-            "An open wet meadow along a channel in 2020, then brightens in 2022",
+            "An open wet meadow along a channel in 2020, then brightens over 2021 and 2022",
             "Forest in 2020, then brightens in 2022",
             "Forest in 2020, then opens to bare ground in 2023",
             "Forest in 2020, then opens to bare ground in 2023")
@@ -87,23 +87,28 @@ if (!identical(paste(areas$id, areas$year, areas$from, areas$to), seen_by_eye$ke
 }
 areas$shows <- seen_by_eye$shows
 
-# Sentinel-2 brightening: each area's mean display value in its year less the
-# year before, against the same for the whole box. Forest is dark, so a patch
-# opened to grass or bare ground brightens more than the box does.
+# Sentinel-2 brightening: each area's mean display value less the year before,
+# less the same for the whole box, for every year. Forest is dark, so a patch
+# opened to grass or bare ground brightens more than the box does that year.
 s2_grey <- lapply(s2, mean)
 box_mean <- vapply(s2_grey, function(r) global(r, "mean")[[1]], 1)
-areas$rise <- vapply(seq_len(nrow(areas)), function(a) {
-  m <- vapply(as.character(areas$year[a] - 1:0), function(k) {
-    extract(s2_grey[[k]], area_v[a], fun = mean)[1, 2]
-  }, 1)
-  m[2] - m[1]
-}, 1)
-areas$rise_box <- box_mean[as.character(areas$year)] - box_mean[as.character(areas$year - 1)]
-areas$brightens <- areas$rise > areas$rise_box
+area_mean <- t(vapply(seq_len(nrow(areas)), function(a) {
+  vapply(s2_grey, function(r) extract(r, area_v[a], fun = mean)[1, 2], 1)
+}, numeric(length(years))))
+rise <- t(apply(area_mean, 1, diff)) - matrix(diff(box_mean), nrow(areas), length(years) - 1,
+                                              byrow = TRUE)
+colnames(rise) <- years[-1]
+areas$rise <- rise[cbind(seq_len(nrow(areas)), match(areas$year, years[-1]))]
+areas$brightens <- areas$rise > 0
+# the year of an area's largest rise against the box
+areas$rise_year <- as.integer(colnames(rise)[apply(rise, 1, which.max)])
 
 seen <- which(!is.na(areas$wb_before) & !is.na(areas$wb_after))
 s2_only <- which(is.na(areas$wb_after) & !is.na(areas$wb_before))
-stopifnot(all(areas$brightens[s2_only]), areas$brightens[areas$id == "A"],
+stopifnot(all(areas$rise_year[s2_only] == areas$year[s2_only]),
+          areas$brightens[areas$id == "A"],
+          all(areas$wb_before[seen] == areas$wb_before[seen[1]]),
+          all(as.Date(areas$wb_after[seen]) == newest),
           all(areas$cutblock_share[areas$id != "I"] < 0.1),
           areas$cutblock_share[areas$id == "I"] >= 0.1,
           !is.na(areas$cutblock_year[areas$id == "I"]),
@@ -173,8 +178,8 @@ floodplain in the Bulkley River watershed group, northern British Columbia,
 where most of the change lies along Maxan Creek and Crow Creek. It then looks at each
 change with drift's two imagery tools: sharp Esri Wayback images where they
 exist, and a Sentinel-2 image of every summer. The sharp images say what
-changed; here they stop in `r yr(newest)`, so the later changes are dated by
-Sentinel-2 alone.
+changed; here they stop in `r yr(newest)`, so the later changes are seen only
+in Sentinel-2.
 
 ## What changed in this floodplain, and when?
 
@@ -230,9 +235,9 @@ knitr::kable(data.frame(
 `dft_stac_composite()` reads Sentinel-2 from Microsoft's Planetary Computer.
 For each summer it takes the June and July scenes, masks cloud and snow, and
 keeps the median of each band. The panels share one display stretch, so a
-difference in brightness between them is in the data, not the display. A summer
-with few clear scenes still carries haze: the 2019 image is the palest of the
-seven, in patches.
+difference in brightness between them is in the data, not the display. A
+composite can still carry pale patches: the 2019 image is the palest of the
+seven.
 
 ```{r fetch-composites, eval = FALSE, code = from_script("composites")}
 ```
@@ -256,10 +261,9 @@ area_rows(seen, list(wb_panel("wb_before"), wb_panel("wb_after"), s2_panel(-1), 
 ```
 
 Only C is a change on the ground. The forest along Maxan Creek has opened up by
-`r yr(newest)`, with new trails through it. A, D and E are parts of one open
-meadow, the same in both images, which the land-cover map moved from Crops to
-Rangeland; at D the meadow was mown in 2016 and grassed over by `r yr(newest)`,
-a change of use at most. B is the same stand of trees in both.
+`r yr(newest)`. A, D and E are parts of one open meadow, which the land-cover
+map moved from Crops to Rangeland; where it was mown in 2016, across D and the
+western arm of A, it is grassed over by `r yr(newest)`, a change of use at most. B is the same stand of trees in both.
 Sentinel-2 alone would not have shown this: in its year A brightens more than the
 box as a whole does, just as a cleared patch would.
 
@@ -274,10 +278,11 @@ along a channel.
 area_rows(s2_only, list(wb_panel("wb_before"), s2_panel(-1), s2_panel(0)))
 ```
 
-Sentinel-2 dates each of them: in its year, each area brightens more than the box
-as a whole does. For F, H, I and J that is forest opening to grass or bare
-ground. G was already open in `r yr(newest)`, so the map's switch from Trees there
-may be a label catching up with what was on the ground. Part of I
+Sentinel-2 bears the dates out: of the six years, each area brightens most,
+against the box as a whole, in the year the map gives it. For F, H, I and J that
+is forest opening to grass or bare ground in one summer. G brightens over two
+summers and was already open in `r yr(newest)`, so the map's switch from Trees
+there may be a label catching up with what was on the ground. Part of I
 lies in a cutblock the province records as harvested from
 `r areas$cutblock_year[areas$id == "I"]`, and none of the others lies mostly in
 one. What happened in F, G, H and J cannot be told at 10 m: a cut, a slide and
@@ -288,8 +293,7 @@ a channel moving would all look alike.
 Wayback can show only what Esri's providers imaged and Esri released. Over this
 box it holds `r nrow(sharp)` sharp captures, from `r paste(fmt(sharp$capture_date), collapse = ", ")`.
 The newest is still the one drawn by every release from `r fmt(newest_first)` to
-`r fmt(newest_last)`, the latest. Nothing sharper or newer has been released
-here, so a change after `r yr(newest)` has no sharp image yet. Sentinel-2 images
+`r fmt(newest_last)`, the latest. Nothing newer has been released here, so a change after `r yr(newest)` has no sharp image yet. Sentinel-2 images
 every summer, but at 10 m.
 
 ## The numbers
@@ -319,5 +323,5 @@ knitr::kable(data.frame(
 - Wayback shows only what Esri has released, and here nothing after
   `r fmt(newest)`; the `r fmt(sharp$capture_date[sharp$cover_max < 0.99])` capture covers only part
   of the box.
-- Sentinel-2 at 10 m dates a change and shows that ground opened up or greened,
-  not what did it, and a summer with few clear scenes carries haze.
+- Sentinel-2 at 10 m bears out a date and shows that ground opened up or greened,
+  not what did it, and a composite can carry pale patches.

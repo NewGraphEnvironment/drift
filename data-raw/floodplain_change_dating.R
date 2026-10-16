@@ -7,7 +7,8 @@
 #
 # Every call goes to the network the first time and to drift's cache after it
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
-# except the STAC item, its rasters and the BC cutblocks, which are read live.
+# except the STAC item, its rasters, the Wayback release list and the BC
+# cutblocks, which are read live.
 # A warm rerun must leave the committed files unchanged unless the published
 # item or the cutblock layer changed. Only small display files are committed;
 # the article reads them and makes no network call.
@@ -24,8 +25,8 @@
 #   floodplain.csv  - the floodplain in the box, as WKT in UTM 9N: the area
 #                     (part "area") and its edge cut to the box (part "edge")
 #   change.tif      - per floodplain cell: 0 stable, 1 changed but never settled,
-#                     2 flickered and came back, or the year (2018-2023) of a
-#                     clean switch; 255 outside the floodplain
+#                     2 flickered and came back, or the year of a clean switch
+#                     less 2000 (18-23); 255 (nodata) outside the floodplain
 #   areas.csv       - change areas: connected cells that switched cleanly in the
 #                     same year, 1 ha or more, with their classes, size, the
 #                     cutblock they lie in, and the views drawn of them
@@ -199,6 +200,14 @@ releases <- dft_wayback_releases()
 releases <- releases[releases$release_date >= as.Date("2015-01-01") &
                        releases$release_date <= as.Date("2026-10-15"), ]
 captures <- dft_wayback_captures(aoi, zoom = 16:18, releases = releases)
+
+# A polygon pick prefers the later release among equally near captures, and cover
+# only breaks ties, so keep for each capture only the releases where it covers as
+# much of the box as it ever does (research/esri-wayback.md, "Picking for a polygon").
+best <- stats::ave(captures$cover, captures$capture_date, FUN = max)
+sharp <- captures[captures$res_m < 1 & captures$cover >= best - 0.001, ]
+sharp_dates <- sort(unique(sharp$capture_date))
+picks <- dft_wayback_pick(sharp, as.Date(paste0(format(sharp_dates, "%Y"), "-07-01")))
 ## ----
 
 # One row per capture. The provider name changes across releases (DigitalGlobe
@@ -212,30 +221,27 @@ cap_tab <- do.call(rbind, lapply(split(captures, captures$capture_date), functio
 }))
 utils::write.csv(cap_tab, file.path(out_dir, "captures.csv"), row.names = FALSE)
 
-# A polygon pick prefers the later release among equally near captures, and cover
-# only breaks ties, so keep for each capture only the releases where it covers as
-# much of the box as it ever does (research/esri-wayback.md, "Picking for a polygon").
-cover_best <- stats::ave(captures$cover, captures$capture_date, FUN = max)
-sub <- captures[captures$res_m < 1 & captures$cover >= cover_best - 0.001, ]
-sub_dates <- sort(unique(sub$capture_date))
-picks <- dft_wayback_pick(sub, as.Date(paste0(format(sub_dates, "%Y"), "-07-01")))
-picks <- picks[match(sub_dates, picks$capture_date), ]
+picks <- picks[match(sharp_dates, picks$capture_date), ]
 if (anyNA(picks$capture_date)) stop("A sub-metre capture was not picked for its own year")
 
-# Tiles are not cached and one failed tile aborts a fetch, so retry a transient
-# HTTP failure; the finished chip is cached, so a retry after success is free.
+# Tiles are not cached and one failed tile aborts a fetch, so fetch each chip
+# here first with retries on a transient HTTP failure. The finished chip is
+# cached, so the block below, which the article shows, reads it from the cache.
 fetch_retry <- function(..., tries = 3) {
   for (k in seq_len(tries)) {
     r <- tryCatch(dft_wayback_fetch(...), drift_wayback_http = function(e) e)
-    if (!inherits(r, "condition")) return(r)
+    if (!inherits(r, "condition")) return(invisible(r))
     message("  fetch failed (", k, "/", tries, "): ", conditionMessage(r))
   }
   stop(r)
 }
+for (i in seq_len(nrow(picks))) {
+  fetch_retry(aoi, picks$release_id[i], picks$zoom[i], crs = crs, res = 0.5)
+}
 
 ## ---- wayback-fetch
 chips <- lapply(seq_len(nrow(picks)), function(i) {
-  fetch_retry(aoi, picks$release_id[i], picks$zoom[i], crs = crs, res = 0.5)
+  dft_wayback_fetch(aoi, picks$release_id[i], picks$zoom[i], crs = crs, res = 0.5)
 })
 names(chips) <- format(picks$capture_date)
 ## ----
