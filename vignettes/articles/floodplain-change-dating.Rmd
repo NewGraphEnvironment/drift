@@ -280,7 +280,10 @@ and `r paste(by_ground("Unclear"), collapse = ", ")` is unclear.
 The floodplain and its land cover are a published STAC item, `r item$item`
 (processed `r substr(item$processed, 1, 10)` with drift `r item$drift` and flooded
 `r item$flooded`): the floodplain polygon, and Impact Observatory's 10 m land
-cover for every year from 2017 to 2023, clipped to it. `dft_rast_break_class()`
+cover for every year from 2017 to 2023, clipped to it. The item is in the
+[stac_floodplains_bc](https://www.newgraphenvironment.com/stac_floodplains_bc/)
+catalogue, and the modelling that made it is in
+[floodplains](https://www.newgraphenvironment.com/floodplains/). `dft_rast_break_class()`
 reads the seven years in each cell and finds the year its class switched, and
 `dft_rast_break_category()` says whether the switch held.
 
