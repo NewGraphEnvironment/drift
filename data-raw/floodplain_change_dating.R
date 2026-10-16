@@ -8,11 +8,12 @@
 # Every call goes to the network the first time and to drift's cache after it
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
 # except the STAC item, its rasters, the Wayback release list, the BC
-# cutblocks, watershed group and river, and the basemap tiles, which are read
-# live, and the BC outline and towns, which bcmaps caches itself.
+# cutblocks, watershed group, river and town names, and the basemap tiles and
+# their attribution, which are read live, and the BC outline, which bcmaps caches.
 # A warm rerun must leave the committed files unchanged unless one of those live
-# sources changed: the published item, the cutblocks, the watershed group or
-# river, or Esri's basemaps (maptiles caches its tiles only for the session). Only small display files are committed;
+# sources changed: the published item, the cutblocks, the watershed group, river
+# or town names, or Esri's basemaps or their attribution (maptiles caches its
+# tiles only for the session). Only small display files are committed;
 # the article reads them and makes no network call.
 #
 # The article shows the blocks between `## ---- <label>` lines as its code, so
@@ -40,7 +41,7 @@
 #                     the Bulkley watershed group, zoom 10, Web Mercator, 8-bit
 #   context.csv     - features for the context map, as simplified WKT with their
 #                     CRS: the watershed group, its floodplain, the Bulkley River,
-#                     its towns (named), the box, and BC
+#                     its municipalities (named), the box, and BC
 #   relief_credit.txt - the basemap's attribution, as each Esri service gives it
 
 suppressMessages({
@@ -96,7 +97,12 @@ river <- bcdata::bcdc_query_geodata("WHSE_BASEMAPPING.FWA_STREAM_NETWORKS_SP") |
   dplyr::filter(GNIS_NAME == "Bulkley River", WATERSHED_GROUP_CODE == "BULK") |>
   dplyr::collect() |>
   sf::st_transform(3857)
-towns <- sf::st_filter(sf::st_transform(bcmaps::bc_cities(), 3857), around)
+around_3005 <- sf::st_transform(around, 3005)  # bcdata cannot translate a call inside filter()
+municipal <- c("City", "Town", "Village (1)", "District Municipality (1)")
+towns <- bcdata::bcdc_query_geodata("WHSE_BASEMAPPING.GNS_GEOGRAPHICAL_NAMES_SP") |>
+  dplyr::filter(INTERSECTS(around_3005), FEATURE_TYPE %in% municipal) |>
+  dplyr::collect() |>
+  sf::st_transform(3857)
 bc_outline <- bcmaps::bc_bound()
 
 ## ---- landcover
@@ -384,13 +390,15 @@ simple <- function(x, part, tol, name = "") {
   data.frame(part = part, name = name, crs = paste0("EPSG:", sf::st_crs(g)$epsg),
              wkt = sf::st_as_text(g[[1]], digits = 7))
 }
-river_xy <- sf::st_zm(river)
+# the WFS returns segments in no fixed order, and a union keeps the order it is given
+river_xy <- sf::st_zm(river[order(river$LINEAR_FEATURE_ID), ])
+towns <- towns[order(towns$GEOGRAPHICAL_NAME), ]
 context <- rbind(
   simple(bulk, "bulk", 100),
   simple(sf::st_transform(fp, 3857), "floodplain", 120),
   simple(river_xy, "river", 100, "Bulkley River"),
   do.call(rbind, lapply(seq_len(nrow(towns)), function(i) {
-    simple(towns[i, ], "town", 0, tools::toTitleCase(tolower(towns$NAME[i])))
+    simple(towns[i, ], "town", 0, towns$GEOGRAPHICAL_NAME[i])
   })),
   simple(sf::st_transform(aoi, 3857), "box", 0),
   simple(bc_outline, "bc", 2000),
