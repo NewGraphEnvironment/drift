@@ -34,6 +34,7 @@
 #   captures.csv    - the dated Wayback captures over the box
 #   s2_<year>.tif   - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one stretch
 #   wb_<area>_<date>.tif - sub-metre Wayback view of a change area, 0.5 m, 8-bit
+#   wb_box_<date>.tif - the newest sub-metre capture over the whole box, 2 m, 8-bit
 
 suppressMessages({
   library(sf)
@@ -345,6 +346,15 @@ for (a in seq_len(nrow(areas))) {
                file.path(out_dir, paste0("wb_", areas$id[a], "_", d, ".tif")), rgb, jpeg = TRUE)
   }
 }
+
+# The overview: the newest sharp capture over the whole box, at 2 m. It is drawn
+# as one capture, so it must cover the whole box.
+newest_d <- format(max(picks$capture_date))
+if (cap_tab$cover_max[format(cap_tab$capture_date) == newest_d] < 0.999) {
+  stop("The newest sharp capture does not cover the whole box")
+}
+ov <- round(terra::aggregate(chips[[newest_d]], fact = 4, fun = "mean", na.rm = TRUE))
+write_8bit(ov, file.path(out_dir, paste0("wb_box_", newest_d, ".tif")), rgb, jpeg = TRUE)
 
 print(read.csv(file.path(out_dir, "summary.csv")))
 print(areas[, c("id", "year", "from", "to", "ha", "cutblock_year", "cutblock_share",

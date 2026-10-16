@@ -64,6 +64,9 @@ s2_view <- setNames(lapply(years, function(y) rast(d(paste0("s2_", y, ".tif"))))
 fpc <- utils::read.csv(d("floodplain.csv"))
 fp_edge <- vect(fpc$wkt[fpc$part == "edge"], crs = crs)
 area_v <- vect(areas$wkt, crs = crs)
+wb_box <- rast(d(paste0("wb_box_", fmt(newest), ".tif")))
+# ground outside the floodplain is dimmed, so the floodplain reads as the subject
+outside <- ifel(is.na(change), 1, NA)
 
 # What the imagery shows in each area was read off the panels below. It is tied
 # to the areas it was read for, so a rerun that changes them stops the build
@@ -82,12 +85,23 @@ seen_by_eye <- data.frame(
             "An open wet meadow along a channel in 2020, then brightens over 2021 and 2022",
             "Forest in 2020, then brightens in 2022",
             "Forest in 2020, then opens up in 2023",
-            "Forest in 2020, then opens up in 2023")
+            "Forest in 2020, then opens up in 2023"),
+  ground = c("Class error", "Class error", "Change", "Class error", "Class error",
+             "Likely change", "Unclear", "Likely change", "Likely change", "Likely change")
 )
 if (!identical(paste(areas$id, areas$year, areas$from, areas$to), seen_by_eye$key)) {
   stop("areas.csv has changed: look at the panels again before reusing the verdicts")
 }
 areas$shows <- seen_by_eye$shows
+areas$ground <- seen_by_eye$ground
+by_ground <- function(g) areas$id[areas$ground == g]
+
+# A Google Maps satellite link at a point inside each area. Google does not say
+# when its image was taken, so it is a look at the ground now, not a date.
+ll <- crds(project(vect(cbind(areas$lab_x, areas$lab_y), crs = crs), "EPSG:4326"))
+areas$google <- sprintf(
+  "https://www.google.com/maps/@?api=1&map_action=map&center=%.5f,%.5f&zoom=17&basemap=satellite",
+  ll[, 2], ll[, 1])
 
 # Sentinel-2 brightening: each area's mean display value less the year before,
 # less the same for the whole box, for every year. Forest is dark, so a patch
@@ -195,6 +209,28 @@ exist, and a Sentinel-2 image of every summer. The sharp images say what
 changed; here they stop in `r yr(newest)`, so the later changes are seen only
 in Sentinel-2.
 
+```{r fig-overview, fig.height = 7 * asp, fig.cap = paste0("The box, in the sharp Esri Wayback image of ", fmt(newest), ". The blue line is the edge of the floodplain, and the gold outlines are the ", nrow(areas), " areas of 1 ha or more whose land cover switched once and stayed. The scale bar is 500 m.")}
+op <- par(mar = c(0, 0, 0, 0), bg = "white")
+plotRGB(wb_box, scale = 255, mar = NA, axes = FALSE)
+plot(outside, add = TRUE, col = "white", alpha = 0.35, legend = FALSE, axes = FALSE)
+draw_fp(1.2)
+lines(area_v, col = "white", lwd = 3)
+lines(area_v, col = "gold", lwd = 1.5)
+text(vect(cbind(areas$lab_x, areas$lab_y), crs = crs), areas$id,
+     col = "black", font = 2, cex = 0.8, halo = TRUE, hc = "white")
+sbar(500, "topleft", type = "bar", divs = 2, below = "", label = "", col = "white")
+par(op)
+```
+
+Most of the mapped change is not change on the ground. Of the `r nrow(areas)`
+areas, the sharp images show `r paste(by_ground("Change"), collapse = ", ")` as a
+change and `r paste(by_ground("Class error"), collapse = ", ")` as class errors,
+where the land-cover map gave the same ground a different class. The
+`r length(c(by_ground("Likely change"), by_ground("Unclear")))` areas dated after
+`r yr(newest)` are seen only in Sentinel-2:
+`r paste(by_ground("Likely change"), collapse = ", ")` look like forest opening up,
+and `r paste(by_ground("Unclear"), collapse = ", ")` is unclear.
+
 ## What changed in this floodplain, and when?
 
 The floodplain and its land cover are a published STAC item, `r item$item`
@@ -216,8 +252,6 @@ makes no network call.
 ```{r fig-lead, fig.height = 7 * asp, fig.cap = paste0("Floodplain cells by the year their land cover switched and stayed switched, over the ", years[length(years)], " Sentinel-2 image. Grey cells changed but never settled on one class. Uncoloured floodplain cells either kept their class or flickered and came back to it. Ground outside the floodplain is dimmed. Letters name the change areas of 1 ha or more. The blue line is the edge of the floodplain; the scale bar is 500 m.")}
 op <- par(mar = c(0, 0, 0, 0), bg = "white")
 plotRGB(s2_view[[length(s2_view)]], scale = 255, mar = NA, axes = FALSE)
-# ground outside the floodplain is dimmed, so the floodplain reads as the subject
-outside <- ifel(is.na(change), 1, NA)
 plot(outside, add = TRUE, col = "white", alpha = 0.45, legend = FALSE, axes = FALSE)
 # change.tif stores a switch year less 2000, 1 for never settled, 0 and 2 for
 # no lasting change, and NA outside the floodplain
@@ -324,15 +358,19 @@ every summer, but at 10 m.
 
 ```{r numbers, echo = FALSE}
 fp_ha <- function(w) round(summ$ha[summ$what == w], 1)
+ord <- order(match(areas$ground, c("Class error", "Change", "Likely change", "Unclear")),
+             areas$year, areas$id)
 knitr::kable(data.frame(
   Area = areas$id, Year = areas$year,
   `Land cover` = paste(areas$from, "to", areas$to),
-  ha = areas$ha,
+  `On the ground` = areas$ground,
   `What the imagery shows` = areas$shows,
+  ha = areas$ha,
   Cutblock = ifelse(areas$cutblock_share >= 0.1,
                     paste0(round(100 * areas$cutblock_share), "% in a ", areas$cutblock_year, " block"), ""),
+  `Google Maps` = paste0("[view](", areas$google, ")"),
   check.names = FALSE
-), caption = paste0("The change areas. Cutblock is the share of the area inside a BC consolidated cutblock, with the block's harvest start year, where that is 10% or more. Across the box, the floodplain's 10 m cells hold ",
+)[ord, ], row.names = FALSE, caption = paste0("The change areas, class errors first. On the ground is what the imagery shows: a change or a class error where Wayback has sharp images from before and after, and a likely change where only Sentinel-2 does. Google Maps opens Google's current satellite image of the area, whose date Google does not give. Cutblock is the share of the area inside a BC consolidated cutblock, with the block's harvest start year, where that is 10% or more. Across the box, the floodplain's 10 m cells hold ",
   fp_ha("Stable"), " ha with no change, ", fp_ha("Changed once, and stayed"), " ha that switched once and stayed, ",
   fp_ha("Changed, never settled"), " ha that changed and never settled, and ", fp_ha("Flickered and came back"),
   " ha that flickered and came back to its first class."))
