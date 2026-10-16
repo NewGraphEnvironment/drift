@@ -8,7 +8,7 @@
 # Every call goes to the network the first time and to drift's cache after it
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
 # except the STAC item, its rasters, the Wayback release list, the BC
-# cutblocks, watershed group, river and town names, and the basemap tiles and
+# cutblocks, watershed group, river, town names, and the basemap tiles and
 # their attribution, which are read live, and the BC outline, which bcmaps caches.
 # A warm rerun must leave the committed files unchanged unless one of those live
 # sources changed: the published item, the cutblocks, the watershed group, river
