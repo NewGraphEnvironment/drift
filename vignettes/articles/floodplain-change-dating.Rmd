@@ -64,7 +64,6 @@ s2_view <- setNames(lapply(years, function(y) rast(d(paste0("s2_", y, ".tif"))))
 fpc <- utils::read.csv(d("floodplain.csv"))
 fp_edge <- vect(fpc$wkt[fpc$part == "edge"], crs = crs)
 area_v <- vect(areas$wkt, crs = crs)
-wb_box <- rast(d(paste0("wb_box_", fmt(newest), ".tif")))
 topo <- rast(d("topo_bulk.tif"))
 topo_credit <- readLines(d("topo_credit.txt"))
 ctx <- utils::read.csv(d("context.csv"))
@@ -249,19 +248,6 @@ bc_v <- ctx_v("bc")
 plot(bc_v, col = "grey92", border = "grey45", axes = FALSE, mar = c(0, 0, 0, 0),
      background = "white", box = TRUE)
 plot(ctx_v("bulk_bc"), add = TRUE, col = "red", border = NA)
-par(op)
-```
-
-```{r fig-box, fig.height = 7 * asp, fig.cap = paste0("The box, in the sharp Esri Wayback image of ", fmt(newest), ". The blue line is the edge of the floodplain, and the gold outlines are the ", nrow(areas), " areas of 1 ha or more where neighbouring cells switched in the same year and stayed. Ground outside the floodplain is dimmed. The scale bar is 500 m.")}
-op <- par(mar = c(0, 0, 0, 0), bg = "white")
-plotRGB(wb_box, scale = 255, mar = NA, axes = FALSE)
-plot(outside, add = TRUE, col = "white", alpha = 0.35, legend = FALSE, axes = FALSE)
-draw_fp(1.2)
-lines(area_v, col = "white", lwd = 3)
-lines(area_v, col = "gold", lwd = 1.5)
-text(vect(cbind(areas$lab_x, areas$lab_y), crs = crs), areas$id,
-     col = "black", font = 2, cex = 0.8, halo = TRUE, hc = "white")
-sbar(500, "topleft", type = "bar", divs = 2, below = "", label = "", col = "white")
 par(op)
 ```
 

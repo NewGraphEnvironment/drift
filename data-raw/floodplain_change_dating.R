@@ -36,7 +36,6 @@
 #   captures.csv    - the dated Wayback captures over the box
 #   s2_<year>.tif   - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one stretch
 #   wb_<area>_<date>.tif - sub-metre Wayback view of a change area, 0.5 m, 8-bit
-#   wb_box_<date>.tif - the newest sub-metre capture over the whole box, 2 m, 8-bit
 #   topo_bulk.tif   - Esri World Topographic Map over the Bulkley watershed group,
 #                     zoom 9, Web Mercator, 8-bit
 #   context.csv     - outlines for the context map, as simplified WKT with their
@@ -364,14 +363,6 @@ for (a in seq_len(nrow(areas))) {
   }
 }
 
-# The overview: the newest sharp capture over the whole box, at 2 m. It is drawn
-# as one capture, so it must cover the whole box.
-newest_d <- format(max(picks$capture_date))
-if (cap_tab$cover_max[format(cap_tab$capture_date) == newest_d] < 0.999) {
-  stop("The newest sharp capture does not cover the whole box")
-}
-ov <- round(terra::aggregate(chips[[newest_d]], fact = 4, fun = "mean", na.rm = TRUE))
-write_8bit(ov, file.path(out_dir, paste0("wb_box_", newest_d, ".tif")), rgb, jpeg = TRUE)
 
 # The context map: outlines simplified for drawing at the watershed-group scale
 simple <- function(x, part, tol) {
