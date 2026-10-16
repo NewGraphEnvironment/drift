@@ -101,7 +101,7 @@ areas$ground <- seen_by_eye$ground
 by_ground <- function(g) areas$id[areas$ground == g]
 
 # A Google Maps satellite link at a point inside each area. Google does not say
-# when its image was taken, so it is a look at the ground now, not a date.
+# when its image was taken, so it is an undated look at the ground, not a date.
 ll <- crds(project(vect(cbind(areas$lab_x, areas$lab_y), crs = crs), "EPSG:4326"))
 areas$google <- sprintf(
   "https://www.google.com/maps/@?api=1&map_action=map&center=%.5f,%.5f&zoom=17&basemap=satellite",
@@ -218,7 +218,7 @@ exist, and a Sentinel-2 image of every summer. The sharp images say what
 changed; here they stop in `r yr(newest)`, so the later changes are seen only
 in Sentinel-2.
 
-```{r fig-context, fig.height = 7 * nrow(topo) / ncol(topo), fig.cap = paste0("The box in the Bulkley River watershed group, northern British Columbia. Blue is the watershed group's floodplain, and the inset shows the group in the province. The scale bar is 20 km at the box's latitude. Basemap: ", topo_credit, ".")}
+```{r fig-context, fig.height = 7 * nrow(topo) / ncol(topo), fig.cap = paste0("The box in the Bulkley River watershed group, northern British Columbia. Blue is the watershed group's floodplain, ground outside the group is dimmed, and the inset shows the group in the province. The scale bar is 20 km at the box's latitude. Basemap: ", topo_credit, ".")}
 op <- par(mar = c(0, 0, 0, 0), bg = "white")
 plotRGB(topo, scale = 255, mar = NA, axes = FALSE)
 bulk_v <- ctx_v("bulk")
@@ -252,7 +252,7 @@ plot(ctx_v("bulk_bc"), add = TRUE, col = "red", border = NA)
 par(op)
 ```
 
-```{r fig-box, fig.height = 7 * asp, fig.cap = paste0("The box, in the sharp Esri Wayback image of ", fmt(newest), ". The blue line is the edge of the floodplain, and the gold outlines are the ", nrow(areas), " areas of 1 ha or more whose land cover switched once and stayed. Ground outside the floodplain is dimmed. The scale bar is 500 m.")}
+```{r fig-box, fig.height = 7 * asp, fig.cap = paste0("The box, in the sharp Esri Wayback image of ", fmt(newest), ". The blue line is the edge of the floodplain, and the gold outlines are the ", nrow(areas), " areas of 1 ha or more where neighbouring cells switched in the same year and stayed. Ground outside the floodplain is dimmed. The scale bar is 500 m.")}
 op <- par(mar = c(0, 0, 0, 0), bg = "white")
 plotRGB(wb_box, scale = 255, mar = NA, axes = FALSE)
 plot(outside, add = TRUE, col = "white", alpha = 0.35, legend = FALSE, axes = FALSE)
