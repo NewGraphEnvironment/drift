@@ -33,5 +33,5 @@ data-raw/logs/break_class_groups/*/summary_patches.csv
 # CSVs beside it are the committed evidence record.
 data-raw/logs/disturbance_compare/*/summary_patch_join.csv
 
-# terra sidecars written when the wayback-change article reads its rasters
-vignettes/articles/wayback-change/*.aux.*
+# terra sidecars written when the floodplain-change-dating article reads its rasters
+vignettes/articles/floodplain-change-dating/*.aux.*

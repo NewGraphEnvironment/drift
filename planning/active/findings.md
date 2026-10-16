@@ -24,3 +24,16 @@
 | Error | Resolution |
 |-------|------------|
 | `read_chunk(p)`: object 'p' not found | knitr pre-evaluates read_chunk; use `code =` with readLines |
+| Wayback metadata HTTP 502 after 25/182 releases (32.9 min cold) | Transient; the run was cold only because the box corners were rounded differently from the old script's, so every cache key missed. Used the old full-precision corners: 182 releases in 0.5 min warm |
+| bcdata: `No known SQL translation` for `INTERSECTS(sf::st_transform(aoi, 3005))` | Compute the geometry before `filter()` |
+
+## The change areas against the imagery (2026-10-16)
+
+Ten areas of 1 ha or more (A-J). A-E (2018-2020) have Wayback 2016-09-11 before and 2020-09-18 after, each
+covering the whole view. Looked at full size: only C (2019, Trees to Rangeland) is a change on the ground
+(creekside forest opened up, new trails). A, D, E are the same open field in both images (Crops to
+Rangeland; D striped by cutting or tilling in 2016, grassed in 2020); B is the same stand of trees.
+Sentinel-2 brightening alone would have misled: A brightens 64 display units in 2018 while the box
+moves 1. F-J (2021-2023) are forest in the 2020 image and brighten by 47-110 units in their year
+against -4 to 30 for the box. I is 27% inside a 2023 cutblock; no other area is 10% or more in one.
+2019 is pale across the box (+63 over 2018) and 2017 is a single scene.

@@ -6,14 +6,14 @@ product from STAC, use drift to date the detected change, show each change with 
 keep numbers to one table, fold all code.
 
 ## Phase 1: data-raw script
-- [ ] `data-raw/floodplain_change_dating.R`: STAC item `bulk_all_ff04` via rstac (record processing date,
+- [x] `data-raw/floodplain_change_dating.R`: STAC item `bulk_all_ff04` via rstac (record processing date,
       drift version); floodplain `all_ff04`; annual classified 2017-2023 cropped to the box
-- [ ] `dft_rast_break_class()` + `dft_rast_break_category()`: per-pixel change year for clean switches;
+- [x] `dft_rast_break_class()` + `dft_rast_break_category()`: per-pixel change year for clean switches;
       change areas = connected clean-switch pixels of one year, with from/to class and size
-- [ ] Sentinel-2 composites 2017-2023 on one shared stretch; Wayback captures/picks/chips as before
-- [ ] Wayback before/after chips for the change areas Wayback brackets; cutblock start year per area as
+- [x] Sentinel-2 composites 2017-2023 on one shared stretch; Wayback captures/picks/chips as before
+- [x] Wayback before/after chips for the change areas Wayback brackets; cutblock start year per area as
       corroboration
-- [ ] `## ----` sections for every block the article shows; deterministic writes; warm rerun byte-identical
+- [x] `## ----` sections for every block the article shows; deterministic writes; warm rerun byte-identical
 
 ## Phase 2: article
 - [ ] `vignettes/articles/floodplain-change-dating.Rmd`: folded code via a source hook; fetch code read from
