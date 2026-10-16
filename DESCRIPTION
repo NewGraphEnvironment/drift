@@ -4,8 +4,9 @@ Version: 0.24.1
 Date: 2026-10-15
 Authors@R: c(
     person("Allan", "Irvine", , "al@newgraphenvironment.com", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0002-3495-2128")),
-    person("New Graph Environment", role = "cph")
+           comment = c(ORCID = "0000-0002-3495-2128",
+                       affiliation = "New Graph Environment Ltd.")),
+    person("New Graph Environment Ltd.", role = c("cph", "fnd"))
     )
 Description: Fetch STAC-hosted land cover rasters, classify and summarize
     change over time within user-provided AOI polygons, and produce

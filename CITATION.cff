@@ -18,6 +18,23 @@ authors:
   given-names: Allan
   email: al@newgraphenvironment.com
   orcid: https://orcid.org/0000-0002-3495-2128
+  affiliation: New Graph Environment Ltd.
+preferred-citation:
+  title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
+  authors:
+  - family-names: Irvine
+    given-names: Allan
+    email: al@newgraphenvironment.com
+    orcid: https://orcid.org/0000-0002-3495-2128
+    affiliation: New Graph Environment Ltd.
+  version: 0.24.1
+  date-released: '2026-10-15'
+  url: https://newgraphenvironment.github.io/drift/
+  repository-code: https://github.com/NewGraphEnvironment/drift
+  license: MIT
+  type: software
+  publisher:
+    name: New Graph Environment Ltd.
 repository-code: https://github.com/NewGraphEnvironment/drift
 url: https://newgraphenvironment.github.io/drift/
 date-released: '2026-10-15'
@@ -26,4 +43,5 @@ contact:
   given-names: Allan
   email: al@newgraphenvironment.com
   orcid: https://orcid.org/0000-0002-3495-2128
+  affiliation: New Graph Environment Ltd.
 
