@@ -64,10 +64,10 @@ s2_view <- setNames(lapply(years, function(y) rast(d(paste0("s2_", y, ".tif"))))
 fpc <- utils::read.csv(d("floodplain.csv"))
 fp_edge <- vect(fpc$wkt[fpc$part == "edge"], crs = crs)
 area_v <- vect(areas$wkt, crs = crs)
-topo <- rast(d("topo_bulk.tif"))
-topo_credit <- readLines(d("topo_credit.txt"))
+relief <- rast(d("relief_bulk.tif"))
+relief_credit <- readLines(d("relief_credit.txt"))
 ctx <- utils::read.csv(d("context.csv"))
-ctx_v <- function(part) vect(ctx$wkt[ctx$part == part], crs = ctx$crs[ctx$part == part])
+ctx_v <- function(part) vect(ctx$wkt[ctx$part == part], crs = ctx$crs[ctx$part == part][1])
 # ground outside the floodplain is dimmed, so the floodplain reads as the subject
 outside <- ifel(is.na(change), 1, NA)
 
@@ -217,22 +217,35 @@ exist, and a Sentinel-2 image of every summer. The sharp images say what
 changed; here they stop in `r yr(newest)`, so the later changes are seen only
 in Sentinel-2.
 
-```{r fig-context, fig.height = 7 * nrow(topo) / ncol(topo), fig.cap = paste0("The box in the Bulkley River watershed group, northern British Columbia. Blue is the watershed group's floodplain, ground outside the group is dimmed, and the inset shows the group in the province. The scale bar is 20 km at the box's latitude. Basemap: ", topo_credit, ".")}
+```{r fig-context, fig.height = 7 * nrow(relief) / ncol(relief), fig.cap = paste0("The box in the Bulkley River watershed group, northern British Columbia. Blue is the watershed group's floodplain and the darker line the Bulkley River; ground outside the group is dimmed, and the inset shows the group in the province. The scale bar is 20 km at the box's latitude. Basemap: ", relief_credit, ".")}
 op <- par(mar = c(0, 0, 0, 0), bg = "white")
-plotRGB(topo, scale = 255, mar = NA, axes = FALSE)
+plotRGB(relief, scale = 255, mar = NA, axes = FALSE)
 bulk_v <- ctx_v("bulk")
 # outside the watershed group is dimmed
-frame_v <- as.polygons(ext(topo), crs = crs(topo))
+frame_v <- as.polygons(ext(relief), crs = crs(relief))
 plot(erase(frame_v, bulk_v), add = TRUE, col = adjustcolor("white", 0.5), border = NA)
 plot(ctx_v("floodplain"), add = TRUE, col = adjustcolor(fp_col, 0.75), border = NA)
 lines(bulk_v, col = "grey20", lwd = 1.5)
+river_v <- ctx_v("river")
+lines(river_v, col = "#1F4E79", lwd = 1.2)
+towns_v <- ctx_v("town")
+points(towns_v, pch = 21, bg = "white", col = "grey10", cex = 0.8)
+text(towns_v, ctx$name[ctx$part == "town"], pos = 4, offset = 0.4, cex = 0.75,
+     col = "grey10", halo = TRUE, hc = "white")
+# the river is labelled on its reach between Smithers and New Hazelton, clear of the
+# study area
+town_xy <- crds(towns_v)[ctx$name[ctx$part == "town"] %in% c("Smithers", "New Hazelton"), ]
+river_pts <- crds(river_v)
+near <- which.min(colSums((t(river_pts) - colMeans(town_xy))^2))
+text(vect(river_pts[near, , drop = FALSE], crs = crs(relief)), "Bulkley River", font = 3,
+     cex = 0.8, col = "#1F4E79", pos = 4, offset = 0.6, halo = TRUE, hc = "white")
 # the box is a few pixels at this scale, so it is ringed as well
 box_xy <- crds(centroids(ctx_v("box")))
 points(box_xy, pch = 22, cex = 1.1, col = "red", bg = "red")
 points(box_xy, pch = 1, cex = 3.5, col = "white", lwd = 4)
 points(box_xy, pch = 1, cex = 3.5, col = "red", lwd = 2)
-w <- xmax(topo) - xmin(topo)
-text(vect(box_xy + c(-0.035, 0.02) * w, crs = crs(topo)), "Study area", adj = c(1, 0),
+w <- xmax(relief) - xmin(relief)
+text(vect(box_xy + c(-0.035, 0.02) * w, crs = crs(relief)), "Study area", adj = c(1, 0),
      font = 2, cex = 0.9, col = "red", halo = TRUE, hc = "white")
 # Web Mercator stretches distance by 1 / cos(latitude)
 k <- cos(mean(ext(project(ctx_v("box"), "EPSG:4326"))[3:4]) * pi / 180)

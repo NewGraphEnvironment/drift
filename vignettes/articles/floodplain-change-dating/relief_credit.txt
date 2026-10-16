@@ -1,0 +1,1 @@
+Esri World Light Gray Base (Esri, HERE, Garmin, (c) OpenStreetMap contributors, and the GIS user community); Esri World Hillshade (Esri, Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen, Rijkswaterstaat, GSA, Geoland, FEMA, Intermap, and the GIS user community)

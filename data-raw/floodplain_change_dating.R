@@ -8,11 +8,11 @@
 # Every call goes to the network the first time and to drift's cache after it
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
 # except the STAC item, its rasters, the Wayback release list, the BC
-# cutblocks and watershed group, and the topographic tiles, which are read live,
-# and the BC outline, which bcmaps caches itself.
+# cutblocks, watershed group and river, and the basemap tiles, which are read
+# live, and the BC outline and towns, which bcmaps caches itself.
 # A warm rerun must leave the committed files unchanged unless one of those live
-# sources changed: the published item, the cutblocks, the watershed group, or
-# Esri's topographic map (maptiles caches its tiles only for the session). Only small display files are committed;
+# sources changed: the published item, the cutblocks, the watershed group or
+# river, or Esri's basemaps (maptiles caches its tiles only for the session). Only small display files are committed;
 # the article reads them and makes no network call.
 #
 # The article shows the blocks between `## ---- <label>` lines as its code, so
@@ -36,11 +36,12 @@
 #   captures.csv    - the dated Wayback captures over the box
 #   s2_<year>.tif   - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one stretch
 #   wb_<area>_<date>.tif - sub-metre Wayback view of a change area, 0.5 m, 8-bit
-#   topo_bulk.tif   - Esri World Topographic Map over the Bulkley watershed group,
-#                     zoom 9, Web Mercator, 8-bit
-#   context.csv     - outlines for the context map, as simplified WKT with their
-#                     CRS: the watershed group, its floodplain, the box, and BC
-#   topo_credit.txt - the basemap's attribution
+#   relief_bulk.tif - Esri's light grey base shaded with its World Hillshade over
+#                     the Bulkley watershed group, zoom 10, Web Mercator, 8-bit
+#   context.csv     - features for the context map, as simplified WKT with their
+#                     CRS: the watershed group, its floodplain, the Bulkley River,
+#                     its towns (named), the box, and BC
+#   relief_credit.txt - the basemap's attribution, as each Esri service gives it
 
 suppressMessages({
   library(sf)
@@ -76,13 +77,26 @@ fp <- sf::st_read(href("floodplain"), layer = "all_ff04", quiet = TRUE) |>
   sf::st_transform(crs)
 
 ## ---- context
-# Where the box lies: the Bulkley watershed group over Esri's topographic map
+# Where the box lies: the Bulkley watershed group over Esri's light grey base,
+# shaded with Esri's World Hillshade, with its river and towns drawn on top
 bulk <- bcdata::bcdc_query_geodata("WHSE_BASEMAPPING.FWA_WATERSHED_GROUPS_POLY") |>
   dplyr::filter(WATERSHED_GROUP_CODE == "BULK") |>
   dplyr::collect() |>
   sf::st_transform(3857)
 around <- sf::st_as_sfc(sf::st_bbox(sf::st_buffer(bulk, 4000)))
-topo <- maptiles::get_tiles(around, provider = "Esri.WorldTopoMap", zoom = 9, crop = TRUE)
+esri <- "https://services.arcgisonline.com/arcgis/rest/services/"
+grey_base <- maptiles::get_tiles(around, provider = "Esri.WorldGrayCanvas", zoom = 10,
+                                 crop = TRUE)
+hillshade <- maptiles::get_tiles(around, zoom = 10, crop = TRUE,
+  provider = maptiles::create_provider(
+    name = "Esri.WorldHillshade", citation = "Esri",
+    url = paste0(esri, "Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}.jpg")))
+relief <- gq::gq_basemap_blend(grey_base, hillshade, method = "gamma", as_stars = FALSE)
+river <- bcdata::bcdc_query_geodata("WHSE_BASEMAPPING.FWA_STREAM_NETWORKS_SP") |>
+  dplyr::filter(GNIS_NAME == "Bulkley River", WATERSHED_GROUP_CODE == "BULK") |>
+  dplyr::collect() |>
+  sf::st_transform(3857)
+towns <- sf::st_filter(sf::st_transform(bcmaps::bc_cities(), 3857), around)
 bc_outline <- bcmaps::bc_bound()
 
 ## ---- landcover
@@ -365,20 +379,31 @@ for (a in seq_len(nrow(areas))) {
 
 
 # The context map: outlines simplified for drawing at the watershed-group scale
-simple <- function(x, part, tol) {
+simple <- function(x, part, tol, name = "") {
   g <- sf::st_simplify(sf::st_union(sf::st_geometry(x)), dTolerance = tol)
-  data.frame(part = part, crs = paste0("EPSG:", sf::st_crs(g)$epsg), wkt = sf::st_as_text(g[[1]], digits = 7))
+  data.frame(part = part, name = name, crs = paste0("EPSG:", sf::st_crs(g)$epsg),
+             wkt = sf::st_as_text(g[[1]], digits = 7))
 }
+river_xy <- sf::st_zm(river)
 context <- rbind(
   simple(bulk, "bulk", 100),
   simple(sf::st_transform(fp, 3857), "floodplain", 120),
+  simple(river_xy, "river", 100, "Bulkley River"),
+  do.call(rbind, lapply(seq_len(nrow(towns)), function(i) {
+    simple(towns[i, ], "town", 0, tools::toTitleCase(tolower(towns$NAME[i])))
+  })),
   simple(sf::st_transform(aoi, 3857), "box", 0),
   simple(bc_outline, "bc", 2000),
   simple(sf::st_transform(bulk, 3005), "bulk_bc", 2000)
 )
 utils::write.csv(context, file.path(out_dir, "context.csv"), row.names = FALSE)
-write_8bit(topo[[1:3]], file.path(out_dir, "topo_bulk.tif"), rgb, jpeg = TRUE)
-writeLines(maptiles::get_credit("Esri.WorldTopoMap"), file.path(out_dir, "topo_credit.txt"))
+write_8bit(round(relief[[1:3]]), file.path(out_dir, "relief_bulk.tif"), rgb, jpeg = TRUE)
+credit <- vapply(c("Canvas/World_Light_Gray_Base", "Elevation/World_Hillshade"), function(svc) {
+  jsonlite::fromJSON(paste0(esri, svc, "/MapServer?f=json"))$copyrightText
+}, "")
+writeLines(paste0("Esri World Light Gray Base (", credit[1], "); Esri World Hillshade (",
+                  sub("^Sources: ", "", credit[2]), ")"),
+           file.path(out_dir, "relief_credit.txt"))
 
 print(read.csv(file.path(out_dir, "summary.csv")))
 print(areas[, c("id", "year", "from", "to", "ha", "cutblock_year", "cutblock_share",
