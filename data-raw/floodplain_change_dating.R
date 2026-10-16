@@ -41,7 +41,7 @@
 #                     the Bulkley watershed group, zoom 10, Web Mercator, 8-bit
 #   context.csv     - features for the context map, as simplified WKT with their
 #                     CRS: the watershed group, its floodplain, the Bulkley River,
-#                     its municipalities (named), the box, and BC
+#                     the municipalities in the map frame (named), the box, and BC
 #   relief_credit.txt - the basemap's attribution, as each Esri service gives it
 
 suppressMessages({
@@ -79,7 +79,7 @@ fp <- sf::st_read(href("floodplain"), layer = "all_ff04", quiet = TRUE) |>
 
 ## ---- context
 # Where the box lies: the Bulkley watershed group over Esri's light grey base,
-# shaded with Esri's World Hillshade, with its river and towns drawn on top
+# shaded with Esri's World Hillshade, with its river and the towns in the frame on top
 bulk <- bcdata::bcdc_query_geodata("WHSE_BASEMAPPING.FWA_WATERSHED_GROUPS_POLY") |>
   dplyr::filter(WATERSHED_GROUP_CODE == "BULK") |>
   dplyr::collect() |>

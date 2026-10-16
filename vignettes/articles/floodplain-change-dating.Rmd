@@ -264,8 +264,10 @@ plot(ctx_v("bulk_bc"), add = TRUE, col = "red", border = NA)
 par(op)
 ```
 
-Sharp images from before and after reach `r length(seen)` of the `r nrow(areas)`
-areas, and show only `r paste(by_ground("Change"), collapse = ", ")` as a change:
+drift finds `r nrow(areas)` change areas in the box, lettered `r areas$id[1]` to
+`r areas$id[nrow(areas)]` on the map in the next section: patches of 1 ha or more
+where neighbouring floodplain cells switched land cover in the same year and
+stayed. Sharp images from before and after reach `r length(seen)` of them, and show only `r paste(by_ground("Change"), collapse = ", ")` as a change:
 `r paste(by_ground("Class error"), collapse = ", ")` are class errors, where the
 land-cover map gave the same ground a different class. The
 `r length(c(by_ground("Likely change"), by_ground("Unclear")))` areas dated after
