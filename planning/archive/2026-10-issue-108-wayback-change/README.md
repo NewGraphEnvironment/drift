@@ -40,7 +40,9 @@ layer and tabulates its tags beside measured containment.
   tagged `in_harvest` hold 55.6 ha; 13.9 ha of the tree loss lies inside a cutblock started 2017-2023 (largest
   patch 6964: 7.1 of 25.2 ha). Cutblocks started 2017-2023 in the box: 9 blocks, 8 mapped by the province from
   satellite change detection; the clearing is an 8.5 ha 2020 block outside the floodplain.
-- Committed artifacts 3.6 MB, then 4.7 MB with the 1.2 km window; body prose 1,083 words, then 1,457.
+- Committed artifacts 3.6 MB, then 4.7 MB with the 1.2 km window; body prose 1,083 words, then 1,477.
+- Follow-up review: 3 rounds, 8 findings fixed. Round 3 named the mechanism (where-claims written from a name or a
+  glance, not measured against the layers in hand), enumerated every place it reaches, and found 1 more.
 
 ## Evidence
 
