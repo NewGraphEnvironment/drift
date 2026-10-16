@@ -57,14 +57,21 @@ cb <- utils::read.csv(d("cutblocks.csv"))
 cb_v <- vect(cb$wkt, crs = "EPSG:32609")
 hv_col <- reg$layers$harvest_area$stroke$color
 cb_ha <- function(y) round(sum(cb$area_ha[cb$start_year == y]), 1)
-draw_cutblocks <- function(lwd = 1.2, labels = FALSE) {
+draw_cutblocks <- function(lwd = 1.2) {
   lines(cb_v, col = "white", lwd = lwd + 1.5)
   lines(cb_v, col = hv_col, lwd = lwd)
-  if (labels) {
-    # keep a label near the frame inside it
-    u <- par("usr")
-    x <- pmin(pmax(cb$lab_x, u[1] + 0.05 * (u[2] - u[1])), u[2] - 0.05 * (u[2] - u[1]))
-    text(x, cb$lab_y, cb$start_year, col = "white", font = 2, cex = 0.7)
+}
+# start-year labels, drawn last; one near the right frame ends at its point
+label_cutblocks <- function() {
+  u <- par("usr")
+  edge <- cb$lab_x > u[2] - 0.08 * (u[2] - u[1])
+  for (e in c(FALSE, TRUE)) {
+    k <- edge == e
+    if (any(k)) {
+      text(vect(cbind(cb$lab_x[k], cb$lab_y[k]), crs = "EPSG:32609"), cb$start_year[k],
+           adj = c(if (e) 1 else 0.5, 0.5), col = "black", font = 2, cex = 0.7,
+           halo = TRUE, hc = "white")
+    }
   }
 }
 
@@ -292,9 +299,10 @@ op <- par(mfrow = c(2, 2), mar = c(0.3, 0.3, 0.3, 0.3), bg = "white")
 for (i in seq_along(s2)) {
   plotRGB(s2[[i]], scale = 255, mar = NA, axes = FALSE)
   draw_fp(1.2)
-  draw_cutblocks(1, labels = i == 1)
+  draw_cutblocks(1)
   rect(win[["win_xmin"]], win[["win_ymin"]], win[["win_xmax"]], win[["win_ymax"]],
        border = "white", lwd = 1.5)
+  if (i == 1) label_cutblocks()
   panel_label(paste(s2_years[i], "Jun–Jul"))
   if (i == 1) sbar(1000, "bottomleft", type = "bar", divs = 2, below = "", label = "",
                    col = "white")
@@ -324,9 +332,9 @@ pipeline and published as the `bulk_co_ff04` item of
 maps the change from 2017 to 2023 with a 1 ha sieve, and
 `dft_transition_vectors()` makes one polygon per patch (the `land-cover-change`
 vignette walks through these).
-floodplains then tags each patch with the provincial fire and harvest it touches:
-`in_fire`, `in_harvest`, and `harvest_start_year_calendar`, the start year of the
-cutblock it overlaps most. The layer covers only the floodplain.
+floodplains then tags each patch with the provincial fire and harvest of 2017 to
+2023 that it touches: `in_fire`, `in_harvest`, and `harvest_start_year_calendar`,
+the start year of the cutblock it overlaps most. The layer covers only the floodplain.
 
 ```{r change-code, eval = FALSE, echo = TRUE}
 tv <- sf::st_read(
@@ -361,10 +369,9 @@ knitr::kable(
 )
 ```
 
-In the box the layer has `r round(sum(tl$area_ha), 1)` ha of tree loss, all of
-it on the floodplain. The patches tagged `in_harvest` hold
+In the box the layer has `r round(sum(tl$area_ha), 1)` ha of tree loss. The patches tagged `in_harvest` hold
 `r round(sum(tl$area_ha[tl$in_harvest]), 1)` ha, but `in_harvest` means the
-patch touches a cutblock: only `r round(sum(tl$cutblock_ha), 1)` ha of the tree
+patch touches a cutblock whose harvest started 2017–2023: only `r round(sum(tl$cutblock_ha), 1)` ha of the tree
 loss lies inside one. The largest patch, `r tl_big$patch_id[1]`, runs along the
 river and is pale only in the 2023 composite, and most of it is outside the 2023
 cutblocks it touches. Change that no dated layer explains is what
@@ -391,8 +398,8 @@ class edge.
   (`r zoom_m(own$zoom[3])` m), the deepest zoom covering the whole box in each
   release, so part of the difference in sharpness is the zoom.
 - The change layer covers only the floodplain and compares only 2017 with 2023,
-  and its `in_harvest` tag means a patch touches a cutblock, not that it lies
-  inside one.
+  and its `in_harvest` tag means a patch touches a cutblock whose harvest
+  started 2017–2023, not that it lies inside one.
 - The cutblock layer gives the year a harvest started, and most of these
   cutblocks were mapped from satellite imagery rather than surveyed.
 - Sentinel-2 at 10 m does not resolve single trees, and a composite dates a

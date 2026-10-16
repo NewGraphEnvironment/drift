@@ -273,9 +273,18 @@ cb <- bcdata::bcdc_query_geodata("WHSE_FOREST_VEGETATION.VEG_CONSOLIDATED_CUT_BL
   sf::st_transform(crs)
 cb$start_year <- as.numeric(cb$HARVEST_START_YEAR_CALENDAR)
 cb <- cb[!is.na(cb$start_year) & cb$start_year >= 2017 & cb$start_year <= max(years_key), ]
+# Keep only blocks with area in the box: the query can return one that only
+# touches it, and the per-block results below are joined back by position.
+area_in_box <- function(g) {
+  vapply(seq_along(g), function(i) {
+    sum(as.numeric(sf::st_area(sf::st_intersection(g[i], sf::st_geometry(aoi)))))
+  }, 1)
+}
+cb <- cb[area_in_box(sf::st_geometry(cb)) > 0, ]
 if (!nrow(cb)) stop("No cutblock started 2017-", max(years_key), " in the box")
 cb <- cb[order(cb$VCCB_SYSID), ]
 cb_in <- sf::st_intersection(sf::st_geometry(cb), sf::st_geometry(aoi))
+stopifnot(length(cb_in) == nrow(cb))
 cb_edge <- vapply(seq_len(nrow(cb)), function(i) {
   sf::st_boundary(sf::st_geometry(cb)[i]) |>
     sf::st_intersection(sf::st_geometry(aoi)) |>
@@ -312,8 +321,10 @@ tv <- sf::st_read(tv_file, layer = "transition", quiet = TRUE) |>
   sf::st_transform(crs)
 tv <- tv[tv$from_class == "Trees" & tv$to_class != "Trees" &
            lengths(sf::st_intersects(tv, aoi)) > 0, ]
+tv <- tv[area_in_box(sf::st_geometry(tv)) > 0, ]
 if (!nrow(tv)) stop("No tree-loss patch in the box")
 tv_in <- sf::st_intersection(sf::st_geometry(tv), sf::st_geometry(aoi))
+stopifnot(length(tv_in) == nrow(tv))
 cb_union <- sf::st_union(cb_in)
 tv_edge <- vapply(seq_len(nrow(tv)), function(i) {
   sf::st_boundary(sf::st_geometry(tv)[i]) |>
