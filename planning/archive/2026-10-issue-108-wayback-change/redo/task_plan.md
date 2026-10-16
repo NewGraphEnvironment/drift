@@ -34,4 +34,4 @@ keep numbers to one table, fold all code.
 - [x] Tests pass (no `R/` changes)
 - [x] `/code-check` clean
 - [x] PWF checkboxes match landed work
-- [ ] `/planning-archive` on completion (into the existing #108 archive)
+- [x] `/planning-archive` on completion (into the existing #108 archive)
