@@ -35,8 +35,8 @@ from_script <- function(label) {
 
 
 ```{r data, include = FALSE}
-# The figures read the files data-raw/floodplain_change_dating.R saved (the
-# blocks shown below are from it); nothing here goes to the network. s2_view is
+# The figures read the files data-raw/floodplain_change_dating.R saved;
+# nothing here goes to the network. s2_view is
 # the composites as 8-bit display bytes on one stretch, and change.tif holds a
 # clean switch's year less 2000.
 library(terra)
@@ -117,7 +117,8 @@ one_summer <- vapply(seq_len(nrow(areas)), function(a) {
 stopifnot(length(seen) + length(s2_only) == nrow(areas),
           all(as.Date(areas$wb_before[s2_only]) == newest),
           all(one_summer[areas$id %in% c("F", "H", "I", "J")]), !one_summer[areas$id == "G"],
-          all(rise[areas$id == "G", as.character(2021:2022)] > 0),
+          with(list(r = rise[areas$id == "G", ]),
+               min(r[c("2021", "2022")]) > 2 * max(abs(r[!names(r) %in% c("2021", "2022")]))),
           all(areas$rise_year[s2_only] == areas$year[s2_only]),
           areas$brightens[areas$id == "A"],
           all(areas$wb_before[seen] == areas$wb_before[seen[1]]),
@@ -262,7 +263,8 @@ seven.
 ```{r fetch-composites, eval = FALSE, code = from_script("composites")}
 ```
 
-Esri Wayback keeps the past versions of Esri's World Imagery basemap. Each
+Esri Wayback keeps the versions of Esri's World Imagery basemap released since
+2014. Each
 version, a *release*, is a mosaic of images taken on many days, so drift reads
 which *capture* (the day an image was taken) each release draws over the box,
 then picks and fetches by capture.
@@ -274,9 +276,10 @@ then picks and fetches by capture.
 
 For the `r length(seen)` areas dated `r min(areas$year[seen])` to
 `r max(areas$year[seen])`, Wayback has a sharp image from before the change
-(`r fmt(areas$wb_before[seen[1]])`) and from after it (`r fmt(newest)`).
+(`r fmt(areas$wb_before[seen[1]])`) and one from `r fmt(newest)`, after the change
+or, for the areas dated `r yr(newest)`, late in its year.
 
-```{r fig-seen, fig.height = 7 / 4 * length(seen), fig.cap = paste0("Areas dated ", min(areas$year[seen]), " to ", max(areas$year[seen]), ", one per row: Wayback before and after the change, then Sentinel-2 the summer before and the summer of the change. The outline is the area, in the colour of its year.")}
+```{r fig-seen, fig.height = 7 / 4 * length(seen), fig.cap = paste0("Areas dated ", min(areas$year[seen]), " to ", max(areas$year[seen]), ", one per row: Wayback before the change and at its end or after it, then Sentinel-2 the summer before and the summer of the change. The outline is the area, in the colour of its year.")}
 area_rows(seen, list(wb_panel("wb_before"), wb_panel("wb_after"), s2_panel(-1), s2_panel(0)))
 ```
 
@@ -298,9 +301,9 @@ along a channel.
 area_rows(s2_only, list(wb_panel("wb_before"), s2_panel(-1), s2_panel(0)))
 ```
 
-Sentinel-2 bears the dates out: of the six years, each area brightens most,
-against the box as a whole, in the year the map gives it. For F, H, I and J that
-is forest opening up in one summer. G brightens over two
+Of the six years, each area brightens most, against the box as a whole, in the
+year the map gives it. For F, H, I and J that is forest opening up in one summer,
+which bears the date out. G brightens over two
 summers and was already open in `r yr(newest)`, so the map's switch from Trees
 there may be a label catching up with what was on the ground. Part of I
 lies in a cutblock the province records as harvested from
@@ -311,7 +314,8 @@ a channel moving would all look alike.
 ## Why do the sharp images stop in `r yr(newest)`?
 
 Wayback can show only what Esri's providers imaged and Esri released. Over this
-box, the releases from 2015 on draw `r nrow(sharp)` sharp captures, from `r paste(fmt(sharp$capture_date), collapse = ", ")`.
+box, the releases from 2015 on draw `r nrow(sharp)` sharp captures at the zoom
+levels read (16 to 18), from `r paste(fmt(sharp$capture_date), collapse = ", ")`.
 The newest is still the one drawn by every release from `r fmt(newest_first)` to
 `r fmt(newest_last)`, the latest. Nothing newer has been released here, so a change after `r yr(newest)` has no sharp image yet. Sentinel-2 images
 every summer, but at 10 m.
@@ -344,5 +348,6 @@ knitr::kable(data.frame(
   `r fmt(newest)`; the `r fmt(sharp$capture_date[sharp$cover_max < 0.99])` capture covers only part
   of the box.
 - Sentinel-2 at 10 m shows the year ground brightened. Where forest opened up,
-  that bears out the map's date; on a meadow, mowing moves it too. It cannot say
-  what happened, and a composite can carry pale patches.
+  that bears out the map's date, but a meadow brightens in years its cover did
+  not change, as A, D and E do. It cannot say what happened, and a composite can
+  carry pale patches.

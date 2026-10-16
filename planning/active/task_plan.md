@@ -28,10 +28,10 @@ keep numbers to one table, fold all code.
 ## Phase 3: verify
 - [x] `pkgdown::build_article()` offline; figures read at page width; code folds
 - [x] `pkgdown::check_pkgdown()`; no footnotes
-- [ ] `/code-check branch`
+- [x] `/code-check branch`
 
 ## Validation
 - [x] Tests pass (no `R/` changes)
-- [ ] `/code-check` clean
-- [ ] PWF checkboxes match landed work
+- [x] `/code-check` clean
+- [x] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion (into the existing #108 archive)
