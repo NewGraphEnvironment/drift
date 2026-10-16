@@ -16,10 +16,12 @@ shared one mechanism: a sentence describing what the code meant to produce rathe
 (echoed display code, and a clipped outline labelled as the floodplain edge).
 
 After the PR opened, a look at the published Bulkley change layer (`transition_vector.gpkg`) against the
-composites showed that most of the box's change sat across the creek from the 1 km window, on the floodplain's
-valley floor, inside dated provincial harvest. The window moved south and grew to 1.2 km, and the Sentinel-2
-panels now outline that harvest with its start year. The "pale 2023 valley floor" that the article had partly put
-down to a brighter scene is largely harvest that started in 2023.
+composites showed that most of the floodplain change sat across the creek from the 1 km window. The window moved
+south and grew to 1.2 km. A wrong turn followed: the first harvest outlines read the layer's `in_harvest` tag as
+containment. It is `st_intersects` (floodplains' `fp_disturbance_tag()`), and review measured only 13.9 of the
+55.6 tagged ha inside a 2017-2023 cutblock. The panels now draw the BC consolidated cutblocks themselves, which
+date the window's clearing (2020) and the strips east of the floodplain (2023). A new section explains the change
+layer and tabulates its tags beside measured containment.
 
 ## Measurement
 
@@ -34,10 +36,11 @@ down to a brighter scene is largely harvest that started in 2023.
   0.023-0.030 in the other years), so not all of its pale ground is new.
 - A wrong turn: a crude test on the post's own composites could not place the change at all. 2019, 2023 and
   2025 brighten across the whole scene, and the 2022 offset made 2022 look 99% "new bright" until removed.
-- Tree loss (Trees in 2017, another class in 2023) in the box in the published change layer: 71.3 ha, of which
-  55.6 ha is inside dated harvest, 30.5 ha starting in 2020 and 25.2 ha in 2023. All of it is in the floodplain,
-  which is all the layer covers; the clearing between the arms and the 2023 strips east of the floodplain are not.
-- Committed artifacts 3.6 MB, then 4.7 MB with the 1.2 km window; body prose 1,083 words, then 1,263.
+- Tree loss (Trees in 2017, another class in 2023) in the box in the published change layer: 71.3 ha. Patches
+  tagged `in_harvest` hold 55.6 ha; 13.9 ha of the tree loss lies inside a cutblock started 2017-2023 (largest
+  patch 6964: 7.1 of 25.2 ha). Cutblocks started 2017-2023 in the box: 9 blocks, 8 mapped by the province from
+  satellite change detection; the clearing is an 8.5 ha 2020 block outside the floodplain.
+- Committed artifacts 3.6 MB, then 4.7 MB with the 1.2 km window; body prose 1,083 words, then 1,457.
 
 ## Evidence
 
