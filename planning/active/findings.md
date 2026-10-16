@@ -31,9 +31,9 @@
 
 Ten areas of 1 ha or more (A-J). A-E (2018-2020) have Wayback 2016-09-11 before and 2020-09-18 after, each
 covering the whole view. Looked at full size: only C (2019, Trees to Rangeland) is a change on the ground
-(creekside forest opened up, new trails). A, D, E are the same open field in both images (Crops to
+(creekside forest opened up, new trails). A, D, E are touching parts of one meadow, the same in both images (E runs into a farmyard) (Crops to
 Rangeland; D striped by cutting or tilling in 2016, grassed in 2020); B is the same stand of trees.
 Sentinel-2 brightening alone would have misled: A brightens 64 display units in 2018 while the box
-moves 1. F-J (2021-2023) are forest in the 2020 image and brighten by 47-110 units in their year
+moves 1. F, H, I, J (2021-2023) are forest in the 2020 image and G is an open wet meadow along a channel (my first read called it forest; review r1 measured it brighter and smoother than its ring); all five and brighten by 47-110 units in their year
 against -4 to 30 for the box. I is 27% inside a 2023 cutblock; no other area is 10% or more in one.
 2019 is pale across the box (+63 over 2018) and 2017 is a single scene.

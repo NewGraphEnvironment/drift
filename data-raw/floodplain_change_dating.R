@@ -2,7 +2,8 @@
 # detected floodplain change happen, and what does it look like on the ground?
 #
 # The area is a ~3 x 3 km box on the Bulkley watershed group's floodplain, taken
-# as a rectangle in UTM zone 9 so every raster is a full rectangle on one grid.
+# as a rectangle in UTM zone 9 so every raster is a full rectangle. The land
+# cover and the composites are on two 10 m grids a fraction of a cell apart.
 #
 # Every call goes to the network the first time and to drift's cache after it
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
