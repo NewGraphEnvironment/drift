@@ -133,6 +133,8 @@ one_summer <- vapply(seq_len(nrow(areas)), function(a) {
   r[[k]] > 2 * max(r[names(r) != k])
 }, logical(1))
 stopifnot(length(seen) + length(s2_only) == nrow(areas),
+          setequal(c(by_ground("Change"), by_ground("Class error")), areas$id[seen]),
+          setequal(c(by_ground("Likely change"), by_ground("Unclear")), areas$id[s2_only]),
           all(as.Date(areas$wb_before[s2_only]) == newest),
           all(one_summer[areas$id %in% c("F", "H", "I", "J")]), !one_summer[areas$id == "G"],
           with(list(r = rise[areas$id == "G", ]),
@@ -263,10 +265,10 @@ sbar(500, "topleft", type = "bar", divs = 2, below = "", label = "", col = "whit
 par(op)
 ```
 
-Most of the mapped change is not change on the ground. Of the `r nrow(areas)`
-areas, the sharp images show `r paste(by_ground("Change"), collapse = ", ")` as a
-change and `r paste(by_ground("Class error"), collapse = ", ")` as class errors,
-where the land-cover map gave the same ground a different class. The
+Sharp images from before and after reach `r length(seen)` of the `r nrow(areas)`
+areas, and show only `r paste(by_ground("Change"), collapse = ", ")` as a change:
+`r paste(by_ground("Class error"), collapse = ", ")` are class errors, where the
+land-cover map gave the same ground a different class. The
 `r length(c(by_ground("Likely change"), by_ground("Unclear")))` areas dated after
 `r yr(newest)` are seen only in Sentinel-2:
 `r paste(by_ground("Likely change"), collapse = ", ")` look like forest opening up,
@@ -418,7 +420,7 @@ knitr::kable(data.frame(
   Cutblock = ifelse(areas$cutblock_share >= 0.1,
                     paste0(round(100 * areas$cutblock_share), "% in a ", areas$cutblock_year, " block"), ""),
   check.names = FALSE
-)[ord, ], row.names = FALSE, caption = paste0("The change areas, class errors first. On the ground is what the imagery shows: a change or a class error where Wayback has sharp images from before and after, and a likely change where only Sentinel-2 does. Cutblock is the share of the area inside a BC consolidated cutblock, with the block's harvest start year, where that is 10% or more. Across the box, the floodplain's 10 m cells hold ",
+)[ord, ], row.names = FALSE, caption = paste0("The change areas, class errors first. On the ground is what the imagery shows: a change or a class error where Wayback has sharp images from before and after, and a likely change or unclear where only Sentinel-2 does. Cutblock is the share of the area inside a BC consolidated cutblock, with the block's harvest start year, where that is 10% or more. Across the box, the floodplain's 10 m cells hold ",
   fp_ha("Stable"), " ha with no change, ", fp_ha("Changed once, and stayed"), " ha that switched once and stayed, ",
   fp_ha("Changed, never settled"), " ha that changed and never settled, and ", fp_ha("Flickered and came back"),
   " ha that flickered and came back to its first class."))

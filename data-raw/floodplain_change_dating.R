@@ -9,8 +9,9 @@
 # (Wayback metadata and chips, and the composites, under dft_cache_path()),
 # except the STAC item, its rasters, the Wayback release list, the BC
 # cutblocks and watershed group, and the topographic tiles, which are read live.
-# A warm rerun must leave the committed files unchanged unless the published
-# item or the cutblock layer changed. Only small display files are committed;
+# A warm rerun must leave the committed files unchanged unless one of those live
+# sources changed: the published item, the cutblocks, the watershed group, or
+# Esri's topographic map (maptiles caches its tiles only for the session). Only small display files are committed;
 # the article reads them and makes no network call.
 #
 # The article shows the blocks between `## ---- <label>` lines as its code, so
