@@ -52,20 +52,32 @@ draw_fp <- function(lwd = 1.5) {
   lines(fp, col = fp_col, lwd = lwd)
 }
 
-# Tree loss in the published change layer, and the part of it inside dated harvest
-tl <- utils::read.csv(d("treeloss.csv"))
-tl_h <- tl[tl$in_harvest, ]
-tl_v <- vect(tl_h$wkt, crs = "EPSG:32609")
+# BC cutblocks whose harvest started 2017-2023, in the gq harvest style
+cb <- utils::read.csv(d("cutblocks.csv"))
+cb_v <- vect(cb$wkt, crs = "EPSG:32609")
 hv_col <- reg$layers$harvest_area$stroke$color
-hv_ha <- function(y) round(sum(tl_h$area_ha[tl_h$harvest_year == y]), 1)
-draw_harvest <- function(lwd = 1.2, labels = FALSE) {
-  lines(tl_v, col = "white", lwd = lwd + 1.5)
-  lines(tl_v, col = hv_col, lwd = lwd)
+cb_ha <- function(y) round(sum(cb$area_ha[cb$start_year == y]), 1)
+draw_cutblocks <- function(lwd = 1.2, labels = FALSE) {
+  lines(cb_v, col = "white", lwd = lwd + 1.5)
+  lines(cb_v, col = hv_col, lwd = lwd)
   if (labels) {
-    big <- tl_h$area_ha >= 1
-    text(tl_h$lab_x[big], tl_h$lab_y[big], tl_h$harvest_year[big],
-         col = "white", font = 2, cex = 0.75)
+    # keep a label near the frame inside it
+    u <- par("usr")
+    x <- pmin(pmax(cb$lab_x, u[1] + 0.05 * (u[2] - u[1])), u[2] - 0.05 * (u[2] - u[1]))
+    text(x, cb$lab_y, cb$start_year, col = "white", font = 2, cex = 0.7)
   }
+}
+
+# Tree loss in the published change layer
+tl <- utils::read.csv(d("treeloss.csv"))
+tl_big <- tl[tl$area_ha >= 1, ]
+tl_big <- tl_big[order(-tl_big$area_ha), ]
+tl_v <- vect(tl_big$wkt, crs = "EPSG:32609")
+draw_treeloss <- function(lwd = 1.2) {
+  lines(tl_v, col = "white", lwd = lwd + 1.5)
+  lines(tl_v, col = "black", lwd = lwd, lty = 2)
+  text(vect(cbind(tl_big$lab_x, tl_big$lab_y), crs = "EPSG:32609"), tl_big$patch_id,
+       col = "black", font = 2, cex = 0.8, halo = TRUE, hc = "white")
 }
 
 # Picks for the key years that have no capture of their own
@@ -261,25 +273,26 @@ it gives one image a year built from the clear days. A June–July composite sho
 those two months, so a change that first appears in one panel happened after
 the start of the previous panel's window and before the end of this one's.
 
-The brown outlines on these maps come from the published change layer for the
-same floodplain: drift's patches of change between the 2017 and 2023 Impact
-Observatory 10 m land-cover maps, each tagged with the dated provincial harvest
-it falls in, if any. The layer covers only the floodplain. In the box,
-`r round(sum(tl$area_ha), 1)` ha of it changed from trees to another class, and the
-outlines are the `r round(sum(tl_h$area_ha), 1)` ha of that inside a dated harvest. The
-2018 panel labels each with the year its harvest started.
+The brown outlines are the province's cutblocks whose harvest started from 2017
+to 2023, from BC's consolidated cutblocks layer
+(`WHSE_FOREST_VEGETATION.VEG_CONSOLIDATED_CUT_BLOCKS_SP`, read with
+[bcdata](https://bcgov.github.io/bcdata/)). The 2018 panel labels each with that
+year. `r nrow(cb)` of them cover `r round(sum(cb$area_ha), 1)` ha of the box,
+`r round(sum(cb$fp_ha), 1)` ha of it in the floodplain. The province mapped
+`r sum(grepl("Satellite", cb$data_source))` of them from satellite change
+detection, so they are a dated record but not a field one.
 
 ```{r composite-code, eval = FALSE, echo = TRUE}
 s2 <- dft_stac_composite(aoi, years = c(2018, 2020, 2022, 2023), months = 6:7,
                          crs = "EPSG:32609")
 ```
 
-```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the data and not in the display. Brown outlines are tree loss in the published change layer inside a dated harvest, labelled on the first panel with the year the harvest started. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
+```{r fig-s2, fig.height = 6.9, fig.cap = paste0("The box in Sentinel-2 June–July median composites at 10 m, ", paste(s2_years, collapse = ", "), ", with one brightness stretch shared by all four panels, so a difference in brightness is in the data and not in the display. Brown outlines are cutblocks whose harvest started 2017–2023, labelled on the first panel with that year. The white square is the ", win_km, " km square of the first figure, and the blue line the edge of the floodplain. The scale bar is 1 km.")}
 op <- par(mfrow = c(2, 2), mar = c(0.3, 0.3, 0.3, 0.3), bg = "white")
 for (i in seq_along(s2)) {
   plotRGB(s2[[i]], scale = 255, mar = NA, axes = FALSE)
   draw_fp(1.2)
-  draw_harvest(1, labels = i == 1)
+  draw_cutblocks(1, labels = i == 1)
   rect(win[["win_xmin"]], win[["win_ymin"]], win[["win_xmax"]], win[["win_ymax"]],
        border = "white", lwd = 1.5)
   panel_label(paste(s2_years[i], "Jun–Jul"))
@@ -291,16 +304,73 @@ par(op)
 
 Where the clearing is, the 2018 composite still shows forest and the 2020 one
 bare ground. So the clearing that Wayback shows between `r fmt(sub$capture_date[2])` and
-`r fmt(sub$capture_date[3])` was cut between June 2018 and July 2020, and by 2022
-it is greening. Across the floodplain from it, the harvest that started in 2020
-(`r hv_ha(2020)` ha) is opening in the 2020 composite, as the bare south-west of
-the `r fmt(sub$capture_date[3])` capture shows too, and much of it is bare by
-2022. The harvest that started in 2023 (`r hv_ha(2023)` ha), east of it along
-the river, is still green in 2022 and bare in 2023. So much of the pale valley
-floor in the 2023 composite lies inside dated harvest. New bare strips also run east from it
-through the forest outside the floodplain, where the change layer has nothing.
-No release up to `r fmt(meta$release_to)` has a sub-metre capture of the 2022 or
-2023 change.
+`r fmt(sub$capture_date[3])` was cut between June 2018 and July 2020, and the
+cutblock layer has its harvest starting in 2020. By 2022 it is greening. A second
+2020 cutblock lies on the valley floor to its south-west, the bare ground in the
+south-west of the `r fmt(sub$capture_date[3])` capture. The 2023 cutblocks
+(`r cb_ha(2023)` ha) are bare in the 2023 composite: the largest runs east
+through the forest outside the floodplain, two smaller ones sit on the valley
+floor along the river, and a fourth lies in the forest in the north-west. No release up to `r fmt(meta$release_to)` has a sub-metre
+capture of the 2022 or 2023 change.
+
+## What does drift's change detection say?
+
+The published change layer for the Bulkley floodplain is drift's own change
+detection, run by the [floodplains](https://github.com/NewGraphEnvironment/floodplains)
+pipeline and published as the `bulk_co_ff04` item of
+[stac-floodplains-bc](https://github.com/NewGraphEnvironment/stac_floodplains_bc).
+`dft_stac_fetch()` reads Impact Observatory 10 m land cover,
+`dft_rast_classify()` labels it, `dft_rast_transition(patch_area_min = 10000)`
+maps the change from 2017 to 2023 with a 1 ha sieve, and
+`dft_transition_vectors()` makes one polygon per patch (the `land-cover-change`
+vignette walks through these).
+floodplains then tags each patch with the provincial fire and harvest it touches:
+`in_fire`, `in_harvest`, and `harvest_start_year_calendar`, the start year of the
+cutblock it overlaps most. The layer covers only the floodplain.
+
+```{r change-code, eval = FALSE, echo = TRUE}
+tv <- sf::st_read(
+  "/vsicurl/https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/transition_vector.gpkg",
+  layer = "transition"
+)
+tree_loss <- tv[tv$from_class == "Trees" & tv$to_class != "Trees", ]
+```
+
+```{r fig-change, fig.width = 6.5, fig.height = 6.3, fig.cap = paste0("The box in the ", max(s2_years), " Sentinel-2 composite. Dashed black outlines are the tree-loss patches of 1 ha or more from the published change layer, labelled with their patch_id; brown outlines are cutblocks whose harvest started 2017–", max(s2_years), ", and the blue line is the edge of the floodplain. The scale bar is 1 km.")}
+op <- par(mar = c(0.2, 0.2, 0.2, 0.2), bg = "white")
+plotRGB(s2[[length(s2)]], scale = 255, mar = NA, axes = FALSE)
+draw_fp()
+draw_cutblocks()
+draw_treeloss()
+sbar(1000, "bottomright", type = "bar", divs = 2, below = "", label = "", col = "white")
+par(op)
+```
+
+```{r change-table}
+knitr::kable(
+  data.frame(
+    patch_id = tl_big$patch_id,
+    Change = tl_big$transition,
+    `Hectares in box` = tl_big$area_ha,
+    in_harvest = tl_big$in_harvest,
+    `Harvest start` = ifelse(is.na(tl_big$harvest_year), "", tl_big$harvest_year),
+    `Hectares inside a cutblock` = tl_big$cutblock_ha,
+    check.names = FALSE
+  ),
+  caption = paste0("Tree-loss patches of 1 ha or more in the box. Hectares inside a cutblock is the part of the patch inside a cutblock whose harvest started 2017–", max(s2_years), ".")
+)
+```
+
+In the box the layer has `r round(sum(tl$area_ha), 1)` ha of tree loss, all of
+it on the floodplain. The patches tagged `in_harvest` hold
+`r round(sum(tl$area_ha[tl$in_harvest]), 1)` ha, but `in_harvest` means the
+patch touches a cutblock: only `r round(sum(tl$cutblock_ha), 1)` ha of the tree
+loss lies inside one. The largest patch, `r tl_big$patch_id[1]`, runs along the
+river and is pale only in the 2023 composite, and most of it is outside the 2023
+cutblocks it touches. Change that no dated layer explains is what
+`dft_rast_break_class()` and `dft_transition_artifact()` are for: they test
+whether a patch's change is sustained across the annual series or sits on a
+class edge.
 
 ## What are the limits?
 
@@ -320,8 +390,11 @@ No release up to `r fmt(meta$release_to)` has a sub-metre capture of the 2022 or
   (`r zoom_m(own$zoom[1])` m) and the third from zoom `r own$zoom[3]`
   (`r zoom_m(own$zoom[3])` m), the deepest zoom covering the whole box in each
   release, so part of the difference in sharpness is the zoom.
-- The change layer covers only the floodplain, so cutting outside it, such as
-  the clearing in the first figure, has no outline.
+- The change layer covers only the floodplain and compares only 2017 with 2023,
+  and its `in_harvest` tag means a patch touches a cutblock, not that it lies
+  inside one.
+- The cutblock layer gives the year a harvest started, and most of these
+  cutblocks were mapped from satellite imagery rather than surveyed.
 - Sentinel-2 at 10 m does not resolve single trees, and a composite dates a
   change only to the span from the start of one window to the end of the next.
 - The 2023 composite is brighter across the whole box (median red reflectance

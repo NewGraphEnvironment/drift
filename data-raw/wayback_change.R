@@ -25,9 +25,13 @@
 #   wb_<date>_window.tif - each sub-metre capture over the zoom window, 0.5 m, 8-bit
 #   wb_overview.tif   - the newest capture over the whole box, 5 m, 8-bit
 #   s2_<year>.tif     - Sentinel-2 Jun-Jul composite, 10 m, 8-bit on one shared stretch
+#   cutblocks.csv     - BC consolidated cutblocks in the box whose harvest started
+#                       2017-2023: start year, source, hectares in the box and in the
+#                       floodplain, a label point, and the edge cut to the box as WKT
 #   treeloss.csv      - patches of the published Bulkley change layer that were Trees in
-#                       2017 and another class in 2023, with their harvest tag, hectares
-#                       in the box and edge as WKT in UTM 9N
+#                       2017 and another class in 2023: the layer's own tags, hectares in
+#                       the box and inside those cutblocks, a label point, and the edge cut
+#                       to the box as WKT
 #   floodplain.csv    - the published Bulkley co_ff04 floodplain in the box, as WKT in
 #                       UTM 9N (a GeoPackage stores a timestamp and churns): the polygon
 #                       clipped to the box (part "area", for its hectares) and its edge
@@ -65,9 +69,8 @@ aoi <- sf::st_bbox(bbox_ll, crs = 4326) |>
   sf::st_as_sf()
 
 # Zoom window, 1.2 km square, chosen by eye from the captures and composites:
-# a cut block with its spur road between the floodplain's arms by 2020, and to
-# its south the valley floor where the published change layer has the harvest
-# that starts in 2020 (patches 7003 and 7017). UTM 9N metres.
+# a 2020 cutblock with its spur road between the floodplain's arms, and to its
+# south-west a second 2020 cutblock on the valley floor. UTM 9N metres.
 window <- c(xmin = 683650, ymin = 6027950, xmax = 684850, ymax = 6029150)
 
 # -- Wayback: releases, captures, picks ---------------------------------------
@@ -256,12 +259,51 @@ utils::write.csv(data.frame(layer = "co_ff04", source = fp_url, part = c("area",
                                     sf::st_as_text(fp_edge, digits = 9))),
                  file.path(out_dir, "floodplain.csv"), row.names = FALSE, na = "")
 
+# -- Cutblocks: BC consolidated cutblocks, 2017 to the last composite -----------
+
+# The province's harvest record, read live from the BC WFS, so a rerun after the
+# layer is revised can change this file. Kept: blocks whose harvest started from
+# 2017 to the last composite year. The edge is cut to the box for drawing, as for
+# the floodplain, and the label point is inside the block.
+suppressMessages(library(bcdata))
+aoi_3005 <- sf::st_transform(aoi, 3005)
+cb <- bcdata::bcdc_query_geodata("WHSE_FOREST_VEGETATION.VEG_CONSOLIDATED_CUT_BLOCKS_SP") |>
+  dplyr::filter(INTERSECTS(aoi_3005)) |>
+  dplyr::collect() |>
+  sf::st_transform(crs)
+cb$start_year <- as.numeric(cb$HARVEST_START_YEAR_CALENDAR)
+cb <- cb[!is.na(cb$start_year) & cb$start_year >= 2017 & cb$start_year <= max(years_key), ]
+if (!nrow(cb)) stop("No cutblock started 2017-", max(years_key), " in the box")
+cb <- cb[order(cb$VCCB_SYSID), ]
+cb_in <- sf::st_intersection(sf::st_geometry(cb), sf::st_geometry(aoi))
+cb_edge <- vapply(seq_len(nrow(cb)), function(i) {
+  sf::st_boundary(sf::st_geometry(cb)[i]) |>
+    sf::st_intersection(sf::st_geometry(aoi)) |>
+    sf::st_collection_extract("LINESTRING") |>
+    sf::st_union() |>
+    sf::st_as_text(digits = 9)
+}, character(1))
+in_fp <- function(g) {
+  vapply(seq_along(g), function(i) sum(as.numeric(sf::st_area(sf::st_intersection(g[i], fp)))), 1)
+}
+lab <- sf::st_coordinates(sf::st_point_on_surface(cb_in))
+cutblocks <- data.frame(
+  vccb_sysid = cb$VCCB_SYSID,
+  start_year = cb$start_year,
+  data_source = cb$DATA_SOURCE,
+  area_ha = round(as.numeric(sf::st_area(cb_in)) / 1e4, 2),
+  fp_ha = round(in_fp(cb_in) / 1e4, 2),
+  lab_x = round(lab[, 1]), lab_y = round(lab[, 2]),
+  wkt = cb_edge
+)
+utils::write.csv(cutblocks, file.path(out_dir, "cutblocks.csv"), row.names = FALSE, na = "")
+
 # -- Tree loss: the published Bulkley change layer --------------------------------
 
 # drift's own 2017 -> 2023 change patches on the same floodplain, after a 1 ha
-# sieve, each tagged with the dated provincial harvest it falls in. Kept: patches
-# that were Trees in 2017 and another class in 2023. The edge is cut to the box
-# for drawing, as for the floodplain, and the label point is inside the patch.
+# sieve, tagged by the floodplains pipeline with the fire and harvest each patch
+# touches. Kept: patches that were Trees in 2017 and another class in 2023, with
+# the part of each inside the cutblocks above, because in_harvest means touching.
 tv_url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/transition_vector.gpkg"
 tv_file <- tempfile(fileext = ".gpkg")
 resp <- curl::curl_fetch_disk(tv_url, tv_file)
@@ -272,24 +314,30 @@ tv <- tv[tv$from_class == "Trees" & tv$to_class != "Trees" &
            lengths(sf::st_intersects(tv, aoi)) > 0, ]
 if (!nrow(tv)) stop("No tree-loss patch in the box")
 tv_in <- sf::st_intersection(sf::st_geometry(tv), sf::st_geometry(aoi))
-tv_edge <- lapply(seq_len(nrow(tv)), function(i) {
+cb_union <- sf::st_union(cb_in)
+tv_edge <- vapply(seq_len(nrow(tv)), function(i) {
   sf::st_boundary(sf::st_geometry(tv)[i]) |>
     sf::st_intersection(sf::st_geometry(aoi)) |>
     sf::st_collection_extract("LINESTRING") |>
-    sf::st_union()
-})
+    sf::st_union() |>
+    sf::st_as_text(digits = 9)
+}, character(1))
 lab <- sf::st_coordinates(sf::st_point_on_surface(tv_in))
 treeloss <- data.frame(
   patch_id = tv$patch_id,
   transition = tv$transition,
+  in_fire = tv$in_fire,
   in_harvest = tv$in_harvest,
   harvest_year = tv$harvest_start_year_calendar,
   area_ha = round(as.numeric(sf::st_area(tv_in)) / 1e4, 2),
+  cutblock_ha = round(vapply(seq_along(tv_in), function(i) {
+    sum(as.numeric(sf::st_area(sf::st_intersection(tv_in[i], cb_union))))
+  }, 1) / 1e4, 2),
   lab_x = round(lab[, 1]), lab_y = round(lab[, 2]),
-  wkt = vapply(tv_edge, sf::st_as_text, character(1), digits = 9),
+  wkt = tv_edge,
   source = tv_url
 )
-treeloss <- treeloss[order(-treeloss$area_ha), ]
+treeloss <- treeloss[order(treeloss$patch_id), ]
 utils::write.csv(treeloss, file.path(out_dir, "treeloss.csv"), row.names = FALSE, na = "")
 
 print(captures)
