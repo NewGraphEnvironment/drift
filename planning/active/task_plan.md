@@ -34,10 +34,10 @@ The README (47 lines) describes drift at about v0.1: fetch, classify, summarize.
 - [ ] GitHub About + homepage via `gh repo edit` to match the tagline — after merge (review #14), command in the PR body
 
 ## Phase 4: pkgdown reference index
-- [ ] `reference:` sections by purpose: Fetch imagery and land cover; Classify and summarize;
+- [x] `reference:` sections by purpose: Fetch imagery and land cover; Classify and summarize;
       Change between two dates; Change across the annual series; Spectral trajectories; Accuracy
       and area; Maps; Sources, classes and cache
-- [ ] `pkgdown::check_pkgdown()` clean
+- [x] `pkgdown::check_pkgdown()` clean
 
 ## Validation
 

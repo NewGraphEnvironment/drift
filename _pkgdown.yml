@@ -1,3 +1,54 @@
 url: https://www.newgraphenvironment.com/drift/
 template:
   bootstrap: 5
+
+reference:
+- title: Fetch land cover and imagery
+  contents:
+  - dft_stac_fetch
+  - dft_stac_composite
+  - dft_wayback_releases
+  - dft_wayback_captures
+  - dft_wayback_pick
+  - dft_wayback_fetch
+- title: Classify and summarize
+  contents:
+  - dft_rast_classify
+  - dft_rast_summarize
+  - dft_rast_consensus
+- title: Change between two dates
+  contents:
+  - dft_rast_transition
+  - dft_transition_vectors
+  - dft_transition_artifact
+  - dft_transition_attribute
+- title: Change across an annual series
+  contents:
+  - dft_rast_break_class
+  - dft_break_category
+  - dft_rast_break_category
+  - dft_break_strength
+- title: Spectral index trajectories
+  contents:
+  - dft_stac_cube
+  - dft_index_expr
+  - dft_index_table
+  - dft_rast_break
+  - dft_rast_trend
+- title: Accuracy and area
+  contents:
+  - dft_accuracy_sample
+  - dft_accuracy_labels
+  - dft_accuracy_estimate
+  - dft_accuracy_size
+- title: Maps
+  contents:
+  - dft_map_interactive
+- title: Sources, classes and cache
+  contents:
+  - dft_stac_config
+  - dft_stac_classes
+  - dft_class_table
+  - dft_cache_path
+  - dft_cache_info
+  - dft_cache_clear

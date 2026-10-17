@@ -19,3 +19,4 @@
   Ecosystem table copied verbatim from flooded's. All 24 links 200 (curl). wc -w 269 → 725; prose is short,
   the growth is the ecosystem table, code + output, and alt text.
 - Phase 3: DESCRIPTION Description matches the opening, "Under active development.", URL www (second, so inst/CITATION still takes the repo URL). `_pkgdown.yml` url www in the same commit. Citation workflow passes `authors_roles = c("aut", "cre", "cph")`; a local `cff_create()` lists New Graph Environment Ltd. Title kept.
+- Phase 4: `_pkgdown.yml` reference index in eight sections (review #18 assignment); 33 topics = 33 exports, no duplicates (comm/uniq); `check_pkgdown()` clean; `build_home()` to a temp dir shows the figure at `reference/figures/` and the badge in the sidebar.
