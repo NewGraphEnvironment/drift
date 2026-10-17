@@ -6,7 +6,7 @@
 
 Detecting riparian and inland floodplain transitions: track land cover change within floodplains over time.
 
-drift is an R package that fetches free global land-cover maps, or your own classified rasters, for a floodplain, compares them between two dates and across every year of a series, and turns the change into maps, tables and change polygons. It also fetches dated Sentinel-2 and Esri Wayback imagery to check mapped change against, supports accuracy assessment, and tags change areas with records you supply, such as fire perimeters or cutblocks. The result shows where streamside forest, fields and channels have changed, for restoration planning and for monitoring sites over time.
+drift is an R package that fetches free global land-cover maps, or your own classified rasters, for any area, such as a floodplain, compares them between two dates and across every year of a series, and turns the change into maps, tables and change polygons. It also fetches dated Sentinel-2 and Esri Wayback imagery to check mapped change against, supports accuracy assessment, and tags change areas with records you supply, such as fire perimeters or cutblocks. The result shows where streamside forest, fields and channels have changed, for restoration planning and for monitoring sites over time.
 
 <img src="man/figures/readme-change.png" width="100%" alt="Map of a floodplain reach over aerial imagery, outlined in white. Change between 2017 and 2023 is coloured: large orange areas where trees became rangeland, a yellow field where crops became rangeland, thin blue edges where land became water, and a few small pink patches of other change." />
 

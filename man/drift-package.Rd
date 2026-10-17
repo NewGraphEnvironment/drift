@@ -8,7 +8,7 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your own classified rasters for a floodplain, compare them between two dates and across every year of a series, and turn the change into maps, tables and change polygons. Fetch dated Sentinel-2 composites and Esri Wayback imagery to check mapped change against, estimate accuracy and error-adjusted area from a stratified reference sample, and tag change areas with overlapping records such as fire perimeters or cutblocks. Under active development.
+Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your own classified rasters for any area, such as a floodplain, compare them between two dates and across every year of a series, and turn the change into maps, tables and change polygons. Fetch dated Sentinel-2 composites and Esri Wayback imagery to check mapped change against, estimate accuracy and error-adjusted area from a stratified reference sample, and tag change areas with overlapping records such as fire perimeters or cutblocks. Under active development.
 }
 \seealso{
 Useful links:
