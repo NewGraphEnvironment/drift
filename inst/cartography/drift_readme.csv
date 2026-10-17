@@ -1,0 +1,6 @@
+layer_key,type,source_layer,class_field,class_value,class_label,fill_color,fill_opacity,stroke_color,stroke_width,stroke_opacity,mark_color,mark_shape,mark_radius,mark_stroke_color,mark_stroke_width,label_color,label_font,label_size,label_halo_color,label_halo_width,label_offset_x,label_offset_y,notes
+readme_change,polygon,,group,trees_rangeland,Trees to rangeland,#d55e00,0.5,,,,,,,,,,,,,,,,Okabe-Ito vermillion
+readme_change,polygon,,group,crops_rangeland,Crops to rangeland,#f0e442,0.5,,,,,,,,,,,,,,,,Okabe-Ito yellow
+readme_change,polygon,,group,to_water,Became water,#56b4e9,0.5,,,,,,,,,,,,,,,,Okabe-Ito sky blue
+readme_change,polygon,,group,other,Other change,#cc79a7,0.5,,,,,,,,,,,,,,,,Okabe-Ito reddish purple
+readme_floodplain,polygon,,,,Floodplain,,0,#ffffff,2,1,,,,,,,,,,,,,White edge reads over imagery
