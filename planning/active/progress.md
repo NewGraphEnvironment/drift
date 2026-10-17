@@ -29,3 +29,9 @@
   cells the outline touches) → "34 of the 123 ha mapped". Accepted: `citation("drift")` (aut only, organization
   NGE Ltd., repo URL) and CITATION.cff (NGE Ltd. as author, www URL) differ in form, both valid.
 - Tests: [ FAIL 0 | WARN 0 | SKIP 19 | PASS 1709 ].
+- code-check round 2: Clean (opacity path correct; PNG byte-identical from `git archive HEAD`). Accepted: legend
+  keys at 50% over the dark box read darker than on the map, same hue.
+- code-check round 3 (mechanism: a number at one grain read against another artefact; enumerated every number
+  and quantifier): caption "smaller transitions" false at transition grain (Rangeland→Trees 0.85 ha lumped,
+  Rangeland→Water 0.75 named) → "lumps the remaining 1.2 ha"; script comment "not fourteen" → "not ten"
+  (14 summary rows include 4 unchanged pairs). Neither inside an earlier fix.

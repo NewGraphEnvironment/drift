@@ -19,7 +19,7 @@ lulc <- list(`2017` = terra::rast(file.path(d, "example_2017.tif")),
 classified <- dft_rast_classify(lulc, source = "io-lulc")
 result <- dft_rast_transition(classified, from = "2017", to = "2023")
 
-# Group the transitions so the map carries four colours, not fourteen. The named
+# Group the transitions so the map carries four colours, not ten. The named
 # groups are the three largest kinds of change on the reach; the assertion
 # fails if the data no longer says so.
 s <- result$summary
