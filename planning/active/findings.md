@@ -57,3 +57,11 @@ The New Graph website will describe this package from its README (NewGraphEnviro
 
 | Error | Resolution |
 |-------|------------|
+
+## User direction on framing (2026-10-17)
+
+- Plain language, not much detail; one strong, uncluttered map showing what changed to what on the bundled reach.
+- The point is the **machinery**; QA and review are not the story (user, twice). The README is about the machinery, not about errors in the products it analyses. Point to the QA story
+  (articles) rather than leading with "separating real change from noise". Do mention, briefly, that drift
+  fetches dated Sentinel-2 composites and Esri Wayback imagery to check change against, and supports
+  accuracy sampling.

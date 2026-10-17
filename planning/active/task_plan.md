@@ -3,13 +3,13 @@
 The README (47 lines) describes drift at about v0.1: fetch, classify, summarize. The package does far more, and that is what makes it credible for monitoring. User direction (2026-10-17): plain language, not much detail, one strong map that is easy to read — bundled Neexdzii Kwa reach coloured by what changed to what.
 
 ## Phase 1: README map
-- [ ] `data-raw/readme_figure.R` (loads source tree): classify the bundled 2017 and 2023 rasters,
+- [x] `data-raw/readme_figure.R` (loads source tree): classify the bundled 2017 and 2023 rasters,
       `dft_rast_transition()` 2017→2023, keep the 3–4 largest transitions by area, lump the rest as
       "Other change", unchanged cells muted; floodplain AOI outline
-- [ ] Colours from a new `inst/cartography/drift_readme.csv` via `gq_reg_custom()` (no hex in the
+- [x] Colours from a new `inst/cartography/drift_readme.csv` via `gq_reg_custom()` (no hex in the
       script), drawn with tmap v4; legend, scale bar, no title; faded imagery basemap only if it
       passes cartography check 11
-- [ ] Write opaque `man/figures/readme-change.png`; self-review all 12 cartography checks at ~700 px
+- [x] Write opaque `man/figures/readme-change.png`; self-review all 12 cartography checks at ~700 px
 
 ## Phase 2: README rewrite (soul `readme.md` order)
 - [ ] Title + hex (alt text), lifecycle badge, tagline
