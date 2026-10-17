@@ -43,7 +43,7 @@ The README (47 lines) describes drift at about v0.1: fetch, classify, summarize.
 
 - [ ] Every function the README names is exported; every link resolves (curl)
 - [ ] Example output pasted from a real run; word count before (269) / after reported
-- [ ] Tests pass
+- [x] Tests pass
 - [ ] `/code-check` clean (once over the branch, with every README claim enumerated against code)
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion

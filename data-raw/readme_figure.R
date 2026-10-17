@@ -5,8 +5,8 @@
 # reach in inst/extdata, so the change layer itself needs nothing else.
 #
 # What it shows: where land cover differs between 2017 and 2023 on the reach,
-# coloured by what changed to what. Unchanged ground is left transparent so the
-# imagery shows through. Colours come from inst/cartography/drift_readme.csv.
+# coloured by what changed to what, at half opacity. Unchanged ground is left
+# transparent so the imagery shows through. Colours come from inst/cartography/drift_readme.csv.
 #   Rscript data-raw/readme_figure.R
 
 pkgload::load_all(quiet = TRUE)  # the source tree, not an installed drift
@@ -50,6 +50,10 @@ aoi <- sf::st_transform(aoi, sf::st_crs(change))
 reg <- gq::gq_reg_custom(system.file("cartography", "drift_readme.csv", package = "drift"))
 cls <- gq::gq_tmap_classes(reg$layers$readme_change)
 stopifnot(identical(names(cls$values), grp_levels))
+# one fill opacity for every class, so the imagery shows through the change
+fill_opacity <- unique(vapply(reg$layers$readme_change$classification$classes,
+                              function(k) k$opacity, numeric(1)))
+stopifnot(length(fill_opacity) == 1)
 edge <- reg$layers$readme_floodplain$stroke
 
 # Canvas 7 x 6 in; frame the floodplain to the canvas aspect so there are no bands
@@ -70,7 +74,7 @@ map <- tm_shape(imagery, bbox = frame) +
                                                 labels = cls$labels),
               fill.legend = tm_legend(title = "Land cover change, 2017 to 2023",
                                       position = legend_pos, group_id = "key"),
-              col = NULL) +
+              fill_alpha = fill_opacity, col = NULL) +
   tm_shape(aoi) +
   tm_borders(col = edge$color, lwd = edge$width) +
   tm_add_legend(type = "lines", labels = "Floodplain", col = edge$color,

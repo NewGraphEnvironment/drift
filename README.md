@@ -10,7 +10,7 @@ drift is an R package that fetches free global land-cover maps, or your own clas
 
 <img src="man/figures/readme-change.png" width="100%" alt="Map of a floodplain reach over aerial imagery, outlined in white. Change between 2017 and 2023 is coloured: large orange areas where trees became rangeland, a yellow field where crops became rangeland, thin blue edges where land became water, and a few small pink patches of other change." />
 
-*Where the mapped land-cover class changed between 2017 and 2023 on a reach of Neexdzii Kwa (Upper Bulkley River), BC, from the data bundled with drift. 34 of 123 ha changed class; "Other change" lumps 1.2 ha of smaller transitions. Land cover: Esri / Impact Observatory IO LULC. Imagery: Esri World Imagery.*
+*Where the mapped land-cover class changed between 2017 and 2023 on a reach of Neexdzii Kwa (Upper Bulkley River), BC, from the data bundled with drift. 34 of the 123 ha mapped changed class; "Other change" lumps 1.2 ha of smaller transitions. Land cover: Esri / Impact Observatory IO LULC. Imagery: Esri World Imagery.*
 
 ## Installation
 
