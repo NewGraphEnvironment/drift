@@ -35,3 +35,4 @@
   and quantifier): caption "smaller transitions" false at transition grain (Rangeland→Trees 0.85 ha lumped,
   Rangeland→Water 0.75 named) → "lumps the remaining 1.2 ha"; script comment "not fourteen" → "not ten"
   (14 summary rows include 4 unchanged pairs). Neither inside an earlier fix.
+- code-check round 4: Clean (both round-3 fixes true; enumeration still holds). Loop ended on a clean round with no inside-a-fix finding in any round. Reviewers this task: 1 plan + 4 code-check.
