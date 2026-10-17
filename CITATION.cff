@@ -8,7 +8,7 @@ message: 'To cite package "drift" in publications use:'
 type: software
 license: MIT
 title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
-version: 0.24.1
+version: 0.24.2
 abstract: Fetch STAC-hosted land cover rasters, classify and summarize change over
   time within user-provided AOI polygons, and produce standardized maps, plots, and
   tables for reporting. Generic STAC pipeline works with any classified raster (Esri
@@ -27,8 +27,8 @@ preferred-citation:
     email: al@newgraphenvironment.com
     orcid: https://orcid.org/0000-0002-3495-2128
     affiliation: New Graph Environment Ltd.
-  version: 0.24.1
-  date-released: '2026-10-15'
+  version: 0.24.2
+  date-released: '2026-10-17'
   url: https://newgraphenvironment.github.io/drift/
   repository-code: https://github.com/NewGraphEnvironment/drift
   license: MIT
@@ -37,7 +37,7 @@ preferred-citation:
     name: New Graph Environment Ltd.
 repository-code: https://github.com/NewGraphEnvironment/drift
 url: https://newgraphenvironment.github.io/drift/
-date-released: '2026-10-15'
+date-released: '2026-10-17'
 contact:
 - family-names: Irvine
   given-names: Allan
