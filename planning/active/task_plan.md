@@ -12,20 +12,20 @@ The README (47 lines) describes drift at about v0.1: fetch, classify, summarize.
 - [x] Write opaque `man/figures/readme-change.png`; self-review all 12 cartography checks at ~700 px
 
 ## Phase 2: README rewrite (soul `readme.md` order)
-- [ ] Title + hex (alt text), lifecycle badge, tagline
-- [ ] Opening, 2–3 plain sentences: measures land-cover change in floodplains from free satellite
+- [x] Title + hex (alt text), lifecycle badge, tagline
+- [x] Opening, 2–3 plain sentences: measures land-cover change in floodplains from free satellite
       maps, separates lasting change from map noise, checks accuracy, ties change to causes such as
       fire and harvest; screening tool that informs restoration planning and monitoring
-- [ ] Figure with alt text and one-line caption
-- [ ] Installation: `pak`, the gdalcubes fork note (shortened), dev-status line with
+- [x] Figure with alt text and one-line caption
+- [x] Installation: `pak`, the gdalcubes fork note (shortened), dev-status line with
       `@vX.Y.Z` pin placeholder
-- [ ] Short example on bundled data with its real printed output (no network)
-- [ ] Short "what it does" list by stage (fetch, change, check, attribute, map) — high level,
-      no function names
-- [ ] Learn more: one line per vignette/article (all four), then the reference
-- [ ] Ecosystem (flooded, gq), Data and methods (IO LULC, ESA WorldCover, Sentinel-2, Esri
+- [x] Short example on bundled data with its real printed output (no network)
+- [x] Short "what it does" list by stage (fetch, change, check, attribute, map) — high level,
+      no function names — folded into the opening instead (user: little detail; review #16)
+- [x] Learn more: one line per vignette/article (all four), then the reference
+- [x] Ecosystem (flooded, gq), Data and methods (IO LULC, ESA WorldCover, Sentinel-2, Esri
       Wayback, Olofsson et al. 2014 / Stehman 2014, BFAST), Citation, License
-- [ ] Docs URL → `https://www.newgraphenvironment.com/drift/` everywhere it is set
+- [x] Docs URL → `https://www.newgraphenvironment.com/drift/` everywhere it is set
 
 ## Phase 3: Matching texts
 - [ ] DESCRIPTION `Description` in step with the opening, "Under active development.", URL → www;

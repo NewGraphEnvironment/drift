@@ -14,3 +14,7 @@
   Trees→Rangeland 21.11 ha, Crops→Rangeland 9.98, to water 1.73, other 1.21 (34.0 of 123.1 ha changed).
   Colours from `inst/cartography/drift_readme.csv`. Two placement passes: legend moved from top-left
   (it hid a floodplain arm) to bottom-right, credits moved to the caption, legend type 1.0→0.9 to clear an edge.
+- Phase 2: README rewritten in readme.md order. Opening three sentences, machinery first; checks (Sentinel-2,
+  Wayback, accuracy, overlay tags) in one sentence. Example on bundled data with real output (head of summary).
+  Ecosystem table copied verbatim from flooded's. All 24 links 200 (curl). wc -w 269 → 725; prose is short,
+  the growth is the ecosystem table, code + output, and alt text.
