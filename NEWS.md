@@ -1,3 +1,7 @@
+# drift 0.24.2
+
+- **New article: [When Did the Floodplain Change?](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.html) (#108).** It dates the change drift detects on the Bulkley floodplain with `dft_rast_break_class()`, then looks at each change area in Esri Wayback (sharp images to 2020) and Sentinel-2 composites (after), and says which areas changed on the ground and which are class errors. The article is pkgdown-only; its data comes from `data-raw/floodplain_change_dating.R`.
+
 # drift 0.24.1
 
 - **gdalcubes now comes from `NewGraphEnvironment/gdalcubes@newgraph` (#104).** That build is upstream 0.7.5 plus the fixes proposed as appelmar/gdalcubes#113-115, so a read that fails after the image opens (including a failed cloud-mask read) and a worker that dies early are caught (#99). gdalcubes is a suggested package, so installing drift neither brings it nor replaces an upstream copy: run `pak::pak("NewGraphEnvironment/gdalcubes@newgraph")`. `Remotes:` and the install hints revert to `appelmar/gdalcubes` when those three merge upstream.
