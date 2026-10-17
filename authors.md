@@ -11,18 +11,18 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/NewGraphEnvironment/drift/blob/v0.24.2/inst/CITATION)
+[`inst/CITATION`](https://github.com/NewGraphEnvironment/drift/blob/main/inst/CITATION)
 
 Irvine A (2026). *drift: Detecting Riparian and Inland Floodplain
-Transitions*. New Graph Environment Ltd. R package version 0.24.2,
+Transitions*. New Graph Environment Ltd. Version 0.24.2,
 <https://github.com/NewGraphEnvironment/drift>.
 
-    @Manual{,
+    @Manual{drift,
       title = {drift: Detecting Riparian and Inland Floodplain Transitions},
       author = {Allan Irvine},
       organization = {New Graph Environment Ltd.},
       year = {2026},
       version = {0.24.2},
-      note = {R package version 0.24.2},
+      note = {Version 0.24.2},
       url = {https://github.com/NewGraphEnvironment/drift},
     }
