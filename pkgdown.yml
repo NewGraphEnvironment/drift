@@ -2,10 +2,11 @@ pandoc: 3.8.3
 pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
+  articles/floodplain-change-dating: floodplain-change-dating.html
   land-cover-change: land-cover-change.html
   articles/temporal-composition: temporal-composition.html
   trajectory-break-detection: trajectory-break-detection.html
-last_built: 2026-10-16T01:42Z
+last_built: 2026-10-17T00:46Z
 urls:
   reference: https://newgraphenvironment.github.io/drift/reference
   article: https://newgraphenvironment.github.io/drift/articles
