@@ -1,5 +1,17 @@
 # Changelog
 
+## drift 0.24.2
+
+- **New article: [When Did the Floodplain
+  Change?](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.html)
+  ([\#108](https://github.com/NewGraphEnvironment/drift/issues/108)).**
+  It dates the change drift detects on the Bulkley floodplain with
+  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md),
+  then looks at each change area in Esri Wayback (sharp images to 2020)
+  and Sentinel-2 composites (after), and says which areas changed on the
+  ground and which are class errors. The article is pkgdown-only; its
+  data comes from `data-raw/floodplain_change_dating.R`.
+
 ## drift 0.24.1
 
 - **gdalcubes now comes from `NewGraphEnvironment/gdalcubes@newgraph`
