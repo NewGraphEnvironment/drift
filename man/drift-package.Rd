@@ -8,23 +8,23 @@
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-Fetch STAC-hosted land cover rasters, classify and summarize change over time within user-provided AOI polygons, and produce standardized maps, plots, and tables for reporting. Generic STAC pipeline works with any classified raster (Esri IO LULC, ESA WorldCover, custom COGs).
+Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your own classified rasters for a floodplain, compare them between two dates and across every year of a series, and turn the change into maps, tables and change polygons. Fetch dated Sentinel-2 composites and Esri Wayback imagery to check mapped change against, estimate accuracy and error-adjusted area from a stratified reference sample, and tag change areas with overlapping records such as fire perimeters or cutblocks. Under active development.
 }
 \seealso{
 Useful links:
 \itemize{
   \item \url{https://github.com/NewGraphEnvironment/drift}
-  \item \url{https://newgraphenvironment.github.io/drift/}
+  \item \url{https://www.newgraphenvironment.com/drift/}
   \item Report bugs at \url{https://github.com/NewGraphEnvironment/drift/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Allan Irvine \email{al@newgraphenvironment.com} (\href{https://orcid.org/0000-0002-3495-2128}{ORCID})
+\strong{Maintainer}: Allan Irvine \email{al@newgraphenvironment.com} (\href{https://orcid.org/0000-0002-3495-2128}{ORCID}) (New Graph Environment Ltd.)
 
 Other contributors:
 \itemize{
-  \item New Graph Environment [copyright holder]
+  \item New Graph Environment Ltd. [copyright holder, funder]
 }
 
 }

@@ -28,10 +28,10 @@ The README (47 lines) describes drift at about v0.1: fetch, classify, summarize.
 - [x] Docs URL → `https://www.newgraphenvironment.com/drift/` everywhere it is set
 
 ## Phase 3: Matching texts
-- [ ] DESCRIPTION `Description` in step with the opening, "Under active development.", URL → www;
+- [x] DESCRIPTION `Description` in step with the opening, "Under active development.", URL → www;
       `_pkgdown.yml` url → www; `devtools::document()` (refreshes `drift-package.Rd`)
-- [ ] CITATION.cff workflow: `cff_create(authors_roles = c("aut", "cre", "cph"))`
-- [ ] GitHub About + homepage via `gh repo edit` to match the tagline (after merge-ready wording)
+- [x] CITATION.cff workflow: `cff_create(authors_roles = c("aut", "cre", "cph"))`
+- [ ] GitHub About + homepage via `gh repo edit` to match the tagline — after merge (review #14), command in the PR body
 
 ## Phase 4: pkgdown reference index
 - [ ] `reference:` sections by purpose: Fetch imagery and land cover; Classify and summarize;
