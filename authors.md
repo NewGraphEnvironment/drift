@@ -11,7 +11,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/NewGraphEnvironment/drift/blob/v0.24.3/inst/CITATION)
+[`inst/CITATION`](https://github.com/NewGraphEnvironment/drift/blob/main/inst/CITATION)
 
 Irvine A (2026). *drift: Detecting Riparian and Inland Floodplain
 Transitions*. New Graph Environment Ltd. Version 0.24.3,
