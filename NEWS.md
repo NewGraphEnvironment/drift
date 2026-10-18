@@ -1,3 +1,7 @@
+# drift 0.24.3
+
+- **The README describes what drift does today (#105).** It opens with what the package does (fetch land cover for any area, such as a floodplain, compare two dates and every year of a series, turn the change into maps, tables and polygons), shows a map of 2017 to 2023 change on the bundled Neexdzii Kwa reach and a bundled-data example with its real output, and lists all four articles. The DESCRIPTION `Description` matches it. The docs URL is now `https://www.newgraphenvironment.com/drift/` everywhere, and the [function reference](https://www.newgraphenvironment.com/drift/reference/index.html) is grouped by purpose.
+
 # drift 0.24.2
 
 - **New article: [When Did the Floodplain Change?](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.html) (#108).** It dates the change drift detects on the Bulkley floodplain with `dft_rast_break_class()`, then looks at each change area in Esri Wayback (sharp images to 2020) and Sentinel-2 composites (after), and says which areas changed on the ground and which are class errors. The article is pkgdown-only; its data comes from `data-raw/floodplain_change_dating.R`.
