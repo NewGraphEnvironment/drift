@@ -1,7 +1,7 @@
 # Temporal category of every row of a break-class summary
 
 Compose
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)'s
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)'s
 threshold-free measurements into the labelled split the package and its
 consumers actually report: whether a transition is a switch that held, a
 switch that turns on a single endpoint observation, or a sequence that
@@ -19,7 +19,7 @@ dft_break_category(x, years = NULL, rule = "v1")
 - x:
 
   Either the list returned by
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   (its `$summary` and `$years` are used) or a `$summary`-shaped data
   frame, in which case `years` is required. Columns `from_class`,
   `to_class`, `status` and `break_year` must be present.
@@ -28,7 +28,7 @@ dft_break_category(x, years = NULL, rule = "v1")
 
   Integer vector of the observation years in the series. Ignored with a
   warning when `x` is a
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   result, which carries its own.
 
 - rule:
@@ -45,21 +45,21 @@ preserved (`$summary` arrives sorted by `n_cells` descending):
 - `category` — a factor with the five levels below, in that order
 
 - `strength` —
-  [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md),
+  [`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md),
   `NA` off a clean switch
 
 - `rule` — the rule that produced `category`
 
 ## Details
 
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 deliberately applies no threshold. Composing the label is a judgement,
 so it lives here, in one place, under a version — see `rule`. The
 numbers it rests on stay where they were measured.
 
 `NA` propagates: a row whose pixels carry an `NA` in any interior year
 cannot be scanned, arrives from
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 with `status` `NA`, and is labelled `NA` rather than refused. It is the
 only `NA` this function produces, which is why an unlabelable class code
 is an error instead. The bundled example series has no such row — mask a
@@ -70,7 +70,7 @@ A `status` value outside `stable` /
 [`break`](https://rdrr.io/r/base/Control.html) row carrying no
 `break_year`, is an error rather than an `NA`: both mean the frame did
 not come from
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md).
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md).
 
 ## The `"v1"` rule
 
@@ -93,7 +93,7 @@ them gives 7,811.5 ha of "changed" area where the published layer says
 a free threshold would mean `rule = "v1"` no longer identifies the
 labelling, which is the composition problem this function exists to end.
 Use
-[`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+[`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
 directly for another cut.
 
 `n_flips` is not part of this function's surface. It stays on `$breaks`,
@@ -101,11 +101,11 @@ where it is measured.
 
 ## See also
 
-[`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+[`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
 for the same rule at pixel grain;
-[`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+[`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
 for the number it thresholds;
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 for the measurements.
 
 ## Examples

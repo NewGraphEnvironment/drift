@@ -11,9 +11,9 @@
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Detecting Riparian and Inland Floodplain Transitions">
-<meta name="description" content="Fetch STAC-hosted land cover rasters, classify and summarize change over time within user-provided AOI polygons, and produce standardized maps, plots, and tables for reporting. Generic STAC pipeline works with any classified raster (Esri IO LULC, ESA WorldCover, custom COGs).">
-<meta property="og:description" content="Fetch STAC-hosted land cover rasters, classify and summarize change over time within user-provided AOI polygons, and produce standardized maps, plots, and tables for reporting. Generic STAC pipeline works with any classified raster (Esri IO LULC, ESA WorldCover, custom COGs).">
-<meta property="og:image" content="https://newgraphenvironment.github.io/drift/logo.png">
+<meta name="description" content="Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your own classified rasters for any area, such as a floodplain, compare them between two dates and across every year of a series, and turn the change into maps, tables and change polygons. Fetch dated Sentinel-2 composites and Esri Wayback imagery to check mapped change against, estimate accuracy and error-adjusted area from a stratified reference sample, and tag change areas with overlapping records such as fire perimeters or cutblocks. Under active development.">
+<meta property="og:description" content="Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your own classified rasters for any area, such as a floodplain, compare them between two dates and across every year of a series, and turn the change into maps, tables and change polygons. Fetch dated Sentinel-2 composites and Esri Wayback imagery to check mapped change against, estimate accuracy and error-adjusted area from a stratified reference sample, and tag change areas with overlapping records such as fire perimeters or cutblocks. Under active development.">
+<meta property="og:image" content="https://www.newgraphenvironment.com/drift/logo.png">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -61,46 +61,128 @@
 <img src="logo.png" class="logo" alt=""><h1 id="drift-">drift <a class="anchor" aria-label="anchor" href="#drift-"></a>
 </h1>
 </div>
-<p>Track land cover change in riparian and floodplain areas using free satellite imagery.</p>
-<p>drift fetches classified rasters from STAC catalogs (Esri IO LULC, ESA WorldCover, or your own COGs), applies class labels and colors, and summarizes area change over time — ready for reports, maps, and plots.</p>
+<!-- badges: start -->
+
+<p>Detecting riparian and inland floodplain transitions: track land cover change within floodplains over time.</p>
+<p>drift is an R package that fetches free global land-cover maps, or your own classified rasters, for any area, such as a floodplain, compares them between two dates and across every year of a series, and turns the change into maps, tables and change polygons. It also fetches dated Sentinel-2 and Esri Wayback imagery to check mapped change against, supports accuracy assessment, and tags change areas with records you supply, such as fire perimeters or cutblocks. The result shows where streamside forest, fields and channels have changed, for restoration planning and for monitoring sites over time.</p>
+<p><img src="reference/figures/readme-change.png" width="100%" alt="Map of a floodplain reach over aerial imagery, outlined in white. Change between 2017 and 2023 is coloured: large orange areas where trees became rangeland, a yellow field where crops became rangeland, thin blue edges where land became water, and a few small pink patches of other change."></p>
+<p><em>Where the mapped land-cover class changed between 2017 and 2023 on a reach of Neexdzii Kwa (Upper Bulkley River), BC, from the data bundled with drift. 34 of the 123 ha mapped changed class; “Other change” lumps the remaining 1.2 ha. Land cover: Esri / Impact Observatory IO LULC. Imagery: Esri World Imagery.</em></p>
 <div class="section level2">
-<h2 id="why">Why<a class="anchor" aria-label="anchor" href="#why"></a>
-</h2>
-<p>Monitoring riparian vegetation loss matters for fish habitat, water quality, and restoration planning. Satellite land cover products are free and global, but wrangling multi-year STAC data into usable summaries takes boilerplate. drift handles the pipeline so you can focus on the analysis.</p>
-</div>
-<div class="section level2">
-<h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"NewGraphEnvironment/drift"</span><span class="op">)</span></span></code></pre></div>
-<p>The STAC fetch and cube functions (<code><a href="reference/dft_stac_fetch.html">dft_stac_fetch()</a></code>, <code><a href="reference/dft_stac_cube.html">dft_stac_cube()</a></code>) also need <a href="https://github.com/appelmar/gdalcubes" class="external-link">gdalcubes</a>, which was archived on CRAN on 2026-09-16. Install it from the <code>newgraph</code> branch of NewGraphEnvironment’s fork, which is upstream plus read-failure fixes proposed upstream (#104). It is a suggested package, so installing drift does not bring it. Run this even if gdalcubes is already installed, because it replaces an upstream copy, which does not report a failed cloud-mask read:</p>
+<p>The functions that read STAC or Sentinel-2 imagery need <a href="https://github.com/appelmar/gdalcubes" class="external-link">gdalcubes</a>, which was archived on CRAN. Install NewGraphEnvironment’s fork, which reports failed reads, even if gdalcubes is already installed. Trajectory break detection also needs bfast.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"NewGraphEnvironment/gdalcubes@newgraph"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"NewGraphEnvironment/gdalcubes@newgraph"</span><span class="op">)</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"bfast"</span><span class="op">)</span></span></code></pre></div>
+<p>drift is under active development and its functions change between releases (see <a href="https://www.newgraphenvironment.com/drift/news/index.html">NEWS</a>). Pin a release for reproducible work: <code>pak::pak("NewGraphEnvironment/drift@vX.Y.Z")</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+<h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
 </h2>
+<p>Compare 2017 and 2023 on the bundled reach:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/NewGraphEnvironment/drift" class="external-link">drift</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Fetch IO LULC for your AOI</span></span>
-<span><span class="va">rasters</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/dft_stac_fetch.html">dft_stac_fetch</a></span><span class="op">(</span><span class="va">aoi</span>, source <span class="op">=</span> <span class="st">"io-lulc"</span>, years <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2017</span>, <span class="fl">2020</span>, <span class="fl">2023</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Classify with standard labels and colors</span></span>
-<span><span class="va">classified</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/dft_rast_classify.html">dft_rast_classify</a></span><span class="op">(</span><span class="va">rasters</span>, source <span class="op">=</span> <span class="st">"io-lulc"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Summarize area by class and year</span></span>
-<span><span class="va">summary</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/dft_rast_summarize.html">dft_rast_summarize</a></span><span class="op">(</span><span class="va">classified</span>, unit <span class="op">=</span> <span class="st">"ha"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, package <span class="op">=</span> <span class="st">"drift"</span><span class="op">)</span></span>
+<span><span class="va">lulc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>`2017` <span class="op">=</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/rast.html" class="external-link">rast</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">d</span>, <span class="st">"example_2017.tif"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>             `2023` <span class="op">=</span> <span class="fu">terra</span><span class="fu">::</span><span class="fu"><a href="https://rspatial.github.io/terra/reference/rast.html" class="external-link">rast</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">d</span>, <span class="st">"example_2023.tif"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">classified</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/dft_rast_classify.html">dft_rast_classify</a></span><span class="op">(</span><span class="va">lulc</span>, source <span class="op">=</span> <span class="st">"io-lulc"</span><span class="op">)</span></span>
+<span><span class="va">change</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/dft_rast_transition.html">dft_rast_transition</a></span><span class="op">(</span><span class="va">classified</span>, from <span class="op">=</span> <span class="st">"2017"</span>, to <span class="op">=</span> <span class="st">"2023"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">change</span><span class="op">$</span><span class="va">summary</span>, <span class="fl">6</span><span class="op">)</span></span>
+<span><span class="co">#&gt; # A tibble: 6 × 5</span></span>
+<span><span class="co">#&gt;   from_class to_class  n_cells  area   pct</span></span>
+<span><span class="co">#&gt;   &lt;chr&gt;      &lt;chr&gt;       &lt;int&gt; &lt;dbl&gt; &lt;dbl&gt;</span></span>
+<span><span class="co">#&gt; 1 Trees      Trees        4918 49.2  40.0</span></span>
+<span><span class="co">#&gt; 2 Rangeland  Rangeland    3026 30.3  24.6</span></span>
+<span><span class="co">#&gt; 3 Trees      Rangeland    2111 21.1  17.2</span></span>
+<span><span class="co">#&gt; 4 Crops      Rangeland     998  9.98  8.11</span></span>
+<span><span class="co">#&gt; 5 Water      Water         938  9.38  7.62</span></span>
+<span><span class="co">#&gt; 6 Trees      Water          98  0.98  0.8</span></span></code></pre></div>
+<p><code>area</code> is hectares. For your own area, <code><a href="reference/dft_stac_fetch.html">dft_stac_fetch()</a></code> fetches the land cover for a polygon.</p>
 </div>
 <div class="section level2">
-<h2 id="related-packages">Related packages<a class="anchor" aria-label="anchor" href="#related-packages"></a>
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
-<p><a href="https://github.com/NewGraphEnvironment/flooded" class="external-link">flooded</a> delineates floodplain extents from DEMs and stream networks — use it to generate the AOI polygons that drift analyzes for land cover change.</p>
+<ul>
+<li>
+<a href="https://www.newgraphenvironment.com/drift/articles/land-cover-change.html">Land Cover Change Detection for Floodplains</a>: fetch, classify and compare land cover on the Neexdzii Kwa floodplain, down to single change patches.</li>
+<li>
+<a href="https://www.newgraphenvironment.com/drift/articles/trajectory-break-detection.html">Trajectories as a Check on Land-Cover Change</a>: a Sentinel-2 vegetation index through time, its abrupt breaks and gradual trends.</li>
+<li>
+<a href="https://www.newgraphenvironment.com/drift/articles/temporal-composition.html">What a Land-Cover Change Figure Is Made Of</a>: reading every year of a series, not only the two ends.</li>
+<li>
+<a href="https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.html">When Did the Floodplain Change?</a>: dating mapped change with Sentinel-2 and Esri Wayback imagery.</li>
+<li>
+<a href="https://www.newgraphenvironment.com/drift/reference/index.html">Function reference</a>.</li>
+</ul>
 </div>
 <div class="section level2">
-<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
+<h2 id="ecosystem">Ecosystem<a class="anchor" aria-label="anchor" href="#ecosystem"></a>
 </h2>
-<p>Full reference and a worked example (Neexdzii Kwa floodplain, 2017-2023) at the <a href="https://www.newgraphenvironment.com/drift/" class="external-link">pkgdown site</a>.</p>
+<table class="table">
+<colgroup>
+<col width="60%">
+<col width="40%">
+</colgroup>
+<thead><tr>
+<th>Package</th>
+<th>Role</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/fresh/" class="external-link">fresh</a></td>
+<td>Stream network modelling engine: segment, classify, cluster, aggregate</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/link/" class="external-link">link</a></td>
+<td>Intrinsic habitat models: develop, test and communicate</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/wet/" class="external-link">wet</a></td>
+<td>Stream flow and water temperature for BC’s Freshwater Atlas</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/flooded/" class="external-link">flooded</a></td>
+<td>Delineate floodplain extents from DEMs and stream networks</td>
+</tr>
+<tr>
+<td><strong>drift</strong></td>
+<td>Track land cover change within floodplains over time (this package)</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/floodplains/" class="external-link">floodplains</a></td>
+<td>Floodplain and land cover change modelling for BC watershed groups</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/stac_floodplains_bc/" class="external-link">stac_floodplains_bc</a></td>
+<td>STAC catalogue of floodplain land cover change in BC, 2017-2023, by watershed group</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/cd/" class="external-link">cd</a></td>
+<td>Climate departure analysis from ERA5-Land reanalysis</td>
+</tr>
+<tr>
+<td><a href="https://www.newgraphenvironment.com/fly/" class="external-link">fly</a></td>
+<td>Estimate airphoto footprints and select optimal coverage for a study area</td>
+</tr>
+<tr>
+<td><a href="https://github.com/NewGraphEnvironment/gq" class="external-link">gq</a></td>
+<td>Shared map symbology</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="data-and-methods-it-builds-on">Data and methods it builds on<a class="anchor" aria-label="anchor" href="#data-and-methods-it-builds-on"></a>
+</h2>
+<p>drift reads Esri / Impact Observatory IO LULC and ESA WorldCover land cover, and Sentinel-2 L2A imagery, from the <a href="https://planetarycomputer.microsoft.com/" class="external-link">Microsoft Planetary Computer</a> STAC catalogue through <a href="https://github.com/appelmar/gdalcubes" class="external-link">gdalcubes</a>, and dated sub-metre imagery from <a href="https://livingatlas.arcgis.com/wayback/" class="external-link">Esri World Imagery Wayback</a>. Vegetation trajectories default to kNDVI, with abrupt breaks from BFAST Monitor (<a href="https://cran.r-project.org/package=bfast" class="external-link">bfast</a>) and gradual trends as Theil-Sen slopes with a Mann-Kendall test. Accuracy and error-adjusted area follow Olofsson et al. (2014) and Stehman (2014), through <a href="https://cran.r-project.org/package=mapaccuracy" class="external-link">mapaccuracy</a>.</p>
+</div>
+<div class="section level2">
+<h2 id="citation-and-license">Citation and license<a class="anchor" aria-label="anchor" href="#citation-and-license"></a>
+</h2>
+<p>Cite drift with <code>citation("drift")</code>, or from <a href="https://github.com/NewGraphEnvironment/drift/blob/main/CITATION.cff" class="external-link">CITATION.cff</a>. MIT licensed; see <a href="https://www.newgraphenvironment.com/drift/LICENSE.html">LICENSE</a>.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -136,7 +218,12 @@
 </ul>
 </div>
 
-
+<div class="dev-status">
+<h2 data-toc-skip>Dev status</h2>
+<ul class="list-unstyled">
+<li><a href="https://lifecycle.r-lib.org/articles/stages.html#experimental" class="external-link"><img src="https://img.shields.io/badge/lifecycle-experimental-orange.svg" alt="Lifecycle: experimental"></a></li>
+</ul>
+</div>
 
   </aside>
 </div>

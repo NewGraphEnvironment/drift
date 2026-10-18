@@ -16,7 +16,7 @@ dft_rast_classify(x, class_table = NULL, source = "io-lulc", remap = NULL)
   A
   [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
   or a named list of `SpatRaster`s (e.g. from
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)).
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)).
   A raster that is already a factor, such as a published classified
   raster with its own attribute table, is accepted: its codes are read
   from the raw values, and its levels and colours are replaced by
@@ -26,7 +26,7 @@ dft_rast_classify(x, class_table = NULL, source = "io-lulc", remap = NULL)
 
   A tibble with columns `code`, `class_name`, `color` (hex). When
   `NULL`, loaded via
-  [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+  [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
   using `source`.
 
 - source:

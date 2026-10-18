@@ -1,7 +1,7 @@
 # Attribute transition patches from an overlay polygon layer
 
 Tag change patches (from
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md))
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md))
 with columns from any overlay polygon layer — fire perimeters,
 cutblocks, roads, tenures — to help separate mapped transitions by
 cause. Generic by design: drift carries no domain knowledge; the caller
@@ -27,7 +27,7 @@ dft_transition_attribute(
 - patches:
 
   An `sf` object of change patches, typically from
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md).
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md).
 
 - overlay:
 
@@ -78,7 +78,7 @@ dft_transition_attribute(
   features whose `time_col` falls outside the interval (both bounds
   inclusive) are dropped before joining; features with an `NA` time are
   also dropped. Patches from
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   carry no time columns, so the interval is always supplied explicitly.
 
 ## Value
@@ -142,9 +142,9 @@ axis.
 
 ## See also
 
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
 for producing the input patches;
-[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+[`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
 to flag geometric misregistration artifacts among them first (run it
 before `match_mode = "all"`, which duplicates `patch_id`).
 

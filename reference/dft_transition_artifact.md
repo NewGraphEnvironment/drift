@@ -30,10 +30,10 @@ dft_transition_artifact(
 - patches:
 
   An `sf` object of transition patches from
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md),
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md),
   with columns `patch_id` (unique), `transition` and `area_ha`. Run this
   **before** zone attribution or
-  [`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
+  [`dft_transition_attribute()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_attribute.md)
   with `match_mode = "all"`: zone intersection splits patch geometry and
   `"all"` mode duplicates `patch_id`, and both change what "a patch"
   means to the metrics below.
@@ -42,7 +42,7 @@ dft_transition_artifact(
 
   The factor `SpatRaster` the patches were vectorized from (the
   `$raster` element of
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)).
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)).
   Must be the **unfiltered** raster — one produced without `from_class`
   / `to_class` — because the boundary signature reads the from-epoch
   class of the cells *around* each patch, and a filtered raster is `NA`
@@ -106,7 +106,7 @@ dft_transition_artifact(
 ## Details
 
 This function adds evidence columns to the patches from
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
 and lets the caller decide. It drops nothing. Every signature is derived
 from the transition raster alone, so it costs no extra fetch and works
 on any factor transition raster.
@@ -146,7 +146,7 @@ on the AOI, and real changes are sometimes genuinely thin. Compose it
 yourself, e.g. `flag_sliver & (flag_boundary | flag_reciprocal)`.
 
 The independent confirmation route is spectral:
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 on a Sentinel-2 index cube, described in the *Trajectories as a Check on
 Land-Cover Change* vignette, where a mapped transition with no spectral
 break is read as a label change rather than real change. That route
@@ -166,12 +166,12 @@ pair.
 
 ## See also
 
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
 for producing the input patches and its `patch_area_min` for the area
 axis;
-[`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
+[`dft_transition_attribute()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_attribute.md)
 to tag patches from an overlay layer once artifacts are flagged;
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 for the spectral confirmation route.
 
 ## Examples

@@ -160,7 +160,7 @@ Dominant vegetation classes over time in the Neexdzii Kwa floodplain.
 
 ## Transition Detection
 
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
 compares two rasters cell-by-cell and returns a transition raster plus a
 summary table. The first table below shows the area that remained in the
 same class (stable pixels), while the second shows pixels that changed
@@ -355,7 +355,7 @@ Land cover transitions 2017–2023: unfiltered vs filtered (min patch area
 The figure below shows three views: unfiltered transitions, what the
 filter removed (`$removed`), and the filtered result. The `$removed`
 raster is returned directly by
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
 when `patch_area_min` is set.
 
 ``` r
@@ -383,7 +383,7 @@ m²). Centre panel shows removed patches.
 
 ## Vector Patches
 
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
 converts the transition raster into `sf` polygons — one row per
 connected patch. This is the format needed for GIS QA (click patches,
 filter by size) and spatial attribution to management zones.
@@ -443,9 +443,9 @@ one-pixel band along a 5 km bank at 30 m is 15 ha — thirty times the
 5,000 m² threshold used above — while a genuine 0.5 ha cutblock is
 discarded as speckle. No value of `patch_area_min` fixes both.
 
-[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+[`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
 adds evidence for three geometric signatures to the patches from
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
 and drops nothing — the caller decides. All three are read from the
 transition raster alone, so they cost no extra fetch.
 
@@ -573,7 +573,7 @@ evidence. {.table}
 
 The independent check is spectral. The *Trajectories as a Check on
 Land-Cover Change* vignette runs
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 on a Sentinel-2 kNDVI cube over the same reach and reads a mapped
 `Trees -> Rangeland` outline with no spectral break as a label change
 rather than trees coming off. That route confirms or refutes individual
@@ -592,12 +592,12 @@ real conversion; the geometry is identical. IO LULC is annual, so the
 third leg is free: scan each pixel’s class sequence across every year
 and ask whether it *settled*.
 
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 reports, per pixel, whether the series is stable, a clean switch (one
 class for N years, then another for M years, and nothing else) or
 flicker (more than one change), and dates the clean switches. Its
 `$raster` is the same `from -> to` transition layer
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
 produces for the two endpoints, so the patch tools above take it
 unchanged. The bundled tile ships all seven years.
 

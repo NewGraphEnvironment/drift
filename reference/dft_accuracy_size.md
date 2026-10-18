@@ -23,9 +23,9 @@ dft_accuracy_size(
 
   Numeric stratum weights (`N_h / N`), summing to 1, named by stratum –
   `$strata$weight` from
-  [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md),
+  [`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md),
   or from
-  [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)'s
+  [`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)'s
   `$stratum` table.
 
 - se_target:
@@ -39,7 +39,7 @@ dft_accuracy_size(
   Per-stratum standard deviation of the indicator behind that estimate,
   in the order of `weights` (or matched by name when both are named).
   From a pilot, take `sd` from
-  [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)`$stratum`
+  [`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)`$stratum`
   for the target: `"agreement"` to plan for overall accuracy, or a
   reference class to plan for its area.
 
@@ -73,7 +73,7 @@ dft_accuracy_size(
 
 A list: `n`, the total from Eq. 13 (rounded up); `allocation`, the
 per-stratum sizes named by stratum, ready for
-[`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)'s
+[`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md)'s
 `n`; and the `s_h` used. Allocations are rounded, so they can sum to a
 point or two either side of `n`.
 
@@ -86,7 +86,7 @@ conservative otherwise.
 The allocation changes which estimates are precise, not whether they are
 unbiased: any allocation with at least two points per stratum gives
 unbiased estimates through
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md).
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md).
 Check the anticipated standard errors of the estimates that matter – the
 rare change classes' areas, typically – rather than overall accuracy
 alone.
@@ -105,8 +105,8 @@ accuracy of land change. *Remote Sensing of Environment* 148, 42-57.
 
 ## See also
 
-[`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md),
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md).
+[`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md),
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md).
 
 ## Examples
 

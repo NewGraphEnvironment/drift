@@ -5,9 +5,9 @@ rasters (one per year) and report whether it is **stable**, a **clean
 switch** (class A for N years, then class B for M years, and nothing
 else) or **flicker** (more than one change of class). A clean switch is
 dated. This is the temporal, categorical-only leg of change QA: where
-[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+[`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
 asks whether a patch has the *shape* of a registration artifact and
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 asks whether the *spectral* signal actually moved, this asks whether the
 labels themselves settled.
 
@@ -22,7 +22,7 @@ dft_rast_break_class(x, class_table = NULL, source = "io-lulc", unit = "ha")
 - x:
 
   A named list of classified `SpatRaster`s (e.g. from
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)),
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)),
   one per year, whose names parse as integer years (`"2017"`, ...).
   Order does not matter; layers are sorted by year. At least two, each
   single-layer and in the same CRS. Rasters on a different grid from the
@@ -32,7 +32,7 @@ dft_rast_break_class(x, class_table = NULL, source = "io-lulc", unit = "ha")
 
   A tibble with columns `code`, `class_name`, `color`. When `NULL`,
   loaded via
-  [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+  [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
   using `source`.
 
 - source:
@@ -55,9 +55,9 @@ A list with four elements:
   identical to
   `dft_rast_transition(x, from = <first>, to = <last>)$raster`, so it
   feeds
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   and
-  [`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+  [`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
   unchanged.
 
 - `breaks`: a four-layer integer `SpatRaster` of per-pixel evidence:
@@ -69,7 +69,7 @@ A list with four elements:
     either side of the switch; `NA` unless `n_flips == 1`. Their
     [`pmin()`](https://rdrr.io/r/base/Extremes.html) is the switch's
     **strength** — see
-    [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md),
+    [`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md),
     which is the one name this quantity goes by — and a switch is only
     as sure as its shorter side: a pixel whose last observation alone
     differs is a clean switch with `n_after == 1`, and one whose first
@@ -86,7 +86,7 @@ A list with four elements:
 
 - `years`: the observation years, sorted ascending — the series the
   other three elements were measured over, so
-  [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+  [`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
   can apply the endpoint threshold without being told it again.
 
 ## Details
@@ -104,23 +104,23 @@ endpoints and is flicker here.
 No threshold is applied — every measurement is reported and the caller
 composes, e.g. `n_flips == 1 & pmin(n_before, n_after) >= 2` for a
 switch sustained at least two observations on each side.
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
 is that composition, versioned and in one place; use it rather than
 re-deriving the split, and
-[`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+[`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
 for the number it thresholds. Compare
-[`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md),
+[`dft_rast_consensus()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_consensus.md),
 which votes a real mid-window switch back to its old class because the
 pre-change years outnumber the post-change ones; here that pixel is a
 dated break.
 
 `break_year` is an integer calendar year, unlike `break_date` from
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md),
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md),
 which is a decimal year from a monthly spectral series.
 
 `NA` handling follows the two-epoch comparison: the transition layer is
 `NA` where the first or last year is `NA`, exactly as
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
 propagates `NA` from either epoch. An `NA` in any *interior* year leaves
 the transition in place but makes all four evidence layers `NA` — the
 sequence cannot be scanned — and such pixels appear in `summary` with
@@ -141,15 +141,15 @@ years) are in `NEWS.md`.
 
 ## See also
 
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
 for the two-epoch comparison this splits;
-[`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+[`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
 and
-[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md),
+[`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md),
 which take `$raster` unchanged;
-[`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)
+[`dft_rast_consensus()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_consensus.md)
 for the mode filter this supersedes;
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 for the spectral route.
 
 ## Examples

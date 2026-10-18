@@ -3,7 +3,7 @@
 Build a toggleable leaflet map from classified `SpatRaster`s or remote
 COG URLs served via titiler. Optionally overlay land cover transitions
 from
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md).
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md).
 Includes layer control, legend, and fullscreen.
 
 ## Usage
@@ -33,7 +33,7 @@ dft_map_interactive(
   A named list of classified
   [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)s
   (e.g. from
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md))
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md))
   **or** a named character vector of COG URLs. A single `SpatRaster` or
   URL string is auto-wrapped into a length-1 list/vector. Names become
   the layer toggle labels (years, seasons, etc.). May be `NULL` when
@@ -47,7 +47,7 @@ dft_map_interactive(
 - transition:
 
   Output of
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
   — a list with elements `raster` (factor `SpatRaster`) and `summary`
   (tibble). Each transition type becomes a toggleable overlay. Stable
   transitions (same from/to class) are excluded by default. `NULL`
@@ -58,7 +58,7 @@ dft_map_interactive(
   Dated reference imagery: a named list of three-band
   [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)s
   in red, green, blue order (the output of
-  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
   with its default `bands`), **or** a named character vector of
   three-band COG URLs served through `titiler_url`. Names become the
   layer labels, e.g. `"2017 Jun–Jul"`. Local rasters are drawn with
@@ -79,7 +79,7 @@ dft_map_interactive(
 
   A tibble with columns `code`, `class_name`, `color` (hex). When
   `NULL`, loaded via
-  [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+  [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
   using `source`.
 
 - source:
@@ -127,7 +127,7 @@ each transition type (e.g. Trees -\> Rangeland) is added as a checkbox
 overlay that can be shown simultaneously on top of any classified layer.
 
 When `rgb` is supplied, each composite (e.g. from
-[`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md))
+[`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md))
 is added as a switchable overlay beneath the classified and transition
 layers, so dated imagery can be toggled under a land-cover label to
 check it. Every composite gets **the same stretch**: each band's display

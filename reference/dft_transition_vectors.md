@@ -1,7 +1,7 @@
 # Vectorize transition raster into individual change patches
 
 Convert a transition `SpatRaster` (from
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md))
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md))
 into `sf` polygons — one row per connected patch of pixels sharing the
 same transition type. Useful for QA in GIS, spatial attribution to
 management zones, and patch-level reporting.
@@ -23,7 +23,7 @@ dft_transition_vectors(
 - x:
 
   A factor `SpatRaster` from
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
   (the `$raster` element). Must have a projected CRS.
 
 - zones:
@@ -75,11 +75,11 @@ per-class memory cost.
 
 ## See also
 
-[`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+[`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
 to tag the returned patches with geometric misregistration evidence
 (sliver width, boundary-hugging, reciprocal pairs) — the axis
 `patch_area_min` cannot see;
-[`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
+[`dft_transition_attribute()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_attribute.md)
 to tag them from an overlay polygon layer (fire perimeters, cutblocks,
 ...).
 

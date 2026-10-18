@@ -1,7 +1,7 @@
 # How many observations a dated class switch held, either side
 
 The confidence attached to a clean switch found by
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md):
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md):
 `pmin(n_before, n_after)`, recovered from `break_year` alone. A switch
 is only as sure as its shorter side, so a pixel whose last observation
 alone differs scores 1 however long the run before it was.
@@ -24,7 +24,7 @@ dft_break_strength(break_year, years)
 
   Integer vector of the observation years in the series, sorted and
   unique — `$years` from
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md),
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md),
   or the names of the list passed to it.
 
 ## Value
@@ -36,7 +36,7 @@ An integer vector the length of `break_year`, `NA` where `break_year` is
 
 This is a **measurement**, not a judgement — its meaning is fixed and it
 is never versioned.
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
 thresholds it to produce a label, which is versioned; a caller who wants
 a different threshold uses this number directly rather than asking for
 another rule.
@@ -55,10 +55,10 @@ is six years.
 The maximum is `floor(length(years) / 2)`: 3 on the seven-year series
 drift is usually run on, 1 on a four-year series, and 1 on the two- and
 three-year series
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 also accepts — so on a series shorter than four observations no break
 can score 2, and
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)'s
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)'s
 `break_sustained` level is unreachable rather than merely empty.
 
 A `break_year` equal to `years[1]` is refused: the first year cannot be
@@ -75,16 +75,16 @@ membership check cannot catch a *superset*: on the true series
 `2017:2023` a break at 2023 scores 1, and passing `2017:2030` instead
 scores it 6, turning an endpoint-only switch into a sustained one with
 nothing to say so. Take `years` from
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)'s
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)'s
 own `$years` wherever the result is to hand; a summary read back from
 CSV does not carry the series, so the caller states it and owns being
 right about it.
 
 ## See also
 
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md),
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md),
 which measures the switch;
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md),
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md),
 which thresholds this into a label.
 
 ## Examples

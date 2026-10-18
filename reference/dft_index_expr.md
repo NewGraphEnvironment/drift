@@ -23,19 +23,19 @@ dft_index_expr(
 - cube:
 
   A `gdalcubes` data cube (e.g. the lazy cube built inside
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md))
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md))
   whose bands are the source's assets.
 
 - index:
 
   Character. An index name present in
-  [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
+  [`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md)
   (default `"kndvi"`).
 
 - source:
 
   Character. Source name passed to
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+  [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
   to resolve the role→asset map and reflectance scale/offset (default
   `"sentinel-2-l2a"`).
 
@@ -56,10 +56,10 @@ A single-band `gdalcubes` cube with the band named `index`.
 ## Details
 
 Index formulas are stored in a shipped registry
-([`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md))
+([`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md))
 written over band **roles** (`red`, `nir`, `swir16`), not literal asset
 names. The roles are resolved to per-source asset names via
-[`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md),
+[`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md),
 so the same `"kndvi"` works against Sentinel-2 (`B04`/`B08`) or any
 future reflectance source without changing the formula.
 
@@ -72,9 +72,9 @@ processing baseline 04.00).
 
 ## See also
 
-[`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
+[`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md)
 for the registry,
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
 for the caller that builds the input cube.
 
 ## Examples

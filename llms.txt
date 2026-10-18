@@ -1,141 +1,231 @@
 # drift
 
-Track land cover change in riparian and floodplain areas using free
-satellite imagery.
+Detecting riparian and inland floodplain transitions: track land cover
+change within floodplains over time.
 
-drift fetches classified rasters from STAC catalogs (Esri IO LULC, ESA
-WorldCover, or your own COGs), applies class labels and colors, and
-summarizes area change over time — ready for reports, maps, and plots.
+drift is an R package that fetches free global land-cover maps, or your
+own classified rasters, for any area, such as a floodplain, compares
+them between two dates and across every year of a series, and turns the
+change into maps, tables and change polygons. It also fetches dated
+Sentinel-2 and Esri Wayback imagery to check mapped change against,
+supports accuracy assessment, and tags change areas with records you
+supply, such as fire perimeters or cutblocks. The result shows where
+streamside forest, fields and channels have changed, for restoration
+planning and for monitoring sites over time.
 
-## Why
+![Map of a floodplain reach over aerial imagery, outlined in white.
+Change between 2017 and 2023 is coloured: large orange areas where trees
+became rangeland, a yellow field where crops became rangeland, thin blue
+edges where land became water, and a few small pink patches of other
+change.](reference/figures/readme-change.png)
 
-Monitoring riparian vegetation loss matters for fish habitat, water
-quality, and restoration planning. Satellite land cover products are
-free and global, but wrangling multi-year STAC data into usable
-summaries takes boilerplate. drift handles the pipeline so you can focus
-on the analysis.
+*Where the mapped land-cover class changed between 2017 and 2023 on a
+reach of Neexdzii Kwa (Upper Bulkley River), BC, from the data bundled
+with drift. 34 of the 123 ha mapped changed class; “Other change” lumps
+the remaining 1.2 ha. Land cover: Esri / Impact Observatory IO LULC.
+Imagery: Esri World Imagery.*
 
-## Install
+## Installation
 
 ``` r
 
 pak::pak("NewGraphEnvironment/drift")
 ```
 
-The STAC fetch and cube functions
-([`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md),
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md))
-also need [gdalcubes](https://github.com/appelmar/gdalcubes), which was
-archived on CRAN on 2026-09-16. Install it from the `newgraph` branch of
-NewGraphEnvironment’s fork, which is upstream plus read-failure fixes
-proposed upstream (#104). It is a suggested package, so installing drift
-does not bring it. Run this even if gdalcubes is already installed,
-because it replaces an upstream copy, which does not report a failed
-cloud-mask read:
+The functions that read STAC or Sentinel-2 imagery need
+[gdalcubes](https://github.com/appelmar/gdalcubes), which was archived
+on CRAN. Install NewGraphEnvironment’s fork, which reports failed reads,
+even if gdalcubes is already installed. Trajectory break detection also
+needs bfast.
 
 ``` r
 
 pak::pak("NewGraphEnvironment/gdalcubes@newgraph")
+pak::pak("bfast")
 ```
 
-## Quick start
+drift is under active development and its functions change between
+releases (see
+[NEWS](https://www.newgraphenvironment.com/drift/news/index.html)). Pin
+a release for reproducible work:
+`pak::pak("NewGraphEnvironment/drift@vX.Y.Z")`.
+
+## Example
+
+Compare 2017 and 2023 on the bundled reach:
 
 ``` r
 
 library(drift)
 
-# Fetch IO LULC for your AOI
-rasters <- dft_stac_fetch(aoi, source = "io-lulc", years = c(2017, 2020, 2023))
-
-# Classify with standard labels and colors
-classified <- dft_rast_classify(rasters, source = "io-lulc")
-
-# Summarize area by class and year
-summary <- dft_rast_summarize(classified, unit = "ha")
+d <- system.file("extdata", package = "drift")
+lulc <- list(`2017` = terra::rast(file.path(d, "example_2017.tif")),
+             `2023` = terra::rast(file.path(d, "example_2023.tif")))
+classified <- dft_rast_classify(lulc, source = "io-lulc")
+change <- dft_rast_transition(classified, from = "2017", to = "2023")
+head(change$summary, 6)
+#> # A tibble: 6 × 5
+#>   from_class to_class  n_cells  area   pct
+#>   <chr>      <chr>       <int> <dbl> <dbl>
+#> 1 Trees      Trees        4918 49.2  40.0
+#> 2 Rangeland  Rangeland    3026 30.3  24.6
+#> 3 Trees      Rangeland    2111 21.1  17.2
+#> 4 Crops      Rangeland     998  9.98  8.11
+#> 5 Water      Water         938  9.38  7.62
+#> 6 Trees      Water          98  0.98  0.8
 ```
 
-## Related packages
+`area` is hectares. For your own area,
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
+fetches the land cover for a polygon.
 
-[flooded](https://github.com/NewGraphEnvironment/flooded) delineates
-floodplain extents from DEMs and stream networks — use it to generate
-the AOI polygons that drift analyzes for land cover change.
+## Learn more
 
-## Documentation
+- [Land Cover Change Detection for
+  Floodplains](https://www.newgraphenvironment.com/drift/articles/land-cover-change.html):
+  fetch, classify and compare land cover on the Neexdzii Kwa floodplain,
+  down to single change patches.
+- [Trajectories as a Check on Land-Cover
+  Change](https://www.newgraphenvironment.com/drift/articles/trajectory-break-detection.html):
+  a Sentinel-2 vegetation index through time, its abrupt breaks and
+  gradual trends.
+- [What a Land-Cover Change Figure Is Made
+  Of](https://www.newgraphenvironment.com/drift/articles/temporal-composition.html):
+  reading every year of a series, not only the two ends.
+- [When Did the Floodplain
+  Change?](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.html):
+  dating mapped change with Sentinel-2 and Esri Wayback imagery.
+- [Function
+  reference](https://www.newgraphenvironment.com/drift/reference/index.html).
 
-Full reference and a worked example (Neexdzii Kwa floodplain, 2017-2023)
-at the [pkgdown site](https://www.newgraphenvironment.com/drift/).
+## Ecosystem
+
+| Package | Role |
+|----|----|
+| [fresh](https://www.newgraphenvironment.com/fresh/) | Stream network modelling engine: segment, classify, cluster, aggregate |
+| [link](https://www.newgraphenvironment.com/link/) | Intrinsic habitat models: develop, test and communicate |
+| [wet](https://www.newgraphenvironment.com/wet/) | Stream flow and water temperature for BC’s Freshwater Atlas |
+| [flooded](https://www.newgraphenvironment.com/flooded/) | Delineate floodplain extents from DEMs and stream networks |
+| **drift** | Track land cover change within floodplains over time (this package) |
+| [floodplains](https://www.newgraphenvironment.com/floodplains/) | Floodplain and land cover change modelling for BC watershed groups |
+| [stac_floodplains_bc](https://www.newgraphenvironment.com/stac_floodplains_bc/) | STAC catalogue of floodplain land cover change in BC, 2017-2023, by watershed group |
+| [cd](https://www.newgraphenvironment.com/cd/) | Climate departure analysis from ERA5-Land reanalysis |
+| [fly](https://www.newgraphenvironment.com/fly/) | Estimate airphoto footprints and select optimal coverage for a study area |
+| [gq](https://github.com/NewGraphEnvironment/gq) | Shared map symbology |
+
+## Data and methods it builds on
+
+drift reads Esri / Impact Observatory IO LULC and ESA WorldCover land
+cover, and Sentinel-2 L2A imagery, from the [Microsoft Planetary
+Computer](https://planetarycomputer.microsoft.com/) STAC catalogue
+through [gdalcubes](https://github.com/appelmar/gdalcubes), and dated
+sub-metre imagery from [Esri World Imagery
+Wayback](https://livingatlas.arcgis.com/wayback/). Vegetation
+trajectories default to kNDVI, with abrupt breaks from BFAST Monitor
+([bfast](https://cran.r-project.org/package=bfast)) and gradual trends
+as Theil-Sen slopes with a Mann-Kendall test. Accuracy and
+error-adjusted area follow Olofsson et al. (2014) and Stehman (2014),
+through [mapaccuracy](https://cran.r-project.org/package=mapaccuracy).
+
+## Citation and license
+
+Cite drift with `citation("drift")`, or from
+[CITATION.cff](https://github.com/NewGraphEnvironment/drift/blob/main/CITATION.cff).
+MIT licensed; see
+[LICENSE](https://www.newgraphenvironment.com/drift/LICENSE.html).
 
 # Package index
 
-## All functions
+## Fetch land cover and imagery
 
-- [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
-  : Accuracy and error-adjusted area from a stratified reference sample
-- [`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md)
+- [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
+  : Fetch STAC-hosted rasters via gdalcubes
+- [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
+  : Fetch dated, cloud-masked reflectance composites from a STAC catalog
+- [`dft_wayback_releases()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_releases.md)
+  : List the Esri World Imagery Wayback releases
+- [`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md)
+  : Find the Esri Wayback captures that image each feature
+- [`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md)
+  : Pick, per feature, the capture nearest a date
+- [`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md)
+  : Fetch an Esri Wayback release as a local raster around an AOI
+
+## Classify and summarize
+
+- [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)
+  : Classify a raster with factor levels and colors
+- [`dft_rast_summarize()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_summarize.md)
+  : Summarize area by class
+- [`dft_rast_consensus()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_consensus.md)
+  : Compute per-pixel mode across classified rasters
+
+## Change between two dates
+
+- [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
+  : Detect land cover transitions between two time steps
+- [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
+  : Vectorize transition raster into individual change patches
+- [`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
+  : Tag transition patches with geometric misregistration evidence
+- [`dft_transition_attribute()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_attribute.md)
+  : Attribute transition patches from an overlay polygon layer
+
+## Change across an annual series
+
+- [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
+  : Detect sustained class switches across an annual classified series
+- [`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
+  : Temporal category of every row of a break-class summary
+- [`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
+  : Temporal category of every pixel in a break-class scan
+- [`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
+  : How many observations a dated class switch held, either side
+
+## Spectral index trajectories
+
+- [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
+  : Fetch a masked spectral-index cube from a STAC catalog
+- [`dft_index_expr()`](https://www.newgraphenvironment.com/drift/reference/dft_index_expr.md)
+  : Apply a spectral index to a data cube
+- [`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md)
+  : Load the shipped spectral-index registry
+- [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
+  : Detect per-pixel index-trajectory breakpoints
+- [`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md)
+  : Per-pixel index trend over time
+
+## Accuracy and area
+
+- [`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md)
+  : Draw a stratified random sample of points for accuracy assessment
+- [`dft_accuracy_labels()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_labels.md)
   : Check a reference-label table against the accuracy-assessment
   contract
-- [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)
-  : Draw a stratified random sample of points for accuracy assessment
-- [`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md)
+- [`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)
+  : Accuracy and error-adjusted area from a stratified reference sample
+- [`dft_accuracy_size()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_size.md)
   : Size and allocate a stratified accuracy sample
-- [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
-  : Temporal category of every row of a break-class summary
-- [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
-  : How many observations a dated class switch held, either side
-- [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
-  : Clear the drift tile cache
-- [`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
-  : Show drift cache info
-- [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
-  : Get drift cache directory path
-- [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
-  : Load shipped class lookup table
-- [`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md)
-  : Apply a spectral index to a data cube
-- [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
-  : Load the shipped spectral-index registry
-- [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md)
+
+## Maps
+
+- [`dft_map_interactive()`](https://www.newgraphenvironment.com/drift/reference/dft_map_interactive.md)
   : Interactive leaflet map for classified rasters and transitions
-- [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
-  : Detect per-pixel index-trajectory breakpoints
-- [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
-  : Temporal category of every pixel in a break-class scan
-- [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
-  : Detect sustained class switches across an annual classified series
-- [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
-  : Classify a raster with factor levels and colors
-- [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)
-  : Compute per-pixel mode across classified rasters
-- [`dft_rast_summarize()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.md)
-  : Summarize area by class
-- [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
-  : Detect land cover transitions between two time steps
-- [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
-  : Per-pixel index trend over time
-- [`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md)
-  : Extract class table from STAC item metadata
-- [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
-  : Fetch dated, cloud-masked reflectance composites from a STAC catalog
-- [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+
+## Sources, classes and cache
+
+- [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
   : Get STAC configuration for a known source
-- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
-  : Fetch a masked spectral-index cube from a STAC catalog
-- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
-  : Fetch STAC-hosted rasters via gdalcubes
-- [`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
-  : Tag transition patches with geometric misregistration evidence
-- [`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
-  : Attribute transition patches from an overlay polygon layer
-- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
-  : Vectorize transition raster into individual change patches
-- [`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md)
-  : Find the Esri Wayback captures that image each feature
-- [`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md)
-  : Fetch an Esri Wayback release as a local raster around an AOI
-- [`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md)
-  : Pick, per feature, the capture nearest a date
-- [`dft_wayback_releases()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_releases.md)
-  : List the Esri World Imagery Wayback releases
+- [`dft_stac_classes()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_classes.md)
+  : Extract class table from STAC item metadata
+- [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
+  : Load shipped class lookup table
+- [`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md)
+  : Get drift cache directory path
+- [`dft_cache_info()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_info.md)
+  : Show drift cache info
+- [`dft_cache_clear()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_clear.md)
+  : Clear the drift tile cache
 
 # Articles
 
@@ -143,10 +233,10 @@ at the [pkgdown site](https://www.newgraphenvironment.com/drift/).
 
 - [When Did the Floodplain Change? Dating Detected Change with
   Sentinel-2 and Esri
-  Wayback](https://newgraphenvironment.github.io/drift/articles/floodplain-change-dating.md):
+  Wayback](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.md):
 - [Land Cover Change Detection for
-  Floodplains](https://newgraphenvironment.github.io/drift/articles/land-cover-change.md):
+  Floodplains](https://www.newgraphenvironment.com/drift/articles/land-cover-change.md):
 - [What a Land-Cover Change Figure Is Made
-  Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.md):
+  Of](https://www.newgraphenvironment.com/drift/articles/temporal-composition.md):
 - [Trajectories as a Check on Land-Cover
-  Change](https://newgraphenvironment.github.io/drift/articles/trajectory-break-detection.md):
+  Change](https://www.newgraphenvironment.com/drift/articles/trajectory-break-detection.md):

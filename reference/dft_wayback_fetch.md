@@ -3,7 +3,7 @@
 Reads one Wayback release's tiles at one zoom over `aoi` and returns a
 three-band (red, green, blue) 8-bit raster, cached as a COG. Take the
 `release_id` and `zoom` from
-[`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md),
+[`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md),
 so the raster shows the capture you chose.
 
 ## Usage
@@ -33,14 +33,14 @@ dft_wayback_fetch(
 - release:
 
   A Wayback `release_id` (from
-  [`dft_wayback_releases()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_releases.md)
+  [`dft_wayback_releases()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_releases.md)
   or
-  [`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md)).
+  [`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md)).
 
 - zoom:
 
   One tile zoom level in 10 to 22, normally the `zoom` that
-  [`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md)
+  [`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md)
   returns with the release.
 
 - crs:
@@ -68,7 +68,7 @@ dft_wayback_fetch(
 - cache_dir:
 
   Character. Cache directory. When `NULL`, uses
-  [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md).
+  [`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md).
 
 - force:
 
@@ -105,7 +105,7 @@ a band value of 0 is raised to 1, because 0 is the nodata value.
 
 **Per point, one call each.** For chips around sample points, buffer
 each point and call once per buffered point, as for
-[`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md);
+[`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md);
 each chip is cached separately. Points themselves are refused. With
 `clip = TRUE` a cell belongs to the AOI when its centre does, so AOIs
 that tile the ground without overlap, such as Voronoi cells around the
@@ -120,13 +120,13 @@ whose outputs will be mosaicked.
 
 A polygon's fetch shows whatever the release draws there, which can be
 several captures (see `cover` in
-[`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md)).
+[`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md)).
 
 ## See also
 
-[`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md),
-[`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md),
-[`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md)
+[`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md),
+[`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md),
+[`dft_map_interactive()`](https://www.newgraphenvironment.com/drift/reference/dft_map_interactive.md)
 (`rgb =`) to display it.
 
 ## Examples

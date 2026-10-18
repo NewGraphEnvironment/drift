@@ -1,10 +1,10 @@
 # Per-pixel index trend over time
 
 Reduce an index stack (from
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md))
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md))
 to a per-pixel **trend** — the rate at which the index rises or falls
 across the whole record. Where
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 finds an abrupt structural break, this measures the slow, monotonic
 direction: gradual degradation (a declining stand) or recovery (a
 restoration planting greening up) that annual categorical labels cannot
@@ -21,7 +21,7 @@ dft_rast_trend(cube, min_obs = 6, cores = NULL)
 - cube:
 
   A monthly index `SpatRaster` (the return value of
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)):
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)):
   one layer per time step, with a time value per layer.
 
 - min_obs:
@@ -51,9 +51,9 @@ is the non-parametric **Mann-Kendall** test for a monotonic trend.
 
 ## See also
 
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 (abrupt breaks),
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md).
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md).
 
 ## Examples
 

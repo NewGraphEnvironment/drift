@@ -54,7 +54,7 @@ aoi        <- d$aoi
 
 ## Where has canopy been removed?
 
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 measures the size of an abrupt drop in kNDVI. The strong losses are
 coherent blocks — the shape of harvest — not scattered noise. The beige
 outlines are the stands the land-cover product maps as Trees to
@@ -92,7 +92,7 @@ together they are more complete than either alone.
 ## Gradual change, and recovery
 
 Not all change is a clean step.
-[`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+[`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md)
 gives a robust (Theil-Sen) slope per pixel — the average kNDVI change
 **per year over 2017–2023** — for the slow signals: a stand thinning, or
 a bar revegetating. Because a linear slope spreads an abrupt cut across
@@ -182,16 +182,16 @@ m
 The tools are complements, patch by patch:
 
 - **Categorical**
-  ([`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md) +
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md))
+  ([`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md) +
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md))
   — for named transitions and hectares. Treat its transitions as
   hypotheses to confirm.
 - **Break**
-  ([`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md))
+  ([`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md))
   — to confirm and **date** canopy removal, and to catch harvest the
   categorical map misses.
 - **Trend**
-  ([`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md))
+  ([`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md))
   — for gradual degradation and recovery the annual labels cannot show.
 
 One caveat for this landscape: in peak summer, deciduous riparian trees

@@ -17,13 +17,13 @@ dft_accuracy_estimate(labels, strata, level = 0.95)
 - labels:
 
   A data frame meeting the
-  [`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md)
+  [`dft_accuracy_labels()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_labels.md)
   contract: `point_id`, `stratum`, `map_class`, `ref_class`.
 
 - strata:
 
   The `$strata` table from
-  [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md),
+  [`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md),
   or any data frame with `stratum`, `n_cells` (the stratum's size in
   cells, `n_cells_h`) and `area` (its mapped area in hectares).
 
@@ -49,7 +49,7 @@ A list:
   `weight`, `mean` and `sd` of an indicator within the stratum. `target`
   is `"agreement"` (map equals reference) or a reference class, written
   in full as a string (`"100000"`, never `"1e+05"`). `sd` is what
-  [`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md)
+  [`dft_accuracy_size()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_size.md)
   takes to size a full sample from a pilot.
 
 - `level`, `area_total` (ha).
@@ -131,11 +131,11 @@ random sampling when the strata are different from the map classes.
 
 ## See also
 
-[`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)
+[`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md)
 to draw the points,
-[`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md)
+[`dft_accuracy_labels()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_labels.md)
 for the label contract,
-[`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md)
+[`dft_accuracy_size()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_size.md)
 to size a sample from a pilot.
 
 ## Examples

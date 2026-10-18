@@ -4,10 +4,10 @@
 
 - [When Did the Floodplain Change? Dating Detected Change with
   Sentinel-2 and Esri
-  Wayback](https://newgraphenvironment.github.io/drift/articles/floodplain-change-dating.md):
+  Wayback](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.md):
 - [Land Cover Change Detection for
-  Floodplains](https://newgraphenvironment.github.io/drift/articles/land-cover-change.md):
+  Floodplains](https://www.newgraphenvironment.com/drift/articles/land-cover-change.md):
 - [What a Land-Cover Change Figure Is Made
-  Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.md):
+  Of](https://www.newgraphenvironment.com/drift/articles/temporal-composition.md):
 - [Trajectories as a Check on Land-Cover
-  Change](https://newgraphenvironment.github.io/drift/articles/trajectory-break-detection.md):
+  Change](https://www.newgraphenvironment.com/drift/articles/trajectory-break-detection.md):

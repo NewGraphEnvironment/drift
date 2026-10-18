@@ -25,7 +25,7 @@ dft_rast_transition(
 - x:
 
   A named list of classified `SpatRaster`s (e.g. from
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)).
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)).
   Names identify each time step (typically years).
 
 - from:
@@ -40,7 +40,7 @@ dft_rast_transition(
 
   A tibble with columns `code`, `class_name`, `color`. When `NULL`,
   loaded via
-  [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+  [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
   using `source`.
 
 - source:

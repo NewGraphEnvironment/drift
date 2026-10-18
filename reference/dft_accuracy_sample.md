@@ -3,7 +3,7 @@
 Draw random cells within each stratum of a raster – the map classes, a
 transition map, or strata the caller built, such as "change attributed
 to fire / unattributed / stable" – as the sample design behind
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md),
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md),
 following Olofsson et al. (2014).
 
 ## Usage
@@ -20,16 +20,16 @@ dft_accuracy_sample(strata, n, seed, map = NULL)
   [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
   of integer stratum codes in a projected CRS. `NA` cells are outside
   the population. A factor raster (e.g. `$raster` from
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
   or
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md))
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md))
   keeps its codes as `stratum` and its labels as `stratum_label`.
 
 - n:
 
   Sample size per stratum: a single number for equal allocation, or a
   vector named by stratum code (e.g. from
-  [`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md))
+  [`dft_accuracy_size()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_size.md))
   covering every stratum present. Each must be at least 2.
 
 - seed:
@@ -56,7 +56,7 @@ A list:
 - `strata` – tibble: `stratum`, `stratum_label`, `n_cells` (`N_h`),
   `area` (ha), `weight` (`N_h / N`), `n` (points drawn). This is the
   `strata` argument
-  [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
+  [`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)
   takes.
 
 - `design` – list recording how to redraw it: seed, RNG kinds,
@@ -97,7 +97,7 @@ renumbers cells, so draw from the grid the map is on and keep it.
 A stratum with no more cells than its allocation is taken whole – a
 census – and a message names it. Transition strata with a handful of
 cells are normal.
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)
 applies the finite population correction, so a census stratum
 contributes no variance.
 
@@ -125,9 +125,9 @@ accuracy of land change. *Remote Sensing of Environment* 148, 42-57.
 
 ## See also
 
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md),
-[`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md),
-[`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md).
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md),
+[`dft_accuracy_size()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_size.md),
+[`dft_accuracy_labels()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_labels.md).
 
 ## Examples
 

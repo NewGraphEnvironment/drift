@@ -1,7 +1,7 @@
 # Detect per-pixel index-trajectory breakpoints
 
 Reduce a monthly index stack (from
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md))
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md))
 over time with
 [`bfast::bfastmonitor()`](https://rdrr.io/pkg/bfast/man/bfastmonitor.html),
 returning a two-band `SpatRaster` of the break date and magnitude for
@@ -29,7 +29,7 @@ dft_rast_break(
 - cube:
 
   A monthly index `SpatRaster` (the return value of
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)):
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)):
   one layer per time step, with a time value per layer.
 
 - history:
@@ -56,7 +56,7 @@ dft_rast_break(
   [`bfast::bfastmonitor()`](https://rdrr.io/pkg/bfast/man/bfastmonitor.html)
   (default 3). Lower it (1-2) when the series samples only part of the
   year (e.g. a growing-season-only cube from
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   `months`), where a high order overfits sparse seasonal coverage.
 
 - level:
@@ -100,9 +100,9 @@ short-circuit to `NA`.
 
 ## See also
 
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
 (builds the input stack),
-[`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md).
+[`dft_index_expr()`](https://www.newgraphenvironment.com/drift/reference/dft_index_expr.md).
 
 ## Examples
 

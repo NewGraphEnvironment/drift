@@ -22,7 +22,7 @@ dft_rast_summarize(x, class_table = NULL, source = "io-lulc", unit = "ha")
 
   A tibble with columns `code`, `class_name`, `color`. When `NULL`,
   loaded via
-  [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+  [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
   using `source`.
 
 - source:

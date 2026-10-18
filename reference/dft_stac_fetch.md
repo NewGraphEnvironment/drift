@@ -36,14 +36,14 @@ dft_stac_fetch(
 - source:
 
   Character. A known source name passed to
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md).
+  [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md).
   Ignored when `stac_url`, `collection`, and `asset` are all provided.
 
 - years:
 
   Integer vector of years to fetch. When `NULL`, uses `available_years`
   from
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md).
+  [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md).
 
 - stac_url:
 
@@ -107,7 +107,7 @@ dft_stac_fetch(
 - cache_dir:
 
   Character. Cache directory path. When `NULL`, uses
-  [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md).
+  [`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md).
 
 - force:
 
@@ -128,7 +128,7 @@ A named list of
 [terra::SpatRaster](https://rspatial.github.io/terra/reference/SpatRaster-class.html)
 objects, one per year. The STAC items are attached as
 `attr(, "stac_items")` for use with
-[`dft_stac_classes()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_classes.md)
+[`dft_stac_classes()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_classes.md)
 — paged to exhaustion, with the (stale)
 [`next`](https://rdrr.io/r/base/Control.html) link stripped so a caller
 re-running
@@ -145,7 +145,7 @@ was previously 12 from
 ## Details
 
 Fetched rasters are cached under
-[`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
+[`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md)
 as `v2/<source>/<year>_<key>.nc` (or `.tif` when `tile_size` is set —
 see below), where `key` is a hash of the AOI geometry and every fetch
 parameter that affects the output (`res`, `crs`, `dt`, `aggregation`,
@@ -173,9 +173,9 @@ version and architecture — a cache can be copied between machines and
 stay valid. The leading `v2` is the cache-scheme generation: a
 deliberate key change moves it, leaving older entries findable rather
 than silently orphaned. See
-[`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
+[`dft_cache_info()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_info.md)
 and
-[`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
+[`dft_cache_clear()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_clear.md)
 for reporting and reclaiming them.
 
 Note

@@ -2,9 +2,9 @@
 
 Returns connection details for pre-configured STAC collections. Used as
 a convenience wrapper around
-[`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
 (categorical sources) and
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
 (continuous index-trajectory sources) so users don't need to remember
 STAC URLs, collection IDs, and band names.
 
@@ -38,12 +38,12 @@ categorical sources; test with `isTRUE(cfg$cube)`.
 Sources are of two kinds. **Categorical** sources (`"io-lulc"`,
 `"esa-worldcover"`) host single-band classified rasters and carry a flat
 `asset` name for
-[`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md).
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md).
 **Cube** sources (`"sentinel-2-l2a"`) host multi-band reflectance
 imagery and instead carry a role-based band map
 (`red`/`green`/`blue`/`nir`/`swir16`/`mask`), mask values, and
 reflectance scale/offset for
-[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md);
+[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md);
 they are marked with `cube = TRUE`. The role-based schema means a new
 reflectance source (e.g. Landsat C2 L2) drops in with no API change —
 only the role→asset map and scale/offset differ.

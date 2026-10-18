@@ -104,10 +104,10 @@ for every year from 2017 to 2023, clipped to it. The item is in the
 [stac_floodplains_bc](https://www.newgraphenvironment.com/stac_floodplains_bc/)
 catalogue, and the modelling that made it is in
 [floodplains](https://www.newgraphenvironment.com/floodplains/).
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 reads the seven years in each cell and finds the year its class
 switched, and
-[`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+[`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
 says whether the switch held.
 
 Code
@@ -381,13 +381,13 @@ area is looked at below.
 
 | Tool | What it gives |
 |:---|:---|
-| [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md), [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md) | The year each cell’s land cover switched, and whether it held |
-| [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md) | A Sentinel-2 image of every summer, at 10 m |
-| [`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md), [`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md), [`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md) | Sharp (under 1 m) images where Esri holds them, but only from the days its providers imaged the place |
+| [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md), [`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md) | The year each cell’s land cover switched, and whether it held |
+| [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md) | A Sentinel-2 image of every summer, at 10 m |
+| [`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md), [`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md), [`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md) | Sharp (under 1 m) images where Esri holds them, but only from the days its providers imaged the place |
 
 drift’s tools for dating change and looking at it. {.table}
 
-[`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+[`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
 reads Sentinel-2 from Microsoft’s Planetary Computer. For each summer it
 takes the June and July scenes with under 20% cloud, masks cloud and
 snow, and keeps the median of each band. The panels share one display

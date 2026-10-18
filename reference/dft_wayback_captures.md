@@ -4,11 +4,11 @@ For every feature of `aoi` and every Wayback release, reads the
 release's capture metadata and returns the capture (acquisition date,
 resolution, sensor) the release's tiles show there. A release date is
 not a capture date (see
-[`dft_wayback_releases()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_releases.md)),
+[`dft_wayback_releases()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_releases.md)),
 so this is the table to choose imagery from: pass it to
-[`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md)
+[`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md)
 for the capture nearest a date, then fetch it with
-[`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md).
+[`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md).
 
 ## Usage
 
@@ -42,14 +42,14 @@ dft_wayback_captures(
 - releases:
 
   A release table from
-  [`dft_wayback_releases()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_releases.md),
+  [`dft_wayback_releases()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_releases.md),
   possibly filtered, to search only some releases. When `NULL`, every
   release.
 
 - cache_dir:
 
   Character. Cache directory. When `NULL`, uses
-  [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md).
+  [`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md).
 
 - force:
 
@@ -87,7 +87,7 @@ answered differently:**
   wholly hidden under another earns no row, and the covers of one
   release sum to at most 1 (less where a base layer or no imagery
   shows).
-  [`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md)
+  [`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md)
   prefers the larger cover only among captures equally near the date, so
   filter on it first (for example `cover >= 0.5`) when a capture must
   image most of a patch. A fetch over a polygon is a mosaic of whatever
@@ -99,15 +99,15 @@ result.
 
 One metadata query is made per release and zoom over the bounding box of
 all of `aoi` (paged), not one per feature. Responses are cached under
-[`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md);
+[`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md);
 a past release's metadata does not change, so only `force = TRUE`
 re-reads them. A new query bounding box (a grown or moved `aoi`) is a
 new cache entry.
 
 ## See also
 
-[`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md),
-[`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md).
+[`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md),
+[`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md).
 
 ## Examples
 

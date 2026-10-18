@@ -1,14 +1,14 @@
 # Fetch a masked spectral-index cube from a STAC catalog
 
 Sibling of
-[`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
 for continuous change detection. Where
-[`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
 materializes one categorical raster per year, this builds a sub-annual
 reflectance cube, masks clouds, computes a spectral index over band
 roles, and returns the index time series as a `SpatRaster` (one layer
 per time step) — the input to
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 for per-pixel trajectory breakpoint detection.
 
 ## Usage
@@ -45,13 +45,13 @@ dft_stac_cube(
 - source:
 
   Character. A cube source name for
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+  [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
   (default `"sentinel-2-l2a"`). Must be a source with `cube = TRUE`.
 
 - index:
 
   Character. Spectral index from
-  [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
+  [`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md)
   (default `"kndvi"`). Determines which band roles (and thus assets) are
   fetched.
 
@@ -59,7 +59,7 @@ dft_stac_cube(
 
   Character. ISO 8601 interval `"start/end"`. When `NULL`, uses
   `available_datetime` from
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md).
+  [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md).
 
 - res:
 
@@ -74,7 +74,7 @@ dft_stac_cube(
 
   Character. ISO 8601 duration for the temporal aggregation window
   (default `"P1M"`, monthly). The cadence
-  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)'s
+  [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)'s
   `frequency` must agree with.
 
 - aggregation:
@@ -100,9 +100,9 @@ dft_stac_cube(
   polygon with
   [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html),
   so
-  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+  [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
   /
-  [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  [`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md)
   reduce only in-polygon pixels. The clip keeps every cell the polygon
   **touches** —
   [`terra::mask()`](https://rspatial.github.io/terra/reference/mask.html)
@@ -134,7 +134,7 @@ dft_stac_cube(
   vegetation information — and cuts the number of scenes streamed.
   Months with no retained scenes become `NA` in the monthly cube, so the
   per-pixel series stays regular at `frequency = 12` for
-  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md).
+  [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md).
   Prefer a longer `datetime` window when using this, so enough
   growing-season history remains to fit a stable BFAST baseline.
 
@@ -142,7 +142,7 @@ dft_stac_cube(
 
   Integer vector of mask-band classes to exclude. When `NULL`, uses
   `mask_values` from
-  [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+  [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
   (e.g. Sentinel-2 SCL cloud / shadow / cirrus classes).
 
 - tile_size:
@@ -160,7 +160,7 @@ dft_stac_cube(
   note above), so untiled caches are untouched and `tile_size = NULL` is
   byte-for-byte the previous behavior. This is the continuous-path twin
   of
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)'s
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)'s
   `tile_size`. Benchmarked against the alternatives on the packaged AOI
   (drift#47) it is the **slowest** option — 1263.6 s and 3213 range
   requests against an untiled 236.8 s / 462, because every tile rebuilds
@@ -199,7 +199,7 @@ dft_stac_cube(
 - cache_dir:
 
   Character. Cache directory. When `NULL`, uses
-  [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md).
+  [`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md).
 
 - force:
 
@@ -222,7 +222,7 @@ cached as a GeoTIFF. By default (`clip = TRUE`) the stack is clipped to
 the AOI polygon (cloud-masked; every cell the polygon touches is kept,
 cells it does not touch are `NA` — see `clip`), so the reduced raster
 from
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 is already polygon-tight; pass `clip = FALSE` for the full AOI
 **bounding box** (or, with `tile_size` set, the AOI-intersecting tile
 union). For sources with a reflectance-offset baseline boundary
@@ -232,16 +232,16 @@ side, so a series crossing it carries no artificial index step.
 ## Details
 
 The index stack is materialized once to a GeoTIFF under
-[`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md)
+[`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md)
 as `<source>/cube_<key>.tif`, keyed by a hash of the AOI geometry and
 every cube-affecting parameter (including `clip` and `tile_size`, so a
 tiled read keys apart from an untiled one). Because it is invariant to
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)'s
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)'s
 parameters, caching it here makes bfast parameter sweeps cheap — they
 re-read the local raster instead of re-streaming COGs.
 
 Three STAC-query specifics distinguish cube mode from
-[`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md):
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md):
 pagination via
 [`rstac::items_fetch()`](https://brazil-data-cube.github.io/rstac/reference/items_functions.html)
 is mandatory (a monthly multi-year query returns hundreds of items; a
@@ -253,11 +253,11 @@ filtering.
 
 ## See also
 
-[`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+[`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
 (the reducer that consumes this cube),
-[`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md)
+[`dft_index_expr()`](https://www.newgraphenvironment.com/drift/reference/dft_index_expr.md)
 (the index applied),
-[`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+[`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
 (categorical sibling).
 
 ## Examples

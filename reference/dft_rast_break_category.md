@@ -1,6 +1,6 @@
 # Temporal category of every pixel in a break-class scan
 
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
 at pixel grain: the same `"v1"` rule, applied to the per-pixel
 measurements rather than to the summary rows, so the label can be
 mapped, patched, or crossed against anything else on the grid.
@@ -16,12 +16,12 @@ dft_rast_break_category(x, rule = "v1", filename = NULL, overwrite = FALSE)
 - x:
 
   The list returned by
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md).
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md).
   `$breaks` supplies the measurements and `$raster` whether the
   endpoints differ. `$years` is **not** needed here and not required:
   `n_before` and `n_after` are measured per pixel, so the strength is
   read off them rather than recovered from `break_year` the way
-  [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+  [`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
   must do at row grain. A result saved before drift 0.16.0 therefore
   works unchanged.
 
@@ -60,7 +60,7 @@ A two-layer `SpatRaster`:
   that order
 
 - `strength` —
-  [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+  [`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
   as an integer, `NA` off a clean switch
 
 `NA` where the pixel could not be scanned, which is every pixel with an
@@ -70,7 +70,7 @@ A two-layer `SpatRaster`:
 
 The rule, the reason levels 3 and 4 must never be summed, and why the
 threshold is not an argument are all documented once, under
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md).
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md).
 
 ## Memory
 
@@ -83,9 +83,9 @@ bounded rather than left to terra's memory heuristic, which takes a
 
 ## See also
 
-[`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md)
+[`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md)
 for the same rule over summary rows;
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 for the measurements.
 
 ## Examples

@@ -6,7 +6,7 @@
   Change?](https://www.newgraphenvironment.com/drift/articles/floodplain-change-dating.html)
   ([\#108](https://github.com/NewGraphEnvironment/drift/issues/108)).**
   It dates the change drift detects on the Bulkley floodplain with
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md),
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md),
   then looks at each change area in Esri Wayback (sharp images to 2020)
   and Sentinel-2 composites (after), and says which areas changed on the
   ground and which are class errors. The article is pkgdown-only; its
@@ -41,7 +41,7 @@
   cached COG, which QGIS can draw where the Wayback service cannot.
   Promoted from floodplains#115; on its NECR sample they reproduce every
   pick (960 of 960) and every re-fetched chip.
-  - [`dft_wayback_releases()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_releases.md)
+  - [`dft_wayback_releases()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_releases.md)
     lists the releases, sorted by date.
   - `dft_wayback_captures(aoi, zoom = 17:19)` gives one row per
     (feature, release, capture). A polygon’s `cover` is the share where
@@ -66,9 +66,9 @@
   - **STAC items with no mask asset are dropped.** gdalcubes reads a
     scene whose SCL asset is missing *unmasked* and records it as fine,
     so cloud reached the median.
-    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+    [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
     and
-    [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+    [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
     now drop such items before the read and say how many and which. If
     none has the asset, the read stops with `drift_no_items`, under its
     own subclass `drift_no_mask_items`, and a composite skips that year
@@ -105,10 +105,10 @@
   - **How it is caught:** gdalcubes records each chunk’s status in the
     NetCDF it writes, including from worker processes, where its console
     warning never reaches R.
-    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md),
-    [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+    [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md),
+    [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
     and
-    [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md),
+    [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md),
     tiled or not, now read it after every write and abort with class
     `drift_incomplete_cube` before caching. They also abort on
     gdalcubes’ “could not be added to output” merge warning.
@@ -123,13 +123,13 @@
     now retries a transient 429 or 5xx (`GDAL_HTTP_MAX_RETRY`) on these
     reads.
   - **Old caches:** an untiled
-    [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+    [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
     cache that records failed chunks is now re-fetched. Cube, composite
     and tiled-fetch caches cannot be re-checked. Re-run long tiled reads
     made before this version with `force = TRUE`. Cache keys are
     unchanged.
   - A tiled
-    [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+    [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
     that aborts no longer leaves its tile files in the session temp
     directory.
 
@@ -138,10 +138,10 @@
 - **A misspelt `resampling` no longer returns a nearest-neighbour raster
   without a word
   ([\#96](https://github.com/NewGraphEnvironment/drift/issues/96)).**
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md),
-  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md),
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
   and
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   passed `resampling` straight to
   [`gdalcubes::cube_view()`](https://rdrr.io/pkg/gdalcubes/man/cube_view.html),
   which reads a value it does not know as `near` with no error. So
@@ -166,14 +166,14 @@
     nearest-neighbour data, and since that value is now refused, nothing
     reads it again. It sits in the current cache scheme beside good
     files and cannot be told apart from them, so only
-    [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md),
+    [`dft_cache_clear()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_clear.md),
     which clears everything by default, reclaims it.
   - `aggregation` is now also checked where
-    [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+    [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
     builds each `cube_view()`, tiled or not, as it already was in
-    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+    [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
     and
-    [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md).
+    [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md).
 
 ## drift 0.20.0
 
@@ -187,10 +187,10 @@
     scene could overwrite a clear one. What came back looked like July
     red reflectance, 0.008-0.18.
   - **Refused up front:**
-    [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md),
-    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+    [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md),
+    [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
     and
-    [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+    [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
     now refuse any `aggregation` other than `median`, `mean`, `min`,
     `max`, `first` and `last`. Each of the six was measured to survive a
     round trip through `cube_view()`; the set was not taken from
@@ -203,7 +203,7 @@
     `resampling` has the same silent fallback, to `near`, and is
     [\#96](https://github.com/NewGraphEnvironment/drift/issues/96).
 - **Clear-day counts.** `aggregation = "count"` is new in
-  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md).
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md).
   It returns the number of **distinct clear days** per pixel in each
   window, the number needed to choose composite windows.
   - **What counts as one day:** each day is read as one time step, so
@@ -224,7 +224,7 @@
     shadow and cirrus. A spring or autumn count therefore excludes snow
     cover. The docs now say so.
 - **Cached “count” files from 0.18.0-0.19.2 are never read.** Since
-  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
   arrived in 0.18.0, it cached what it returned for
   `aggregation = "count"`, reflectance, as `composite_<key>.tif`. A
   count now keys under its own tag and file prefix, so nothing reads
@@ -253,13 +253,13 @@
 
 ## drift 0.19.2
 
-- **[`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+- **[`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)
   now classifies a raster that is already a factor
   ([\#91](https://github.com/NewGraphEnvironment/drift/issues/91)).**
   Before, it returned zero levels and no colour table, with no error or
   warning. This affected the published floodplain rasters, which carry
   their own attribute table, and a raster re-classified after an earlier
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md).
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md).
   The cause was
   [`terra::unique()`](https://rspatial.github.io/terra/reference/unique.html),
   which returns a factor’s labels rather than its codes, so no code in
@@ -281,7 +281,7 @@
 
 ## drift 0.19.1
 
-- **[`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+- **[`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)
   no longer modifies the raster it is given
   ([\#89](https://github.com/NewGraphEnvironment/drift/issues/89)).** It
   called the in-place
@@ -305,7 +305,7 @@
   goes red if terra ever makes `coltab<-` work in place.
 - **Found on the way:** given a raster that is already a factor, such as
   the published floodplain rasters,
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)
   returns empty levels and no colours
   ([\#91](https://github.com/NewGraphEnvironment/drift/issues/91)). This
   is not new in 0.19.1.
@@ -320,22 +320,22 @@
   implement the standard remedy (Olofsson et al. 2014): a stratified
   random sample of points, reference labels, and estimators that weight
   the labels back to the population.
-  - [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)
+  - [`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md)
     draws the points from any strata raster: the map classes, a
     transition map, or strata such as “change attributed / unattributed
     / stable”. It records each stratum’s size (the weights) and, through
     `map =`, the map’s class at every point.
-  - [`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
+  - [`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)
     returns the error matrix in proportions of area, overall / user’s /
     producer’s accuracy, and error-adjusted area in hectares with
     confidence intervals. It wraps
     [mapaccuracy](https://cran.r-project.org/package=mapaccuracy)’s
     implementation of Stehman (2014), which holds whether or not the
     strata are the map classes.
-  - [`dft_accuracy_labels()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_labels.md)
+  - [`dft_accuracy_labels()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_labels.md)
     is the contract a reference-label table must meet, so any review
     tool can feed the estimator. drift stores no labels.
-  - [`dft_accuracy_size()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_size.md)
+  - [`dft_accuracy_size()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_size.md)
     sizes and allocates a sample for a target standard error (Olofsson
     Eq. 13). It takes per-stratum SDs from a pilot, so it works for
     strata that are not the map classes.
@@ -372,7 +372,7 @@
   from 1,677 points takes 11 s: the estimator’s run time grows with
   roughly the 2.5th power of the class count.
 - **Found on the way:**
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)
   modifies the raster it is given
   ([\#89](https://github.com/NewGraphEnvironment/drift/issues/89)).
 
@@ -382,19 +382,19 @@
   ([\#79](https://github.com/NewGraphEnvironment/drift/issues/79)).**
   The Esri and Google basemaps say what a place is but not when it
   changed. New
-  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
   returns a cloud-masked median composite of any Sentinel-2 band roles
   for each year’s run of calendar months, for example true colour for
   June–July in 2017 and in 2023. Values are surface reflectance, not
   display bytes, so a composite is data and can later be classifier
   input. It shares its read path with
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md).
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md).
   The cache entry is written as a Cloud Optimized GeoTIFF, so it can be
   served through titiler unchanged. floodplains#93 is the first
   consumer: a stratified accuracy assessment of IO LULC, reviewed at
   sample points across whole floodplains.
 - **Chips, one per point.** To review sample points, call
-  [`dft_stac_composite()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_composite.md)
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
   once per buffered point. Each chip is small and cached on its own, so
   adding a point fetches one chip. The obvious alternative, all the
   points as one AOI with read tiling, was the plan until review: it
@@ -411,13 +411,13 @@
   in the data, not an artefact of stretching each image to its own
   histogram. `x` may be `NULL` for an imagery-only map.
 - **NDWI and MNDWI** join
-  [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md),
+  [`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md),
   with the `green` and `blue` Sentinel-2 roles they need. The tests
   evaluate the resolved expressions on known reflectance and on
   post-2022 DN through the offset, not only their strings.
 - **Floodplain scale, two defects fixed and one open.** Both are in the
   read path the cube shares, so
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   had them too.
   - Planetary Computer returns HTTP 413 once a search body passes about
     1 MiB. BULK’s floodplain is 104,584 vertices (4.2 MB of GeoJSON), so
@@ -446,7 +446,7 @@
     imagery at floodplain scale it is not.
   - A date-only STAC end bound excludes that day’s scenes, 22 of 23 in
     one measured window. The composite queries with explicit times;
-    [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+    [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
     has the same defect
     ([\#83](https://github.com/NewGraphEnvironment/drift/issues/83)).
   - Five network end-to-end assertions had listed a pre-#48 cache path
@@ -469,11 +469,11 @@
   could not reach the failure.
 - **Refactor, measured.** The STAC query, offset split and tiled
   assembly moved out of
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   into helpers shared with the composite. A live untiled NDVI cube from
   main and from the refactor are identical cell for cell (max difference
   0), and a new test pins how
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   calls its cache key. Both matter because the frozen-key test cannot
   see the call site.
 - **HLS is
@@ -492,16 +492,16 @@
   gdalcubes was archived on CRAN on 2026-09-16. That broke the pkgdown
   workflow’s dependency resolve, which had failed on every push since
   2026-09-26, and it left new users unable to install what
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   and
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   need. `appelmar/gdalcubes` is now in `Remotes:` with no suffix, and
   the README says to install it with `pak::pak("appelmar/gdalcubes")`.
   So does the prompt
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md),
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md),
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   and
-  [`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md)
+  [`dft_index_expr()`](https://www.newgraphenvironment.com/drift/reference/dft_index_expr.md)
   raise when it is missing. rlang’s own install offer means CRAN and
   would fail. Upstream master (0.7.5) has merged the `filter_geom`
   segfault fix from `NewGraphEnvironment/gdalcubes@newgraph`, so the
@@ -731,12 +731,12 @@
 ## drift 0.16.0
 
 - **New
-  [`dft_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_break_category.md),
-  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  [`dft_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_break_category.md),
+  [`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
   and
-  [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+  [`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
   ([\#72](https://github.com/NewGraphEnvironment/drift/issues/72)).**
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   still reports every measurement and thresholds nothing; composing them
   into a label is a judgement, and it now lives in one exported,
   versioned place instead of being re-derived in four scripts. The label
@@ -765,16 +765,16 @@
   shorter side, 1 to 3 on a seven-year series — is returned as a
   `strength` column and layer, and recoverable from `break_year` alone
   via
-  [`dft_break_strength()`](https://newgraphenvironment.github.io/drift/reference/dft_break_strength.md)
+  [`dft_break_strength()`](https://www.newgraphenvironment.com/drift/reference/dft_break_strength.md)
   for a summary read back from CSV. Its threshold is deliberately not an
   argument: a free threshold would mean `rule = "v1"` no longer
   identifies the labelling. The `rule` travels as a column, not an
   attribute, because every consumer here writes CSV. Note the unit is
   **observations, not calendar years** — on a gapped series a break
   flanked by three years each side can still score 1.
-- **[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+- **[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   gains `$years`.** Additive; `$summary` and `status` are untouched, and
-  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  [`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
   does not require it, so a result saved by an earlier version still
   works.
 - **Migrated:** `data-raw/break_class_groups.R` (both the per-group and
@@ -794,13 +794,13 @@
 - **Scale (`data-raw/benchmark_break_category_bulk.R`, committed
   evidence in `data-raw/logs/benchmark_break_category/`).** BULK
   floodplain, 14651 x 11552 = 169,248,352 cells at 10 m:
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   60.6 s,
-  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  [`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
   **26.8 s**, a reconciliation crosstab 16.5 s, and peak RSS **8.79
   GiB** across the whole run — every figure from `timings.csv` and
   `rss_summary.csv` in that directory.5 s,
-  [`dft_rast_break_category()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_category.md)
+  [`dft_rast_break_category()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_category.md)
   **26.5 s**, a reconciliation crosstab 16.3 s, and peak RSS **8.82
   GiB** across the whole run — every figure from `timings.csv` and
   `rss_summary.csv` in that directory. The pixel-grain category
@@ -820,7 +820,7 @@
   [`app()`](https://rspatial.github.io/terra/reference/app.html) return
   on a two-column raster as *transposed* and scrambles it silently
   (widths 1 and 3-6 are correct).
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   pads at `ncol == 5` because its own return is five columns, so the new
   function needed its own condition at 2 — and the existing width sweep,
   4/5/6, could not have reached it.
@@ -883,7 +883,7 @@
   markedly *lower* in disturbed patches than in the residual matching no
   disturbance layer, so it does not support reading flicker as
   succession. Write-up in
-  [`inst/notes/temporal-qa-disturbance.md`](https://newgraphenvironment.github.io/drift/news/inst/notes/temporal-qa-disturbance.md);
+  [`inst/notes/temporal-qa-disturbance.md`](https://www.newgraphenvironment.com/drift/news/inst/notes/temporal-qa-disturbance.md);
   evidence in `data-raw/logs/disturbance_compare/`, every number emitted
   by `data-raw/disturbance_compare.R`. No API change.
 
@@ -891,7 +891,7 @@
 
 - **Temporal QA across four watershed groups
   ([\#62](https://github.com/NewGraphEnvironment/drift/issues/62)).**
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   run on the published seven-year IO LULC series of `bulk_co_ff04`,
   `necr_ch_ff04`, `lnth_ch_ff04` and `kotl_bt_ff04` straight from
   stac-floodplains-bc: the share of 2017 -\> 2023 change that is a
@@ -899,23 +899,23 @@
   39.6-48.5%, and 2017 is the odd endpoint more often than 2023 in every
   group. Results, what they do and do not support, and the two follow-up
   decisions are in
-  [`inst/notes/temporal-qa-groups.md`](https://newgraphenvironment.github.io/drift/news/inst/notes/temporal-qa-groups.md);
+  [`inst/notes/temporal-qa-groups.md`](https://www.newgraphenvironment.com/drift/news/inst/notes/temporal-qa-groups.md);
   evidence in `data-raw/logs/break_class_groups/`, every number emitted
   by `data-raw/break_class_groups.R`. No API change.
 
 ## drift 0.14.0
 
 - **New:
-  [`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+  [`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
   scans the annual class series per pixel for a sustained switch versus
   flicker, and dates the switch
   ([\#9](https://github.com/NewGraphEnvironment/drift/issues/9)).** This
   is the temporal, categorical-only leg of change QA, beside the spatial
   one
-  ([`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md),
+  ([`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md),
   [\#44](https://github.com/NewGraphEnvironment/drift/issues/44)) and
   the spectral one
-  ([`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md),
+  ([`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md),
   [\#30](https://github.com/NewGraphEnvironment/drift/issues/30)). For
   each pixel across a named list of classified years it reports
   `n_flips` (0 stable, 1 a clean switch, 2 or more flicker),
@@ -924,17 +924,17 @@
   confidence is their minimum). Its `$raster` is the
   first-year-to-last-year transition layer in the same
   `from * 1000 + to` encoding as
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md),
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md),
   so
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   and
-  [`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+  [`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
   take it unchanged; `$breaks` holds the four evidence layers and
   `$summary` tabulates area by transition, status and break year.
   Nothing is thresholded: the caller composes,
   e.g. `n_flips == 1 & pmin(n_before, n_after) >= 2`.
 - **Why a mode filter cannot do this.**
-  [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)
+  [`dft_rast_consensus()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_consensus.md)
   votes a pixel that genuinely switched mid-window back to its old class
   whenever the pre-change years outnumber the post-change ones, and
   cannot say *when* anything changed. The scan keeps the switch and
@@ -1032,7 +1032,7 @@
 ## drift 0.13.0
 
 - **New:
-  [`dft_transition_artifact()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_artifact.md)
+  [`dft_transition_artifact()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_artifact.md)
   tags transition patches with geometric misregistration evidence, and
   drops nothing
   ([\#44](https://github.com/NewGraphEnvironment/drift/issues/44)).**
@@ -1043,7 +1043,7 @@
   and `Water -> Trees` on the other. Both concentrate on the long linear
   boundaries riparian work is about. The function adds eight columns to
   the patches from
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   — effective width `2 * area / perimeter` (`width_m`, `width_px`,
   `flag_sliver`), the share of a patch adjacent to the from-epoch
   interface with its to-class (`boundary_frac`, `flag_boundary`), and
@@ -1167,7 +1167,7 @@
 - **Cache entries move under a scheme directory,
   `<cache>/v2/<source>/`.** A deliberate key change is now a *migration*
   rather than a silent orphaning: superseded generations stay findable,
-  [`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md)
+  [`dft_cache_info()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_info.md)
   reports them (`n_files_superseded`, `size_mb_superseded`), and
   `dft_cache_clear(scheme = "superseded")` reclaims that space. Nothing
   is deleted automatically.
@@ -1206,7 +1206,7 @@
 - **Bug fix: an interrupted fetch left a corrupt cache entry that every
   later run trusted as a hit
   ([\#41](https://github.com/NewGraphEnvironment/drift/issues/41)).**
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   wrote each year’s raster straight to its canonical cache path, and the
   cache gate was presence-only — so a process killed mid-download left a
   partial file under the name a later run reports as `cached`, returns,
@@ -1217,7 +1217,7 @@
   leaves at most a `*.tmp*` orphan that the gate can never serve. Latent
   on small AOIs, which is why it surfaced on long large-floodplain runs.
 - **The same fix lands on
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)**,
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)**,
   which had the identical defect and was not named in the issue. It is
   the more expensive path to lose — a cube entry is a multi-hour
   Sentinel-2 stream rather than a small annual raster.
@@ -1266,7 +1266,7 @@
   checked and none is corrupt. The same 168 (123 `.nc`, 45 `.tif`) are
   the false-refusal control for the new validator — it rejects none of
   them, at 41 ms each.
-- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+- [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   no longer strands per-tile files when `mosaic_tiles()` errors, and the
   GDAL PAM sidecar is carried across the rename
   ([`terra::writeRaster()`](https://rspatial.github.io/terra/reference/writeRaster.html)
@@ -1276,7 +1276,7 @@
 ## drift 0.10.0
 
 - **Bug fix:
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   read only the first page of STAC items, so a wide AOI could silently
   build a raster from a truncated item set
   ([\#51](https://github.com/NewGraphEnvironment/drift/issues/51)).** It
@@ -1290,9 +1290,9 @@
   over whatever the missing items covered. Because it depends on AOI
   size it would have appeared first on the largest, most-published area
   rather than in a test. The sibling
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   has always paged correctly;
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   was simply never brought across. Fetch now pages to exhaustion through
   a new internal `stac_items_paged()`, signing **after** paging (signing
   first leaves every item from page 2 onward unsigned).
@@ -1324,7 +1324,7 @@
   Planetary Computer nothing else can detect that (`items_matched()` is
   NULL and duplicate ids cannot see a short read), so that link is the
   last local evidence.
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   now warns and leaves it attached. An earlier draft of this fix
   stripped it case-insensitively, which would have deleted the evidence.
 - An item with no usable `id` is now its own error rather than being
@@ -1342,7 +1342,7 @@
   tests rather than left as dead code). `limit = 500` is a round-trip
   reducer, not the fix — `items_fetch()` is.
 - **Cache-format break: existing
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   caches rebuild once.** The paging fix changes no cache-key parameter,
   so without a deliberate break a raster written from a truncated item
   set would keep being served by the
@@ -1353,10 +1353,10 @@
   guardian moves from `79f67b7b9dae` to `2264b5dbef6e`. The cost is a
   one-time re-fetch of small annual land-cover rasters, not the
   multi-hour Sentinel-2 stream — which is why
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   chose a read-path check for its analogous problem and fetch can afford
   a key break.
-  **[`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  **[`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   caches were unaffected *by
   [\#51](https://github.com/NewGraphEnvironment/drift/issues/51)*** —
   `stac_cube_cache_key()` is a separate function and was untouched
@@ -1364,7 +1364,7 @@
   [\#48](https://github.com/NewGraphEnvironment/drift/issues/48) in
   0.12.0**, which re-keys both functions and moves every entry under a
   `v2/` scheme directory; cube caches are invalidated too.
-- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+- [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   now attaches `attr(, "cache_key")` alongside the existing
   `attr(, "stac_items")`, so a caller can record which cache entry
   served a fetch. It is **per call, not per year** — cached files are
@@ -1378,7 +1378,7 @@
 
 ## drift 0.9.0
 
-- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+- [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   gains `parallel` (default `NULL` = `min(4, cores - 1)`), and is
   roughly **2× faster out of the box** on a machine with 5 or more cores
   as a result
@@ -1432,7 +1432,7 @@
   to prevent. Replaced with in-polygon non-`NA`, per-layer non-`NA`, and
   outside-`NA` assertions, with the in-polygon cell set derived from the
   AOI geometry rather than from the cube’s own values.
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   also now aborts, before writing anything to the cache, when the
   assembled cube has no data on **any** layer (deliberately the whole
   stack, not the first layer: an individual layer being empty is
@@ -1449,7 +1449,7 @@
   hectares. The rule is now pinned by a test using an irregular polygon
   — the existing test could not catch it, because its polygon is
   axis-aligned on a cell boundary where both rules agree.
-- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)’s
+- [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)’s
   `tile_size` documentation now carries its measured cost: at 640 m on
   the packaged AOI it is **the slowest option** (1263.6 s / 3213
   requests against an untiled 236.8 s / 462), because every tile
@@ -1459,9 +1459,9 @@
 
 ## drift 0.8.0
 
-- [`dft_transition_attribute()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_attribute.md)
+- [`dft_transition_attribute()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_attribute.md)
   tags change patches from
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   with columns from any overlay polygon layer — fire perimeters,
   cutblocks, roads, tenures — so a driver can separate mapped
   transitions by cause without hand-rolling spatial joins
@@ -1484,9 +1484,9 @@
 
 ## drift 0.7.0
 
-- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+- [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   gains `tile_size` (default `NULL`), the continuous-path twin of
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)’s
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)’s
   `tile_size`
   ([\#36](https://github.com/NewGraphEnvironment/drift/issues/36)): an
   opt-in that bounds the STAC *read* to the AOI footprint
@@ -1511,16 +1511,16 @@
   ~0.997, per-layer means within ~1e-3, no tile seams) but lands on a
   bbox-anchored grid that is sub-pixel-offset from — not pixel-identical
   to — the untiled cube; the offset is immaterial to the per-pixel
-  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+  [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
   /
-  [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  [`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md)
   reducers. With `tile_size` set, `clip = FALSE` returns the
   AOI-intersecting tile union (with `NA` where empty tiles were
   skipped), not a gap-free bounding box.
 
 ## drift 0.6.0
 
-- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+- [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   gains `tile_size` (default `NULL`), an opt-in that bounds the STAC
   download to the AOI footprint
   ([\#36](https://github.com/NewGraphEnvironment/drift/issues/36)). By
@@ -1539,13 +1539,13 @@
   NetCDF (`.nc`) and key distinctly, so existing untiled caches are
   untouched; `tile_size = NULL` is byte-for-byte the previous behavior.
   The same read residual on the continuous
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   path is tracked as
   [\#38](https://github.com/NewGraphEnvironment/drift/issues/38).
 
 ## drift 0.5.0
 
-- [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+- [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   gains `clip` (default `TRUE`), restoring AOI-polygon-tight output
   ([\#32](https://github.com/NewGraphEnvironment/drift/issues/32)). The
   assembled index stack is masked to the AOI polygon with
@@ -1554,7 +1554,7 @@
   [`gdalcubes::filter_geom()`](https://rdrr.io/pkg/gdalcubes/man/filter_geom.html)
   segfaults / returns an all-NA cube on the pinned build — so cells
   outside the polygon are `NA` on every layer. The reduced raster from
-  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)/[`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)/[`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md)
   is now polygon-tight with no caller-side mask, and those reducers skip
   out-of-AOI pixels via their valid-observation gate. `clip = FALSE`
   keeps the full bounding box. This is an output change for callers that
@@ -1570,7 +1570,7 @@
   large-floodplain AOIs
   ([\#34](https://github.com/NewGraphEnvironment/drift/issues/34),
   [\#28](https://github.com/NewGraphEnvironment/drift/issues/28)).
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
   was rewritten to stream entirely through `terra` — transitions are
   encoded and filtered with raster arithmetic,
   [`terra::subst()`](https://rspatial.github.io/terra/reference/subst.html),
@@ -1584,7 +1584,7 @@
   (producer-only peak at 16M cells dropped from 2.66 GB to 1.63 GB).
   Output is byte-identical to the previous version, verified by a golden
   snapshot across the full parameter matrix.
-- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+- [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   gains `changes_only` (default `FALSE`): when `TRUE`, stable
   (`from == to`) transitions are dropped at the raster level before
   polygonizing, so
@@ -1597,7 +1597,7 @@
   `patch_area_min` is set, small patches are also dropped before
   polygonizing, with identical output.
 - `patch_id` in
-  [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+  [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   is numbered over the surviving patches when filtering drops any, and
   an empty result now carries the zone column so per-zone results bind
   cleanly.
@@ -1607,16 +1607,16 @@
 - Continuous index-trajectory change detection for floodplain reaches
   ([\#30](https://github.com/NewGraphEnvironment/drift/issues/30)). A
   new fetch-and-reduce pipeline complements the categorical
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   path.
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   builds a cloud-masked monthly spectral-index stack from Sentinel-2
   (via a new `"sentinel-2-l2a"` source);
-  [`dft_rast_break()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break.md)
+  [`dft_rast_break()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break.md)
   reduces it per pixel with
   [`bfast::bfastmonitor()`](https://rdrr.io/pkg/bfast/man/bfastmonitor.html)
   into a two-band raster of *abrupt* break date and magnitude; and
-  [`dft_rast_trend()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_trend.md)
+  [`dft_rast_trend()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_trend.md)
   reduces it to a per-pixel *gradual* trend — a robust Theil-Sen slope
   (index change per year) with Mann-Kendall significance — for
   degradation/recovery monitoring the annual labels cannot show.
@@ -1624,22 +1624,22 @@
   land-cover transitions (confirming which mapped losses carry a real
   spectral decline) and detect gradual change. See the “Trajectories as
   a Check on Land-Cover Change” vignette.
-- [`dft_index_expr()`](https://newgraphenvironment.github.io/drift/reference/dft_index_expr.md)
+- [`dft_index_expr()`](https://www.newgraphenvironment.com/drift/reference/dft_index_expr.md)
   and
-  [`dft_index_table()`](https://newgraphenvironment.github.io/drift/reference/dft_index_table.md)
+  [`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md)
   add a table-driven spectral-index registry (NDVI, kNDVI, NDMI) whose
   formulas are written over band *roles*, so one index resolves against
   any reflectance source; the reflectance scale/offset is folded into
   each expression.
 - Sentinel-2 handling is correctness-focused:
-  [`dft_stac_cube()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_cube.md)
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
   masks cloud/shadow/cirrus/snow, restricts to caller-chosen calendar
   `months` (e.g. the growing season) to sharpen the signal and cut
   scenes streamed, and — because the +1000 DN reflectance offset only
   applies from processing baseline 04.00 (2022-01-25) — splits items at
   that boundary and corrects each side, so a multi-year series carries
   no artificial index step at 2022.
-- [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+- [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
   gains a role-based schema for reflectance cube sources (band roles,
   mask classes, scale/offset, offset boundary), leaving the categorical
   `io-lulc`/`esa-worldcover` sources unchanged. `bfast` added to
@@ -1653,7 +1653,7 @@
 
 ## drift 0.2.4
 
-- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+- [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   no longer exhausts memory on large-extent rasters
   ([\#27](https://github.com/NewGraphEnvironment/drift/issues/27)). The
   per-class loop allocated full-grid vectors per class and per patch —
@@ -1671,7 +1671,7 @@
 ## drift 0.2.3
 
 - Fix silent cross-AOI cache collision in
-  [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+  [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   ([\#25](https://github.com/NewGraphEnvironment/drift/issues/25)).
   Cache files were keyed by source + year only, so fetching a second AOI
   with the same source/year silently returned the first AOI’s raster
@@ -1679,7 +1679,7 @@
   of the AOI geometry and all fetch-affecting parameters (`res`, `crs`,
   `dt`, `aggregation`, `resampling`, `stac_url`, `collection`, `asset`).
   Existing caches re-fetch on first use after upgrading;
-  [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
+  [`dft_cache_clear()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_clear.md)
   reclaims the orphaned old-format files.
 - `force = TRUE` now overwrites the cached file instead of erroring with
   “File already exists”
@@ -1714,24 +1714,24 @@
 
 ## drift 0.2.0
 
-- [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+- [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
   — add `patch_area_min` parameter to filter small connected patches of
   changed pixels; return `$removed` raster for visual QA of filtered
   patches; add `from_class`/`to_class` filters
-- [`dft_transition_vectors()`](https://newgraphenvironment.github.io/drift/reference/dft_transition_vectors.md)
+- [`dft_transition_vectors()`](https://www.newgraphenvironment.com/drift/reference/dft_transition_vectors.md)
   — vectorize transition raster into sf polygons with per-patch area,
   transition labels, and optional zone attribution
-- [`dft_rast_consensus()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_consensus.md)
+- [`dft_rast_consensus()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_consensus.md)
   — per-pixel mode across classified rasters for temporal noise
   filtering; optional confidence layer
-- [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md)
+- [`dft_map_interactive()`](https://www.newgraphenvironment.com/drift/reference/dft_map_interactive.md)
   — new `transition` parameter overlays transition layers as checkboxes;
   Google Satellite and Esri Satellite basemaps; custom tile URL support
 - `dft_check_crs()` — internal helper that errors on geographic CRS
   input; wired into
-  [`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+  [`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
   and
-  [`dft_rast_summarize()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.md)
+  [`dft_rast_summarize()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_summarize.md)
 - Vignette: transition detection, tree loss filtering, patch area
   filtering with comparison table, interactive map with transition
   overlays
@@ -1740,21 +1740,21 @@
 
 Initial public release.
 
-- [`dft_stac_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_fetch.md)
+- [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md)
   — fetch classified rasters from STAC catalogs via gdalcubes
-- [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)
+- [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)
   — apply class labels, colors, and optional remap to SpatRasters
-- [`dft_rast_summarize()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_summarize.md)
+- [`dft_rast_summarize()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_summarize.md)
   — compute area by class and year with unit conversion
-- [`dft_map_interactive()`](https://newgraphenvironment.github.io/drift/reference/dft_map_interactive.md)
+- [`dft_map_interactive()`](https://www.newgraphenvironment.com/drift/reference/dft_map_interactive.md)
   — interactive leaflet map with layer toggle, legend, fullscreen, and
   titiler COG support
-- [`dft_class_table()`](https://newgraphenvironment.github.io/drift/reference/dft_class_table.md)
+- [`dft_class_table()`](https://www.newgraphenvironment.com/drift/reference/dft_class_table.md)
   — shipped class tables for IO LULC and ESA WorldCover
-- [`dft_stac_config()`](https://newgraphenvironment.github.io/drift/reference/dft_stac_config.md)
+- [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
   — STAC endpoint registry
 - Cache management:
-  [`dft_cache_path()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_path.md),
-  [`dft_cache_info()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_info.md),
-  [`dft_cache_clear()`](https://newgraphenvironment.github.io/drift/reference/dft_cache_clear.md)
+  [`dft_cache_path()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_path.md),
+  [`dft_cache_info()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_info.md),
+  [`dft_cache_clear()`](https://www.newgraphenvironment.com/drift/reference/dft_cache_clear.md)
 - Vignette: Neexdzii Kwa floodplain land cover change 2017-2023

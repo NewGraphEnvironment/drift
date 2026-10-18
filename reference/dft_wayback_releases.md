@@ -24,7 +24,7 @@ over the Neexdzii Kwa floodplain the 2017-11-16 release serves
 WorldView-2 captures from 2013 and 2016. The release date bounds the
 capture from above and says nothing more. To find the capture a feature
 was actually imaged at, use
-[`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md),
+[`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md),
 which reads each release's capture metadata.
 
 Release ids are not ordered by date, so sort or filter on
@@ -32,9 +32,9 @@ Release ids are not ordered by date, so sort or filter on
 
 ## See also
 
-[`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md),
-[`dft_wayback_pick()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_pick.md),
-[`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md).
+[`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md),
+[`dft_wayback_pick()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_pick.md),
+[`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md).
 
 ## Examples
 

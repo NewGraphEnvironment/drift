@@ -4,7 +4,7 @@ Given multiple classified rasters of the same extent and resolution,
 compute the most frequent (mode) class at each pixel. Useful for
 temporal smoothing — averaging out single-year misclassification noise
 before running
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md).
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md).
 
 ## Usage
 
@@ -17,7 +17,7 @@ dft_rast_consensus(x, confidence = FALSE)
 - x:
 
   A named list of classified `SpatRaster`s (e.g. from
-  [`dft_rast_classify()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_classify.md)).
+  [`dft_rast_classify()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_classify.md)).
   Rasters with slightly different extents are automatically resampled
   (nearest-neighbour) to the first raster's grid.
 
@@ -39,14 +39,14 @@ Mode smoothing filters single-year misclassification but cannot
 distinguish noise from real change. A pixel that genuinely transitions
 mid-window may be voted back to its original class if the pre-change
 years outnumber the post-change years.
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 scans the same series for a sustained switch instead, dating it and
 separating it from flicker, and is the right tool when the question is
 *when* a pixel changed rather than which class dominates the window.
 
 ## See also
 
-[`dft_rast_break_class()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_break_class.md)
+[`dft_rast_break_class()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_break_class.md)
 for the per-pixel switch-vs-flicker scan that a mode filter cannot
 perform.
 

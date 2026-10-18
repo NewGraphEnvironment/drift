@@ -1,11 +1,11 @@
 # Pick, per feature, the capture nearest a date
 
 From the captures table of
-[`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md),
+[`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md),
 keeps for each feature and each target `date` the one capture whose
 acquisition date is nearest to it. The result names the release and zoom
 to pass to
-[`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md).
+[`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md).
 
 ## Usage
 
@@ -18,7 +18,7 @@ dft_wayback_pick(captures, date)
 - captures:
 
   A captures table from
-  [`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md).
+  [`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md).
   Any table with `feature`, `capture_date` and `res_m` works;
   `release_date`, `release_id` and `cover` are used as tiebreaks when
   present.
@@ -64,8 +64,8 @@ the result. The ranking itself does not band.
 
 ## See also
 
-[`dft_wayback_captures()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_captures.md),
-[`dft_wayback_fetch()`](https://newgraphenvironment.github.io/drift/reference/dft_wayback_fetch.md).
+[`dft_wayback_captures()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_captures.md),
+[`dft_wayback_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_wayback_fetch.md).
 
 ## Examples
 

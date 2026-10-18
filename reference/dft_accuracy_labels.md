@@ -2,7 +2,7 @@
 
 drift does not store reference labels; the caller does, in whatever
 review tool they use. This is the contract such a table must meet before
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md)
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md)
 will read it, so a review tool can be checked against it directly.
 
 ## Usage
@@ -20,7 +20,7 @@ dft_accuracy_labels(labels, strata = NULL)
 - strata:
 
   Optional. The `$strata` table from
-  [`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md),
+  [`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md),
   or any data frame with columns `stratum` and `n_cells`. When given,
   the labels are also checked for coverage of it.
 
@@ -41,7 +41,7 @@ dft_accuracy_labels(labels, strata = NULL)
 | `use`        | optional | `"accuracy"`, `"training"` or `NA`        |
 
 `stratum` and `map_class` come from the design, not from the reviewer:
-[`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md)
+[`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md)
 writes both (`map_class` through its `map` argument). Only `ref_class`,
 and the optional columns, are the reviewer's.
 
@@ -74,15 +74,15 @@ cells). Report it if you do it.
 For accuracy of a transition map, `map_class` is the transition id and
 `ref_class` is composed from the reviewer's two endpoint labels with the
 same scheme
-[`dft_rast_transition()`](https://newgraphenvironment.github.io/drift/reference/dft_rast_transition.md)
+[`dft_rast_transition()`](https://www.newgraphenvironment.com/drift/reference/dft_rast_transition.md)
 uses: `ref_from * 1000 + ref_to`. The contract needs no endpoint
 columns; carry them alongside if useful.
 
 ## See also
 
-[`dft_accuracy_estimate()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_estimate.md),
+[`dft_accuracy_estimate()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_estimate.md),
 which calls this;
-[`dft_accuracy_sample()`](https://newgraphenvironment.github.io/drift/reference/dft_accuracy_sample.md),
+[`dft_accuracy_sample()`](https://www.newgraphenvironment.com/drift/reference/dft_accuracy_sample.md),
 which writes `point_id`, `stratum` and `map_class`.
 
 ## Examples
