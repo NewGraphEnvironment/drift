@@ -22,7 +22,6 @@ authors:
   email: al@newgraphenvironment.com
   orcid: https://orcid.org/0000-0002-3495-2128
   affiliation: New Graph Environment Ltd.
-- name: New Graph Environment Ltd.
 preferred-citation:
   title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
   authors:
@@ -31,7 +30,6 @@ preferred-citation:
     email: al@newgraphenvironment.com
     orcid: https://orcid.org/0000-0002-3495-2128
     affiliation: New Graph Environment Ltd.
-  - name: New Graph Environment Ltd.
   version: 0.24.3
   date-released: '2026-10-18'
   url: https://www.newgraphenvironment.com/drift/
