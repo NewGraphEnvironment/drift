@@ -4,11 +4,12 @@
 # ------------------------------------------------
  
 cff-version: 1.2.0
-message: 'To cite package "drift" in publications use:'
+message: If you use drift, please cite it by its DOI, 10.5281/zenodo.23372090.
 type: software
 license: MIT
 title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
 version: 0.24.3
+doi: 10.5281/zenodo.23372090
 abstract: Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your
   own classified rasters for any area, such as a floodplain, compare them between
   two dates and across every year of a series, and turn the change into maps, tables
@@ -35,6 +36,7 @@ preferred-citation:
   url: https://www.newgraphenvironment.com/drift/
   repository-code: https://github.com/NewGraphEnvironment/drift
   license: MIT
+  doi: 10.5281/zenodo.23372090
   type: software
   publisher:
     name: New Graph Environment Ltd.
