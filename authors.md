@@ -14,8 +14,9 @@ Source:
 [`inst/CITATION`](https://github.com/NewGraphEnvironment/drift/blob/main/inst/CITATION)
 
 Irvine A (2026). *drift: Detecting Riparian and Inland Floodplain
-Transitions*. New Graph Environment Ltd. Version 0.24.3,
-<https://github.com/NewGraphEnvironment/drift>.
+Transitions*. New Graph Environment Ltd.
+[doi:10.5281/zenodo.23372090](https://doi.org/10.5281/zenodo.23372090).
+Version 0.24.3, <https://github.com/NewGraphEnvironment/drift>.
 
     @Manual{drift,
       title = {drift: Detecting Riparian and Inland Floodplain Transitions},
@@ -25,4 +26,5 @@ Transitions*. New Graph Environment Ltd. Version 0.24.3,
       version = {0.24.3},
       note = {Version 0.24.3},
       url = {https://github.com/NewGraphEnvironment/drift},
+      doi = {10.5281/zenodo.23372090},
     }
