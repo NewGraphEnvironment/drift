@@ -133,7 +133,7 @@ at small n (measured on the tile, see the estimator docs), so do not starve the 
 
 ```r
 devtools::document()   # after roxygen changes
-devtools::test()       # ~700 tests; network/bfast tests skip by default (opt-in via env var)
+devtools::test()       # ~1,700 tests; network/bfast tests skip by default (opt-in via env var)
 devtools::install()    # needed before rendering vignettes
 ```
 
@@ -166,7 +166,7 @@ Tag PR bodies with `Relates to NewGraphEnvironment/sred-2025-2026#16` (the issue
 
 ## Reference docs
 
-- [What a Land-Cover Change Figure Is Made Of](https://newgraphenvironment.github.io/drift/articles/temporal-composition.html)
+- [What a Land-Cover Change Figure Is Made Of](https://www.newgraphenvironment.com/drift/articles/temporal-composition.html)
   (`vignettes/articles/temporal-composition.Rmd`, #66) — the #62 result stated for a reader outside
   the package. **Read before quoting a temporal share:** the retired four-level vocabulary pooled
   changed-but-unsettled with the flicker whose endpoints agree (2,032.9 vs 3,186.5 ha on BULK), and
