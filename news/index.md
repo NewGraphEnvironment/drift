@@ -1125,7 +1125,7 @@
   measured identical (max abs diff 0, holes and multipolygons included),
   with a test asserting lwgeom is never loaded. Bare
   [`st_length()`](https://r-spatial.github.io/sf/reference/geos_measures.html)
-  on polygons returns 0. Filed as soul#189.
+  on polygons returns 0. Filed as an internal issue.
 - New *Geometric Artifacts* section in the land-cover vignette, beside
   `patch_area_min`, with the trajectory vignette named as the
   independent spectral confirmation route: that check confirms or
