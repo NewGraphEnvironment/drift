@@ -25,6 +25,6 @@ Along the way the new tests found two defects:
 - The offline fixture is `chunk_fixture()` in `tests/testthat/helper-gdalcubes.R`.
 - Review rounds: `review-plan.md`, `review-round[123].md` in this directory.
 - Durable notes: `inst/notes/gdalcubes-pc-gotchas.md`, "Detecting failed chunk reads (#87)".
-- Follow-ups: drift#99, soul#316.
+- Follow-ups: drift#99, an internal issue.
 
 Closed by: commit 36f2a6f / PR (see `gh pr list --search 87`)

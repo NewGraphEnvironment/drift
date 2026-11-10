@@ -37,7 +37,7 @@ Analysis only. Nothing in `R/` changes unless the run finds a defect.
 ## Phase 4: Q5 decisions, archive, PR
 - [x] Filed with the numbers: (a) drift#64 corrected annual series (flicker 39.6-48.5% of changed area in every group — worth building); (b) stac_floodplains_bc#67 `break_n_flips` / `break_year` assets (overstatement 3.2-5.1x everywhere)
 - [x] Fold in the Plan-agent review findings (landed before the first run; see findings.md)
-- [ ] `/planning-archive` with Measurement + Evidence sections; `/gh-pr-push` with `Relates to NewGraphEnvironment/sred-2025-2026#16`
+- [ ] `/planning-archive` with Measurement + Evidence sections; `/gh-pr-push` with `Relates to an internal issue`
 
 ## Validation
 

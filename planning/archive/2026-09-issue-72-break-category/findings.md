@@ -193,5 +193,4 @@ discarded and the composition still duplicated in every caller.
 #62 (where the split was measured, and Q4), #64 (the corrected series, which must treat the two
 flicker populations differently), #66 (where the pooling was found), #73 (needs this settled
 first), NewGraphEnvironment/stac_floodplains_bc#67.
-Relates to NewGraphEnvironment/sred-2025-2026#16.
 

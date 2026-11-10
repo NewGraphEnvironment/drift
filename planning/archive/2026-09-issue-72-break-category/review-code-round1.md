@@ -162,7 +162,7 @@ dft_break_strength(2020.7, years)   #> 3     (truncated to 2020, accepted)
 dft_break_strength("abc",  years)   #> NA    (R's coercion warning only)
 ```
 
-The first is the truncation shape `code-check.md` catalogues (rtj#265): a
+The first is the truncation shape `code-check.md` catalogues: a
 value that is not a calendar year at all is silently rounded into a valid one,
 where every *other* malformed input to this function is a named error. The
 second turns unparseable input into "this pixel had no break", which is the

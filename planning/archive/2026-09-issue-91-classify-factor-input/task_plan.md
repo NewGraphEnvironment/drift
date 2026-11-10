@@ -64,7 +64,7 @@ and it is documented in `@param x`.
 ## Phase 4: Release bookkeeping
 - [x] NEWS.md `# drift 0.19.2` entry, with numbers derived from the scale run
 - [ ] `/planning-archive`, then bump the version to 0.19.2 as the final commit, then `/gh-pr-push`.
-      Tag the PR with `Relates to NewGraphEnvironment/sred-2025-2026#16`.
+      Tag the PR with `Relates to an internal issue`.
 
 ## Validation
 

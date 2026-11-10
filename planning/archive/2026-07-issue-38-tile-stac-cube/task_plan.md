@@ -46,7 +46,7 @@ unconditional — no `.nc`/`.tif` routing).
 
 ## Phase 6: validate, archive, PR, release
 - [x] `devtools::test()` (365 pass / 6 skip) / `lint` / `document` / `check` clean (0/0/0; network tests skip)
-- [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #38`, `Relates to NewGraphEnvironment/sred-2025-2026#16`)
+- [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #38`, `Relates to an internal issue`)
 - [ ] `/gh-pr-merge` → release v0.7.0
 
 ## Validation

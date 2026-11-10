@@ -35,7 +35,7 @@ Fetch-time streaming stays bbox-bound (documented residual).
 ## Phase 4: Validate, bump, archive, PR, release
 - [x] `devtools::test()` / `lint` / `document` / `check` clean (check: 0E/0W/0N; suite 319 pass)
 - [x] `DESCRIPTION` 0.4.0 → 0.5.0 + Date, committed as `Release v0.5.0` (final code commit)
-- [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #32`, `Relates to NewGraphEnvironment/sred-2025-2026#16`)
+- [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #32`, `Relates to an internal issue`)
 - [ ] `/gh-pr-merge` → tag v0.5.0
 
 ## Validation

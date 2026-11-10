@@ -322,5 +322,5 @@ the fourth place composing it by hand.
 
 #66 (the article), #62 (Q3, and why the per-stream layer was dropped), #64, #67 (flicker lower in
 disturbed patches), #72 (pooled flicker populations),
-NewGraphEnvironment/stac_floodplains_bc#67. Relates to NewGraphEnvironment/sred-2025-2026#16.
+NewGraphEnvironment/stac_floodplains_bc#67. Relates to an internal issue.
 

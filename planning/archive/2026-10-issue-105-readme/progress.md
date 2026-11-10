@@ -20,7 +20,7 @@
   the growth is the ecosystem table, code + output, and alt text.
 - Phase 3: DESCRIPTION Description matches the opening, "Under active development.", URL www (second, so inst/CITATION still takes the repo URL). `_pkgdown.yml` url www in the same commit. Citation workflow passes `authors_roles = c("aut", "cre", "cph")`; a local `cff_create()` lists New Graph Environment Ltd. Title kept.
 - Phase 4: `_pkgdown.yml` reference index in eight sections (review #18 assignment); 33 topics = 33 exports, no duplicates (comm/uniq); `check_pkgdown()` clean; `build_home()` to a temp dir shows the figure at `reference/figures/` and the badge in the sidebar.
-- Plan review #10: CLAUDE.md:817 (generated from soul cartography.md:133) links `articles/neexdzii-kwa.html`, 404. Filed soul#446; not edited in place.
+- Plan review #10: CLAUDE.md:817 (generated from soul cartography.md:133) links `articles/neexdzii-kwa.html`, 404. Filed an internal issue; not edited in place.
 - User: polygons at least 50% transparent; asked whether to use the published stac_floodplains_bc / QGIS scheme
   (colour by destination class, drift's IO LULC colours, 50%). Rendered both in scratch: the published scheme
   nearly vanishes over imagery (cream rangeland, trees green on forest, two transitions merge). User chose the

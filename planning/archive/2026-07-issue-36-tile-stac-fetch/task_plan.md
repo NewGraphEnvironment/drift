@@ -41,7 +41,7 @@ tracked separately as #38 (out of scope).
 
 ## Phase 6: validate, archive, PR, release
 - [x] `devtools::test()` / `lint` / `document` / `check` clean (network tests skip) — check: 0 errors / 0 warnings / 0 notes
-- [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #36`, `Relates to NewGraphEnvironment/sred-2025-2026#16`)
+- [ ] `/planning-archive`; `/gh-pr-push` (`Fixes #36`, `Relates to an internal issue`)
 - [ ] `/gh-pr-merge` → release v0.6.0
 
 ## Validation

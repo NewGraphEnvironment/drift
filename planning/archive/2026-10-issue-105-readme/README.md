@@ -22,4 +22,4 @@ colours at 50%) nearly vanishes over imagery, so the README map keeps its own gr
   `review-round*.md`: the caption's "of 123 ha" read as the floodplain area, then "smaller transitions" was false
   at the transition grain.
 
-Closed by: PR for #105 (see `git log`); follow-up soul#446 (404 vignette link in the shared cartography convention).
+Closed by: PR for #105 (see `git log`); follow-up an internal issue (404 vignette link in the shared cartography convention).

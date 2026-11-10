@@ -3,7 +3,7 @@
 ## Session 2026-07-09
 
 - Committed pending memory-audit docs to `main` first (`a5ef052`: CLAUDE.md +
-  inst/notes/gdalcubes-pc-gotchas.md, soul#47) so they stay out of this PR.
+  inst/notes/gdalcubes-pc-gotchas.md, an internal issue) so they stay out of this PR.
 - Plan-mode exploration: 2 Explore agents (producers + vectorizer/test harness) +
   1 Plan agent (terra-native rewrite design, terra-1.9.11 semantics verified) + read
   the `floodplains` field caller. Diagnosed **two independent memory drivers**

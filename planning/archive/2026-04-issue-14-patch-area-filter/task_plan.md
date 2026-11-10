@@ -2,7 +2,7 @@
 
 **Issue:** drift#14
 **Branch:** 14-patch-area-filter
-**SRED:** Relates to NewGraphEnvironment/sred-2025-2026#16
+**SRED:** Relates to an internal issue
 
 ## Goal
 
@@ -53,7 +53,7 @@ Add optional `min_patch_area` parameter to `dft_rast_transition()` that removes 
 ### Phase 5: Commit, push, PR `status: pending`
 - Commit with Fixes #14
 - PR body with SRED tag
-- Tag sred-2025-2026#16
+- Tag an internal issue
 
 ## Errors Encountered
 
