@@ -1,21 +1,26 @@
 # Scale run of dft_rast_break_class() on the whole BULK floodplain (drift#9).
 #
-# The bundled Neexdzii Kwa tile (600 x 600) cannot reach memory or runtime
-# failure modes; the BULK watershed group floodplain (386 km2 of ff04 floodplain,
-# a 14651 x 11552 grid at 10 m, 169M cells, 97.7% NA) found the #44 memory bug
-# that 125 green unit assertions had not. The STAC item `bulk_co_ff04` carries
-# classified rasters for 2017/2020/2023 only, so the seven IO LULC years are
-# fetched from Planetary Computer through dft_stac_fetch() (tiled, cached).
+# The bundled Neexdzii Kwa tile (314 x 326) cannot reach memory or runtime
+# failure modes; the BULK watershed group floodplain found the #44 memory bug
+# that 125 green unit assertions had not. The AOI is the `all_ff04` layer of the
+# `floodplain` asset of the STAC item `bulk_all_ff04` (#118; the earlier
+# `bulk_co_ff04` item answers 403 from 2026-11-13). That item also carries the
+# seven classified years, but the script fetches IO LULC 2017-2023 from Planetary
+# Computer itself through dft_stac_fetch() (tiled, cached): the fetch at
+# floodplain scale is part of what it measures.
 #
 # Usage (from the repo root):
 #   Rscript data-raw/benchmark_break_class_bulk.R fetch   # populate the cache only
 #   Rscript data-raw/benchmark_break_class_bulk.R run     # fetch (cached) + scan + patches
 #
-# Sample RSS from outside while it runs:
-#   ps -o rss= -p $PID >> data-raw/logs/benchmark_break_class/rss_run.txt  (every 2 s)
+# Measure memory by running it under /usr/bin/time -l (macOS; -v with GNU time) and
+# keeping its block (the 2026-11-13 run's is all_ff04/time_l.txt). On macOS record the
+# peak memory footprint beside the resident set, which misses what was compressed or swapped:
+#   /usr/bin/time -l Rscript data-raw/benchmark_break_class_bulk.R run
 #
-# Outputs (data-raw/logs/benchmark_break_class/; rasters/logs are gitignored,
-# the CSVs are the committed evidence record):
+# Outputs (data-raw/logs/benchmark_break_class/all_ff04/; rasters/logs are
+# gitignored, the CSVs are the committed evidence record; the top level of
+# benchmark_break_class/ holds the 2026-09-05 co_ff04 run that NEWS 0.14.0 cites):
 #   summary_pixels.csv  - res$summary (from, to, status, break_year, cells, ha)
 #   summary_change.csv  - endpoint-changed pixels by category
 #   summary_patches.csv - per-patch temporal evidence joined to #44's geometric tags (gitignored)
@@ -32,7 +37,7 @@ stage <- commandArgs(trailingOnly = TRUE)[1]
 if (is.na(stage)) stage <- "run"
 stopifnot(stage %in% c("fetch", "run"))
 
-out_dir <- file.path("data-raw", "logs", "benchmark_break_class")
+out_dir <- file.path("data-raw", "logs", "benchmark_break_class", "all_ff04")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 t0 <- Sys.time()
@@ -45,10 +50,10 @@ tick <- function(label, start) {
   invisible(el)
 }
 
-# --- 1. BULK floodplain polygon (the `floodplain` asset of bulk_co_ff04) ----
+# --- 1. BULK floodplain polygon (the `floodplain` asset of bulk_all_ff04) ----
 gpkg <- file.path(out_dir, "floodplain.gpkg")
 if (!file.exists(gpkg)) {
-  url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/floodplain.gpkg"
+  url <- "https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_all_ff04/floodplain.gpkg"
   # fetch to a temp file and rename on 200 only: a transport error mid-body
   # would otherwise leave a truncated gpkg under the name the next run trusts
   tmp <- tempfile(fileext = ".gpkg")
@@ -66,8 +71,9 @@ if (!file.exists(gpkg)) {
   }
   stopifnot(file.rename(tmp, gpkg))
 }
-# co_ff04 is the layer #44 measured (386.5 km2); the file also carries ff02/ff06
-aoi <- sf::st_read(gpkg, layer = "co_ff04", quiet = TRUE)
+# name the layer: the file also carries all_ff02, all_ff06 and the per-stream
+# all_ff04_by_blue_line_key, and st_read() without `layer =` takes all_ff02 with only a warning
+aoi <- sf::st_read(gpkg, layer = "all_ff04", quiet = TRUE)
 aoi <- sf::st_as_sf(sf::st_union(sf::st_geometry(aoi)))
 message("AOI: ", round(as.numeric(sum(sf::st_area(aoi))) / 1e6, 1), " km2, CRS ",
         sf::st_crs(aoi)$epsg)
@@ -89,6 +95,12 @@ if (stage == "fetch") {
 t1 <- Sys.time()
 classified <- dft_rast_classify(rasters, source = "io-lulc")
 tick("classify", t1)
+
+# the first->last pair alone, as the #44 pipeline reads it
+t1 <- Sys.time()
+tr <- dft_rast_transition(classified, from = "2017", to = "2023")
+tick("transition", t1)
+rm(tr)
 
 t1 <- Sys.time()
 res <- dft_rast_break_class(classified)
