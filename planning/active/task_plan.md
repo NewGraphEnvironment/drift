@@ -34,10 +34,10 @@
 
 ## Phase 3: Read path
 
-- [ ] `stac_cube_items()`: normalise window-only items to a midpoint `datetime` (one helper, used before the months filter and the offset split). Skip `ext_filter(eo:cloud_cover)` when the source has none.
-- [ ] A shared helper resolving `cloud_cover_max` per source, called from `dft_stac_cube()` and `dft_stac_composite()` with `missing()`. It refuses an explicit value on a source without the property.
-- [ ] `dft_stac_cube()`: `res` from `cfg$res` when missing. Refuse an index whose roles the source lacks, before the query (`index_roles()` against `cfg$roles`).
-- [ ] roxygen for `source`, `res` and `cloud_cover_max` in both functions; `devtools::document()`.
+- [x] `stac_cube_items()`: normalise window-only items to a midpoint `datetime` (one helper, used before the months filter and the offset split). Skip `ext_filter(eo:cloud_cover)` when the source has none.
+- [x] A shared helper resolving `cloud_cover_max` per source, called from `dft_stac_cube()` and `dft_stac_composite()` with `missing()`. It refuses an explicit value on a source without the property.
+- [x] `dft_stac_cube()`: `res` from `cfg$res` when missing. Refuse an index whose roles the source lacks, before the query (`index_roles()` against `cfg$roles`).
+- [x] roxygen for `source`, `res` and `cloud_cover_max` in both functions; `devtools::document()`.
 
 ## Phase 4: Live verification
 

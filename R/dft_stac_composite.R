@@ -82,8 +82,11 @@
 #'   number of them; `c("nir", "red", "green")` is the standard vegetation false
 #'   colour. Layers are named by role, in the order given.
 #' @param source Character. A cube source name for [dft_stac_config()] (default
-#'   `"sentinel-2-l2a"`).
-#' @param res Numeric. Output pixel size in CRS units (default 10).
+#'   `"sentinel-2-l2a"`). `"modis-13Q1-061"` has no green band, so give it
+#'   `bands` from `"red"`, `"nir"` and `"blue"`.
+#' @param res Numeric. Output pixel size in CRS units. When not given, the
+#'   source's native resolution where it has one (250 for `"modis-13Q1-061"`),
+#'   otherwise 10.
 #' @param crs Character. Target CRS as an EPSG string. When `NULL`,
 #'   auto-detected from the AOI centroid's UTM zone.
 #' @param aggregation Character. How scenes within a window are reduced
@@ -105,7 +108,9 @@
 #'   [dft_stac_cube()]: every cell the polygon touches is kept.
 #' @param cloud_cover_max Numeric. Scene-level `eo:cloud_cover` maximum percent
 #'   (default 20, stricter than the cube's 60 because a composite of few clear
-#'   scenes looks better than one of many cloudy ones).
+#'   scenes looks better than one of many cloudy ones), or `NULL` for none. A
+#'   source with no `eo:cloud_cover` (`"modis-13Q1-061"`) gets no pre-filter,
+#'   and passing a value for one is an error; see [dft_stac_cube()].
 #' @param mask_values Integer vector of mask-band classes to exclude. When
 #'   `NULL`, taken from [dft_stac_config()]; for Sentinel-2 that is the SCL
 #'   cloud, cloud-shadow, cirrus and **snow** classes, so snow cover is masked
@@ -188,6 +193,10 @@ dft_stac_composite <- function(aoi,
       "i" = "Use {.fn dft_stac_fetch} for categorical rasters."
     ))
   }
+  # Before anything reads them: missing() tells a default from a choice (#115).
+  cloud_cover_max <- stac_cloud_cover_resolve(cfg, source, cloud_cover_max,
+                                              explicit = !missing(cloud_cover_max))
+  if (missing(res)) res <- cfg$res %||% res
   aggregation <- aggregation_check(aggregation,
                                    c(.cube_view_aggregations, "count"))
   resampling <- resampling_check(resampling)

@@ -29,7 +29,11 @@ dft_stac_cube(
 \item{aoi}{An \code{sf} polygon defining the area of interest.}
 
 \item{source}{Character. A cube source name for \code{\link[=dft_stac_config]{dft_stac_config()}} (default
-\code{"sentinel-2-l2a"}). Must be a source with \code{cube = TRUE}.}
+\code{"sentinel-2-l2a"}). Must be a source with \code{cube = TRUE}:
+\code{"sentinel-2-l2a"} (10 m, from 2017) or \code{"modis-13Q1-061"} (MODIS 16-day
+composites at 250 m, from 2000-02-18). MODIS has red, NIR and blue but no
+green or SWIR band, so it serves \code{ndvi}, \code{kndvi} and \code{evi}; an index needing
+another band is refused before any query.}
 
 \item{index}{Character. Spectral index from \code{\link[=dft_index_table]{dft_index_table()}} (default
 \code{"kndvi"}). Determines which band roles (and thus assets) are fetched.}
@@ -37,7 +41,9 @@ dft_stac_cube(
 \item{datetime}{Character. ISO 8601 interval \code{"start/end"}. When \code{NULL}, uses
 \code{available_datetime} from \code{\link[=dft_stac_config]{dft_stac_config()}}.}
 
-\item{res}{Numeric. Output pixel size in CRS units (default 10).}
+\item{res}{Numeric. Output pixel size in CRS units. When not given, the
+source's native resolution where it has one (250 for \code{"modis-13Q1-061"}),
+otherwise 10.}
 
 \item{crs}{Character. Target CRS as an EPSG string. When \code{NULL}, auto-detected
 from the AOI centroid's UTM zone.}
@@ -77,7 +83,10 @@ stair-stepped superset of the polygon with \code{NA} where empty tiles were
 skipped), not a gap-free bounding box.}
 
 \item{cloud_cover_max}{Numeric. Scene-level \code{eo:cloud_cover} maximum percent
-for the STAC pre-filter (default 60).}
+for the STAC pre-filter (default 60), or \code{NULL} for no pre-filter. A source
+whose items carry no \code{eo:cloud_cover} (\code{"modis-13Q1-061"}) gets no
+pre-filter, since the filter would drop every item; passing a value for one
+is an error. Its mask band does the cloud screening.}
 
 \item{months}{Integer vector of calendar months (1-12) to keep, or \code{NULL}
 (default) for all. Restricting to the growing season (e.g. \code{6:9}) both

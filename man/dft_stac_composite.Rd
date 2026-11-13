@@ -41,9 +41,12 @@ number of them; \code{c("nir", "red", "green")} is the standard vegetation false
 colour. Layers are named by role, in the order given.}
 
 \item{source}{Character. A cube source name for \code{\link[=dft_stac_config]{dft_stac_config()}} (default
-\code{"sentinel-2-l2a"}).}
+\code{"sentinel-2-l2a"}). \code{"modis-13Q1-061"} has no green band, so give it
+\code{bands} from \code{"red"}, \code{"nir"} and \code{"blue"}.}
 
-\item{res}{Numeric. Output pixel size in CRS units (default 10).}
+\item{res}{Numeric. Output pixel size in CRS units. When not given, the
+source's native resolution where it has one (250 for \code{"modis-13Q1-061"}),
+otherwise 10.}
 
 \item{crs}{Character. Target CRS as an EPSG string. When \code{NULL},
 auto-detected from the AOI centroid's UTM zone.}
@@ -70,7 +73,9 @@ default keeps the whole AOI bounding box. \code{TRUE} uses the same rule as
 
 \item{cloud_cover_max}{Numeric. Scene-level \code{eo:cloud_cover} maximum percent
 (default 20, stricter than the cube's 60 because a composite of few clear
-scenes looks better than one of many cloudy ones).}
+scenes looks better than one of many cloudy ones), or \code{NULL} for none. A
+source with no \code{eo:cloud_cover} (\code{"modis-13Q1-061"}) gets no pre-filter,
+and passing a value for one is an error; see \code{\link[=dft_stac_cube]{dft_stac_cube()}}.}
 
 \item{mask_values}{Integer vector of mask-band classes to exclude. When
 \code{NULL}, taken from \code{\link[=dft_stac_config]{dft_stac_config()}}; for Sentinel-2 that is the SCL
