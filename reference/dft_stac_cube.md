@@ -46,7 +46,11 @@ dft_stac_cube(
 
   Character. A cube source name for
   [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
-  (default `"sentinel-2-l2a"`). Must be a source with `cube = TRUE`.
+  (default `"sentinel-2-l2a"`). Must be a source with `cube = TRUE`:
+  `"sentinel-2-l2a"` (10 m, from 2017) or `"modis-13Q1-061"` (MODIS
+  16-day composites at 250 m, from 2000-02-18). MODIS has red, NIR and
+  blue but no green or SWIR band, so it serves `ndvi`, `kndvi` and
+  `evi`; an index needing another band is refused before any query.
 
 - index:
 
@@ -63,7 +67,9 @@ dft_stac_cube(
 
 - res:
 
-  Numeric. Output pixel size in CRS units (default 10).
+  Numeric. Output pixel size in CRS units. When not given, the source's
+  native resolution where it has one (250 for `"modis-13Q1-061"`),
+  otherwise 10.
 
 - crs:
 
@@ -124,7 +130,10 @@ dft_stac_cube(
 - cloud_cover_max:
 
   Numeric. Scene-level `eo:cloud_cover` maximum percent for the STAC
-  pre-filter (default 60).
+  pre-filter (default 60), or `NULL` for no pre-filter. A source whose
+  items carry no `eo:cloud_cover` (`"modis-13Q1-061"`) gets no
+  pre-filter, since the filter would drop every item; passing a value
+  for one is an error. Its mask band does the cloud screening.
 
 - months:
 
@@ -249,7 +258,26 @@ single page silently truncates); the query uses `intersects` with the
 AOI geometry, not a bounding box (floodplain polygons are highly
 non-rectangular); and a scene-level `eo:cloud_cover` pre-filter shrinks
 the collection before any pixel is read, complementing per-pixel mask
-filtering.
+filtering. A source whose items carry no `eo:cloud_cover` gets no
+pre-filter.
+
+## Sources
+
+Two cube sources, both on Microsoft Planetary Computer and free with no
+account:
+
+- `"sentinel-2-l2a"`: 10 m, from 2017, cloud-masked with the Scene
+  Classification Layer. Every index in
+  [`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md).
+
+- `"modis-13Q1-061"`: MODIS Terra and Aqua MOD13Q1 v6.1 16-day
+  composites at a nominal 250 m, from 2000-02-18, so an index for any
+  year before Sentinel-2. Masked with the product's pixel reliability
+  (snow/ice and cloudy). It has red, NIR and blue but no green or SWIR
+  band, so it serves `ndvi`, `kndvi` and `evi`. Each item is a 16-day
+  window rather than one date; it is placed at the window's midpoint,
+  which decides its month for `months` and for the monthly layer, so a
+  month holds about four composites (two per satellite).
 
 ## See also
 

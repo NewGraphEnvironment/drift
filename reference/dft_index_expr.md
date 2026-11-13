@@ -57,11 +57,15 @@ A single-band `gdalcubes` cube with the band named `index`.
 
 Index formulas are stored in a shipped registry
 ([`dft_index_table()`](https://www.newgraphenvironment.com/drift/reference/dft_index_table.md))
-written over band **roles** (`red`, `nir`, `swir16`), not literal asset
-names. The roles are resolved to per-source asset names via
+written over band **roles** (`red`, `green`, `blue`, `nir`, `swir16`),
+not literal asset names. The roles are resolved to per-source asset
+names via
 [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md),
-so the same `"kndvi"` works against Sentinel-2 (`B04`/`B08`) or any
-future reflectance source without changing the formula.
+so the same `"kndvi"` works against Sentinel-2 (`B04`/`B08`) and MODIS
+(`250m_16_days_red_reflectance`/`..._NIR_...`) without changing the
+formula. A band whose asset name is not a valid expression identifier
+(the MODIS names start with a digit) is renamed to its role in the cube
+before the expression is applied.
 
 Reflectance `scale`/`offset` are folded **into** the expression as a
 per-band affine transform `(asset * scale + offset)`. This matters for
@@ -82,14 +86,15 @@ for the caller that builds the input cube.
 ``` r
 # The registry the resolver reads:
 dft_index_table()
-#> # A tibble: 5 × 4
-#>   index formula                                 roles        description        
-#>   <chr> <chr>                                   <chr>        <chr>              
-#> 1 ndvi  (nir - red) / (nir + red)               nir,red      Normalized Differe…
-#> 2 kndvi tanh(pow((nir - red) / (nir + red), 2)) nir,red      Kernel NDVI (tanh …
-#> 3 ndmi  (nir - swir16) / (nir + swir16)         nir,swir16   Normalized Differe…
-#> 4 ndwi  (green - nir) / (green + nir)           green,nir    Normalized Differe…
-#> 5 mndwi (green - swir16) / (green + swir16)     green,swir16 Modified NDWI (Xu …
+#> # A tibble: 6 × 4
+#>   index formula                                              roles   description
+#>   <chr> <chr>                                                <chr>   <chr>      
+#> 1 ndvi  (nir - red) / (nir + red)                            nir,red Normalized…
+#> 2 kndvi tanh(pow((nir - red) / (nir + red), 2))              nir,red Kernel NDV…
+#> 3 ndmi  (nir - swir16) / (nir + swir16)                      nir,sw… Normalized…
+#> 4 ndwi  (green - nir) / (green + nir)                        green,… Normalized…
+#> 5 mndwi (green - swir16) / (green + swir16)                  green,… Modified N…
+#> 6 evi   2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1) nir,re… Enhanced V…
 
 if (FALSE) { # \dontrun{
 # Applied to a lazy Sentinel-2 cube (requires network + gdalcubes):

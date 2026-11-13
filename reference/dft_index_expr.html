@@ -98,10 +98,13 @@ from the source config (falling back to <code>1</code> / <code>0</code>).</p></d
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Index formulas are stored in a shipped registry (<code><a href="dft_index_table.html">dft_index_table()</a></code>) written
-over band <strong>roles</strong> (<code>red</code>, <code>nir</code>, <code>swir16</code>), not literal asset names. The
-roles are resolved to per-source asset names via <code><a href="dft_stac_config.html">dft_stac_config()</a></code>, so the
-same <code>"kndvi"</code> works against Sentinel-2 (<code>B04</code>/<code>B08</code>) or any future
-reflectance source without changing the formula.</p>
+over band <strong>roles</strong> (<code>red</code>, <code>green</code>, <code>blue</code>, <code>nir</code>, <code>swir16</code>), not literal
+asset names. The roles are resolved to per-source asset names via
+<code><a href="dft_stac_config.html">dft_stac_config()</a></code>, so the same <code>"kndvi"</code> works against Sentinel-2
+(<code>B04</code>/<code>B08</code>) and MODIS (<code>250m_16_days_red_reflectance</code>/<code>..._NIR_...</code>)
+without changing the formula. A band whose asset name is not a valid
+expression identifier (the MODIS names start with a digit) is renamed to its
+role in the cube before the expression is applied.</p>
 <p>Reflectance <code>scale</code>/<code>offset</code> are folded <strong>into</strong> the expression as a per-band
 affine transform <code>(asset * scale + offset)</code>. This matters for ratio indices:
 a non-zero offset does not cancel in <code>(nir - red)/(nir + red)</code>, so computing
@@ -118,14 +121,15 @@ caller that builds the input cube.</p></div>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># The registry the resolver reads:</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="dft_index_table.html">dft_index_table</a></span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 5 × 4</span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   index formula                                 roles        description        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                                   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>        <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> ndvi  (nir - red) / (nir + red)               nir,red      Normalized Differe…</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> kndvi tanh(pow((nir - red) / (nir + red), 2)) nir,red      Kernel NDVI (tanh …</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> ndmi  (nir - swir16) / (nir + swir16)         nir,swir16   Normalized Differe…</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> ndwi  (green - nir) / (green + nir)           green,nir    Normalized Differe…</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> mndwi (green - swir16) / (green + swir16)     green,swir16 Modified NDWI (Xu …</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #949494;"># A tibble: 6 × 4</span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   index formula                                              roles   description</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                                                <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">1</span> ndvi  (nir - red) / (nir + red)                            nir,red Normalized…</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">2</span> kndvi tanh(pow((nir - red) / (nir + red), 2))              nir,red Kernel NDV…</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">3</span> ndmi  (nir - swir16) / (nir + swir16)                      nir,sw… Normalized…</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">4</span> ndwi  (green - nir) / (green + nir)                        green,… Normalized…</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">5</span> mndwi (green - swir16) / (green + swir16)                  green,… Modified N…</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> <span style="color: #BCBCBC;">6</span> evi   2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1) nir,re… Enhanced V…</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
 <span class="r-in"><span><span class="co"># Applied to a lazy Sentinel-2 cube (requires network + gdalcubes):</span></span></span>

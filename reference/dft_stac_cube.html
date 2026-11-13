@@ -92,7 +92,11 @@ breakpoint detection.</p>
 
 <dt id="arg-source">source<a class="anchor" aria-label="anchor" href="#arg-source"></a></dt>
 <dd><p>Character. A cube source name for <code><a href="dft_stac_config.html">dft_stac_config()</a></code> (default
-<code>"sentinel-2-l2a"</code>). Must be a source with <code>cube = TRUE</code>.</p></dd>
+<code>"sentinel-2-l2a"</code>). Must be a source with <code>cube = TRUE</code>:
+<code>"sentinel-2-l2a"</code> (10 m, from 2017) or <code>"modis-13Q1-061"</code> (MODIS 16-day
+composites at 250 m, from 2000-02-18). MODIS has red, NIR and blue but no
+green or SWIR band, so it serves <code>ndvi</code>, <code>kndvi</code> and <code>evi</code>; an index needing
+another band is refused before any query.</p></dd>
 
 
 <dt id="arg-index">index<a class="anchor" aria-label="anchor" href="#arg-index"></a></dt>
@@ -106,7 +110,9 @@ breakpoint detection.</p>
 
 
 <dt id="arg-res">res<a class="anchor" aria-label="anchor" href="#arg-res"></a></dt>
-<dd><p>Numeric. Output pixel size in CRS units (default 10).</p></dd>
+<dd><p>Numeric. Output pixel size in CRS units. When not given, the
+source's native resolution where it has one (250 for <code>"modis-13Q1-061"</code>),
+otherwise 10.</p></dd>
 
 
 <dt id="arg-crs">crs<a class="anchor" aria-label="anchor" href="#arg-crs"></a></dt>
@@ -158,7 +164,10 @@ skipped), not a gap-free bounding box.</p></dd>
 
 <dt id="arg-cloud-cover-max">cloud_cover_max<a class="anchor" aria-label="anchor" href="#arg-cloud-cover-max"></a></dt>
 <dd><p>Numeric. Scene-level <code>eo:cloud_cover</code> maximum percent
-for the STAC pre-filter (default 60).</p></dd>
+for the STAC pre-filter (default 60), or <code>NULL</code> for no pre-filter. A source
+whose items carry no <code>eo:cloud_cover</code> (<code>"modis-13Q1-061"</code>) gets no
+pre-filter, since the filter would drop every item; passing a value for one
+is an error. Its mask band does the cloud screening.</p></dd>
 
 
 <dt id="arg-months">months<a class="anchor" aria-label="anchor" href="#arg-months"></a></dt>
@@ -266,8 +275,23 @@ returns hundreds of items; a single page silently truncates); the query uses
 <code>intersects</code> with the AOI geometry, not a bounding box (floodplain polygons
 are highly non-rectangular); and a scene-level <code>eo:cloud_cover</code> pre-filter
 shrinks the collection before any pixel is read, complementing per-pixel mask
-filtering.</p>
+filtering. A source whose items carry no <code>eo:cloud_cover</code> gets no pre-filter.</p>
     </div>
+    <div class="section level2">
+    <h2 id="sources">Sources<a class="anchor" aria-label="anchor" href="#sources"></a></h2>
+
+
+<p>Two cube sources, both on Microsoft Planetary Computer and free with no
+account:</p><ul><li><p><code>"sentinel-2-l2a"</code>: 10 m, from 2017, cloud-masked with the Scene
+Classification Layer. Every index in <code><a href="dft_index_table.html">dft_index_table()</a></code>.</p></li>
+<li><p><code>"modis-13Q1-061"</code>: MODIS Terra and Aqua MOD13Q1 v6.1 16-day composites at a
+nominal 250 m, from 2000-02-18, so an index for any year before Sentinel-2.
+Masked with the product's pixel reliability (snow/ice and cloudy). It has
+red, NIR and blue but no green or SWIR band, so it serves <code>ndvi</code>, <code>kndvi</code>
+and <code>evi</code>. Each item is a 16-day window rather than one date; it is placed
+at the window's midpoint, which decides its month for <code>months</code> and for the
+monthly layer, so a month holds about four composites (two per satellite).</p></li>
+</ul></div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p><code><a href="dft_rast_break.html">dft_rast_break()</a></code> (the reducer that consumes this cube),

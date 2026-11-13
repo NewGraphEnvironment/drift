@@ -256,6 +256,23 @@ trends, and weakest at telling riparian tree from rangeland. Used with
 the categorical map, they say whether a mapped change is <em>real</em>,
 which <em>way</em> it is going, and <em>when</em> it happened.</p>
 </div>
+<div class="section level2">
+<h2 id="what-about-years-before-2017">What about years before 2017?<a class="anchor" aria-label="anchor" href="#what-about-years-before-2017"></a>
+</h2>
+<p>Sentinel-2 starts in 2017. For an index in earlier years, use MODIS:
+the same call with <code>source = "modis-13Q1-061"</code> reads the
+MOD13Q1 16-day composites from 2000 on, from the same catalogue and with
+no account.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">cube_2008</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/dft_stac_cube.html">dft_stac_cube</a></span><span class="op">(</span><span class="va">aoi</span>, source <span class="op">=</span> <span class="st">"modis-13Q1-061"</span>, index <span class="op">=</span> <span class="st">"kndvi"</span>,</span>
+<span>                           datetime <span class="op">=</span> <span class="st">"2008-01-01/2017-12-31"</span>, months <span class="op">=</span> <span class="fl">6</span><span class="op">:</span><span class="fl">9</span><span class="op">)</span></span></code></pre></div>
+<p>The cells are 250 m rather than 10 m, which suits a site-level or
+reach-level series better than the patch-level questions above. A whole
+harvest block is a few MODIS cells, and a riparian strip narrower than
+one cell is mixed with what lies beside it. MODIS has no SWIR16 or green
+band, so it serves <code>ndvi</code>, <code>kndvi</code> and
+<code>evi</code> only.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

@@ -64,11 +64,14 @@ dft_stac_composite(
 
   Character. A cube source name for
   [`dft_stac_config()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_config.md)
-  (default `"sentinel-2-l2a"`).
+  (default `"sentinel-2-l2a"`). `"modis-13Q1-061"` has no green band, so
+  give it `bands` from `"red"`, `"nir"` and `"blue"`.
 
 - res:
 
-  Numeric. Output pixel size in CRS units (default 10).
+  Numeric. Output pixel size in CRS units. When not given, the source's
+  native resolution where it has one (250 for `"modis-13Q1-061"`),
+  otherwise 10.
 
 - crs:
 
@@ -107,7 +110,10 @@ dft_stac_composite(
 
   Numeric. Scene-level `eo:cloud_cover` maximum percent (default 20,
   stricter than the cube's 60 because a composite of few clear scenes
-  looks better than one of many cloudy ones).
+  looks better than one of many cloudy ones), or `NULL` for none. A
+  source with no `eo:cloud_cover` (`"modis-13Q1-061"`) gets no
+  pre-filter, and passing a value for one is an error; see
+  [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md).
 
 - mask_values:
 
@@ -163,11 +169,11 @@ warning; if every year is empty, the call aborts.
 This is the multi-band sibling of
 [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md)
 and shares its read path: the same STAC query (paginated, `intersects`
-the AOI, scene-level `eo:cloud_cover` pre-filter), the same per-pixel
-mask, the same Sentinel-2 offset correction at the 2022-01-25
-processing-baseline boundary, the same tiling and the same AOI clip.
-Where the cube returns one index per month, this returns the bands
-themselves, one time step per window.
+the AOI, scene-level `eo:cloud_cover` pre-filter where the source has
+one), the same per-pixel mask, the same Sentinel-2 offset correction at
+the 2022-01-25 processing-baseline boundary, the same tiling and the
+same AOI clip. Where the cube returns one index per month, this returns
+the bands themselves, one time step per window.
 
 Values are **surface reflectance** (the source's `scale` and `offset`
 applied), stored as floating point rather than display bytes. That keeps
@@ -184,18 +190,22 @@ brightness difference between years is a real one.
 caller needs to choose composite windows. It is read one day per time
 step, so where adjacent MGRS tiles overlap, their two items of one
 acquisition count once, and a masked tile does not hide a clear one from
-the same day. "Clear" means not in `mask_values` (by default cloud,
-cloud shadow, cirrus **and snow**, so a spring or autumn count excludes
-snow cover as well as cloud), and only scenes passing `cloud_cover_max`
-are counted. The counts are whole numbers with no scale or offset
-applied, stored as integers, one layer per band. The mask is shared, so
-bands count alike and `bands = "red"` is enough. A pixel with no clear
-day is `NA`, never 0, because gdalcubes cannot tell a chunk it failed to
-read from one that was all cloud. For the same reason a day whose read
-failed for part of a chunk goes uncounted there, so where reads fail a
-count is a lower bound; gdalcubes reports such failures only on the
-console, as a composite's are. A count is not refused across the
-Sentinel-2 2022-01-25 offset change, which does not affect it.
+the same day. "Clear" means not in `mask_values` (for Sentinel-2 by
+default cloud, cloud shadow, cirrus **and snow**, so a spring or autumn
+count excludes snow cover as well as cloud; for MODIS snow/ice, cloudy
+and fill, keeping "marginal"), and only scenes passing `cloud_cover_max`
+are counted where the source has one. The counts are whole numbers with
+no scale or offset applied, stored as integers, one layer per band. The
+mask is shared, so bands count alike and `bands = "red"` is enough. A
+pixel with no clear day is `NA`, never 0, because gdalcubes cannot tell
+a chunk it failed to read from one that was all cloud. For the same
+reason a day whose read failed for part of a chunk goes uncounted there,
+so where reads fail a count is a lower bound; gdalcubes reports such
+failures only on the console, as a composite's are. A count is not
+refused across the Sentinel-2 2022-01-25 offset change, which does not
+affect it. On `"modis-13Q1-061"` each item is a 16-day composite placed
+at its window midpoint, so the count is of clear **composites**, not
+clear days.
 
 ## Caching
 

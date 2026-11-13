@@ -11,7 +11,9 @@ STAC URLs, collection IDs, and band names.
 ## Usage
 
 ``` r
-dft_stac_config(source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a"))
+dft_stac_config(
+  source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a", "modis-13Q1-061")
+)
 ```
 
 ## Arguments
@@ -19,19 +21,25 @@ dft_stac_config(source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a"))
 - source:
 
   Character. One of `"io-lulc"` (Esri IO LULC annual v02),
-  `"esa-worldcover"` (ESA WorldCover), or `"sentinel-2-l2a"` (Sentinel-2
-  L2A surface reflectance, a cube source).
+  `"esa-worldcover"` (ESA WorldCover), `"sentinel-2-l2a"` (Sentinel-2
+  L2A surface reflectance at 10 m from 2017, a cube source), or
+  `"modis-13Q1-061"` (MODIS Terra/Aqua MOD13Q1 v6.1 reflectance, 16-day
+  composites at 250 m from 2000-02-18, a cube source).
 
 ## Value
 
 A list. Categorical sources have elements `stac_url`, `collection`,
 `asset`, `available_years`. Cube sources have `stac_url`, `collection`,
-`cube = TRUE`, `roles` (a named list mapping
-`red`/`green`/`blue`/`nir`/`swir16`/`mask` to asset names),
-`mask_values` (integer mask classes to exclude), `scale`/`offset` (DN →
-reflectance affine transform), and `available_datetime` (an ISO 8601
-interval string). The `cube` field is absent (not `FALSE`) for
-categorical sources; test with `isTRUE(cfg$cube)`.
+`cube = TRUE`, `roles` (a named list mapping the roles the source has,
+from `red`/`green`/`blue`/`nir`/`swir16`, and `mask`, to asset names;
+MODIS has no `green` or `swir16`), `mask_values` (integer mask classes
+to exclude), `scale`/`offset` (DN → reflectance affine transform), and
+`available_datetime` (an ISO 8601 interval string). A cube source may
+also carry `res` (its native resolution in metres, used when the caller
+passes none) and `cloud_cover = FALSE` (its items have no
+`eo:cloud_cover`, so no scene-level cloud filter applies). The `cube`
+field is absent (not `FALSE`) for categorical sources; test with
+`isTRUE(cfg$cube)`.
 
 ## Details
 
@@ -39,10 +47,10 @@ Sources are of two kinds. **Categorical** sources (`"io-lulc"`,
 `"esa-worldcover"`) host single-band classified rasters and carry a flat
 `asset` name for
 [`dft_stac_fetch()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_fetch.md).
-**Cube** sources (`"sentinel-2-l2a"`) host multi-band reflectance
-imagery and instead carry a role-based band map
-(`red`/`green`/`blue`/`nir`/`swir16`/`mask`), mask values, and
-reflectance scale/offset for
+**Cube** sources (`"sentinel-2-l2a"`, `"modis-13Q1-061"`) host
+multi-band reflectance imagery and instead carry a role-based band map
+(some of `red`/`green`/`blue`/`nir`/`swir16`, plus `mask`), mask values,
+and reflectance scale/offset for
 [`dft_stac_cube()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_cube.md);
 they are marked with `cube = TRUE`. The role-based schema means a new
 reflectance source (e.g. Landsat C2 L2) drops in with no API change —
@@ -124,5 +132,18 @@ dft_stac_config("sentinel-2-l2a")
 #> 
 #> $available_datetime
 #> [1] "2017-01-01/2024-12-31"
+#> 
+dft_stac_config("modis-13Q1-061")$roles
+#> $red
+#> [1] "250m_16_days_red_reflectance"
+#> 
+#> $nir
+#> [1] "250m_16_days_NIR_reflectance"
+#> 
+#> $blue
+#> [1] "250m_16_days_blue_reflectance"
+#> 
+#> $mask
+#> [1] "250m_16_days_pixel_reliability"
 #> 
 ```

@@ -110,11 +110,14 @@ colour. Layers are named by role, in the order given.</p></dd>
 
 <dt id="arg-source">source<a class="anchor" aria-label="anchor" href="#arg-source"></a></dt>
 <dd><p>Character. A cube source name for <code><a href="dft_stac_config.html">dft_stac_config()</a></code> (default
-<code>"sentinel-2-l2a"</code>).</p></dd>
+<code>"sentinel-2-l2a"</code>). <code>"modis-13Q1-061"</code> has no green band, so give it
+<code>bands</code> from <code>"red"</code>, <code>"nir"</code> and <code>"blue"</code>.</p></dd>
 
 
 <dt id="arg-res">res<a class="anchor" aria-label="anchor" href="#arg-res"></a></dt>
-<dd><p>Numeric. Output pixel size in CRS units (default 10).</p></dd>
+<dd><p>Numeric. Output pixel size in CRS units. When not given, the
+source's native resolution where it has one (250 for <code>"modis-13Q1-061"</code>),
+otherwise 10.</p></dd>
 
 
 <dt id="arg-crs">crs<a class="anchor" aria-label="anchor" href="#arg-crs"></a></dt>
@@ -151,7 +154,9 @@ default keeps the whole AOI bounding box. <code>TRUE</code> uses the same rule a
 <dt id="arg-cloud-cover-max">cloud_cover_max<a class="anchor" aria-label="anchor" href="#arg-cloud-cover-max"></a></dt>
 <dd><p>Numeric. Scene-level <code>eo:cloud_cover</code> maximum percent
 (default 20, stricter than the cube's 60 because a composite of few clear
-scenes looks better than one of many cloudy ones).</p></dd>
+scenes looks better than one of many cloudy ones), or <code>NULL</code> for none. A
+source with no <code>eo:cloud_cover</code> (<code>"modis-13Q1-061"</code>) gets no pre-filter,
+and passing a value for one is an error; see <code><a href="dft_stac_cube.html">dft_stac_cube()</a></code>.</p></dd>
 
 
 <dt id="arg-mask-values">mask_values<a class="anchor" aria-label="anchor" href="#arg-mask-values"></a></dt>
@@ -201,7 +206,8 @@ warning; if every year is empty, the call aborts.</p>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>This is the multi-band sibling of <code><a href="dft_stac_cube.html">dft_stac_cube()</a></code> and shares its read path:
 the same STAC query (paginated, <code>intersects</code> the AOI, scene-level
-<code>eo:cloud_cover</code> pre-filter), the same per-pixel mask, the same Sentinel-2
+<code>eo:cloud_cover</code> pre-filter where the source has one), the same per-pixel
+mask, the same Sentinel-2
 offset correction at the 2022-01-25 processing-baseline boundary, the same
 tiling and the same AOI clip. Where the cube returns one index per month, this
 returns the bands themselves, one time step per window.</p>
@@ -221,9 +227,10 @@ between years is a real one.</p>
 needs to choose composite windows. It is read one day per time step, so
 where adjacent MGRS tiles overlap, their two items of one acquisition count
 once, and a masked tile does not hide a clear one from the same day. "Clear"
-means not in <code>mask_values</code> (by default cloud, cloud shadow, cirrus <strong>and
-snow</strong>, so a spring or autumn count excludes snow cover as well as cloud), and
-only scenes passing <code>cloud_cover_max</code> are counted. The counts are whole
+means not in <code>mask_values</code> (for Sentinel-2 by default cloud, cloud shadow,
+cirrus <strong>and snow</strong>, so a spring or autumn count excludes snow cover as well
+as cloud; for MODIS snow/ice, cloudy and fill, keeping "marginal"), and only
+scenes passing <code>cloud_cover_max</code> are counted where the source has one. The counts are whole
 numbers with no scale or offset applied, stored as integers, one layer per
 band. The mask is shared, so bands count alike and <code>bands = "red"</code> is enough.
 A pixel with no clear day is <code>NA</code>, never 0, because gdalcubes cannot tell a
@@ -231,7 +238,9 @@ chunk it failed to read from one that was all cloud. For the same reason a
 day whose read failed for part of a chunk goes uncounted there, so where
 reads fail a count is a lower bound; gdalcubes reports such failures only on
 the console, as a composite's are. A count is not refused
-across the Sentinel-2 2022-01-25 offset change, which does not affect it.</p>
+across the Sentinel-2 2022-01-25 offset change, which does not affect it.
+On <code>"modis-13Q1-061"</code> each item is a 16-day composite placed at its window
+midpoint, so the count is of clear <strong>composites</strong>, not clear days.</p>
     </div>
     <div class="section level2">
     <h2 id="caching">Caching<a class="anchor" aria-label="anchor" href="#caching"></a></h2>
