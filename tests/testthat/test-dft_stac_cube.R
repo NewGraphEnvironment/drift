@@ -1364,6 +1364,27 @@ test_that("an item with neither datetime nor a window is refused, naming it (#11
   expect_error(drift:::stac_items_datetime(list(bad)), "no_time")
 })
 
+test_that("a window in UTC reads, and one at another offset is refused (#115)", {
+  # strptime ignores trailing characters, so a -07:00 window would otherwise be
+  # read as UTC and the midpoint placed seven hours early.
+  ok <- modis_feature("utc", "2017-06-10T00:00:00+00:00", "2017-06-25T23:59:59+00:00")
+  expect_equal(drift:::stac_items_datetime(list(ok))[[1]]$properties$datetime,
+               "2017-06-17T23:59:59Z")
+  off <- modis_feature("pdt", "2017-06-10T00:00:00-07:00", "2017-06-25T23:59:59-07:00")
+  expect_error(drift:::stac_items_datetime(list(off)), class = "drift_item_no_datetime")
+})
+
+test_that("the role refusal counts the missing roles, not the index (#115)", {
+  skip_if_not_installed("gdalcubes")
+  cfg <- dft_stac_config("modis-13Q1-061")
+  one <- tryCatch(drift:::stac_index_roles_check("ndmi", c("nir", "swir16"), cfg, "m"),
+                  error = conditionMessage)
+  two <- tryCatch(drift:::stac_index_roles_check("mndwi", c("green", "swir16"), cfg, "m"),
+                  error = conditionMessage)
+  expect_match(one, "band role \"swir16\"")
+  expect_match(two, "band roles \"green\" and \"swir16\"")
+})
+
 test_that("stac_cube_items keeps MODIS items by month and skips the cloud filter (#115)", {
   feats <- list(
     modis_feature("MOD_jun", "2017-06-10T00:00:00Z", "2017-06-25T23:59:59Z"),

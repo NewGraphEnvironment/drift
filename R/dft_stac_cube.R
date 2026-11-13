@@ -615,7 +615,13 @@ stac_items_datetime <- function(features) {
     if (!is.null(f$properties$datetime)) return(f)
     w <- c(f$properties$start_datetime %||% NA_character_,
            f$properties$end_datetime %||% NA_character_)
-    t <- as.POSIXct(sub("Z$", "", w), format = "%Y-%m-%dT%H:%M:%OS", tz = "UTC")
+    # UTC only: strptime ignores trailing characters, so any other offset would be
+    # parsed and silently dropped. Such a time is refused below as unreadable.
+    utc <- grepl(paste0("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}",
+                        "([.][0-9]+)?(Z|[+]00:00)?$"), w)
+    t <- as.POSIXct(sub("(Z|[+]00:00)$", "", w), format = "%Y-%m-%dT%H:%M:%OS",
+                    tz = "UTC")
+    t[!utc] <- NA
     if (anyNA(t)) {
       id <- f$id %||% NA_character_ # nolint: object_usage_linter. cli template
       cli::cli_abort(c(
@@ -674,8 +680,8 @@ stac_index_roles_check <- function(index, roles_needed, cfg, source) {
   absent <- setdiff(roles_needed, setdiff(names(cfg$roles), "mask"))
   if (!length(absent)) return(invisible(TRUE))
   cli::cli_abort(c(
-    "Index {.val {index}} needs band role{?s} {.val {absent}}, which \\
-     {.val {source}} does not have.",
+    "Index {.val {index}} needs band {cli::qty(length(absent))}role{?s} \\
+     {.val {absent}}, which {.val {source}} does not have.",
     "i" = "Roles it has: {.val {setdiff(names(cfg$roles), 'mask')}}."
   ), class = "drift_index_role_missing")
 }

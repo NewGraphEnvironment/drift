@@ -15,3 +15,4 @@
 - BULK scale run (co_ff04 from the local floodplains copy; `bulk_co_ff04` now 403s, its successor `bulk_all_ff04` has no co_ff04 layer): MODIS kNDVI 2008-2017 months 6:9, 314 items, 587 x 463 x 120 layers (40 summer layers with data, median 16,336 cells), 21.7 min wall, peak RSS 1.74 GiB (`/usr/bin/time -l`). The run's 160 warnings were the probe's own range() over the 80 empty months, confirmed on the cached cube
 - Owner, mid-run: finish #115 to an open PR, then merge it with /gh-pr-merge
 - Full suite: [ FAIL 0 | WARN 0 | SKIP 20 | PASS 1774 ]; pkgdown::check_pkgdown() clean; no new lints in touched files
+- /code-check branch round 1: Clean; two below-the-bar points fixed (role plural via cli::qty; a non-UTC window offset is refused rather than read as UTC), with tests
