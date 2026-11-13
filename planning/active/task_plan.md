@@ -53,7 +53,7 @@
 
 - [x] An opt-in network test (`DRIFT_TEST_NETWORK=true`): the packaged AOI, MODIS, `kndvi` and `evi`, 2017-06-01/2017-09-30, `months = 6:9`. It asserts data inside the polygon on every layer, NA outside, kndvi in [0, 1), ndvi in [-1, 1], and a MODIS composite's red/nir/blue reflectance in [0, 1] (a -1000 fill is -0.1; kndvi/evi ranges cannot catch it, review G3). A pre-2017 window (2010) returns data.
 - [x] Fill check: confirm that gdalcubes honours red/NIR NoData -1000 and the reliability NoData 255 (no fill value reaches the index), and record the result in `inst/notes/gdalcubes-pc-gotchas.md`.
-- [ ] BULK scale run: the `co_ff04` floodplain, MODIS kndvi for one decade (2008-2017, `months = 6:9`), with `/usr/bin/time -l` peak RSS and wall time recorded in the PR body (CLAUDE.md, "Scale-test raster functions").
+- [x] BULK scale run: the `co_ff04` floodplain, MODIS kndvi for one decade (2008-2017, `months = 6:9`), with `/usr/bin/time -l` peak RSS and wall time recorded in the PR body (CLAUDE.md, "Scale-test raster functions").
 
 ## Phase 5: Docs and release prep
 
