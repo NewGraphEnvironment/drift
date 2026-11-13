@@ -853,3 +853,22 @@ test_that("dft_stac_composite defaults keep the Sentinel-2 key and use MODIS's o
   expect_equal(seen$res, 250)
   expect_null(seen$cc)
 })
+
+test_that("an all-skipped MODIS composite does not advise a cloud filter it refuses (#115)", {
+  skip_if_not_installed("gdalcubes")
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) {
+      rlang::abort("No STAC items found", class = "drift_no_items")
+    }
+  )
+  cache <- withr::local_tempdir()
+  msg <- function(...) {
+    tryCatch(suppressWarnings(dft_stac_composite(aoi_pkg(), years = 2010,
+                                                 cache_dir = cache, ...)),
+             error = function(e) cli::ansi_strip(conditionMessage(e)))
+  }
+  modis <- msg(source = "modis-13Q1-061", bands = c("red", "nir"))
+  expect_match(modis, "No year produced a composite")
+  expect_no_match(modis, "cloud_cover_max")
+  expect_match(msg(), "cloud_cover_max")   # Sentinel-2 keeps the advice
+})

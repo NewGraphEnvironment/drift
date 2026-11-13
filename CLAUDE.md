@@ -76,7 +76,7 @@ trend  <- dft_rast_trend(cube)                        # gradual change (Theil-Se
 
 Before 2017 (#115): MODIS MOD13Q1 16-day composites at 250 m from 2000, same catalogue, no account.
 `ndvi`/`kndvi`/`evi` only (no green or SWIR). Items are 16-day windows placed at their midpoint;
-no `eo:cloud_cover`, so an explicit `cloud_cover_max` is refused; `res` defaults to 250:
+no `eo:cloud_cover`, so a `cloud_cover_max` value is refused (`NULL` is fine); `res` defaults to 250:
 
 ```r
 cube <- dft_stac_cube(aoi, source = "modis-13Q1-061", index = "kndvi",

@@ -339,12 +339,17 @@ dft_stac_composite <- function(aoi,
   names(out) <- vapply(years, composite_label, character(1), months = months)
   out <- out[!vapply(out, is.null, logical(1))]
   if (!length(out)) {
-    cli::cli_abort(c(
-      "No year produced a composite.",
-      "i" = "Every window was skipped; the warnings say why. For no scenes or \\
-             no clear pixels, try more {.arg months} or a higher \\
-             {.arg cloud_cover_max}."
-    ))
+    # A source with no scene cloud cover refuses cloud_cover_max (#115), so the
+    # advice names it only where it can be followed.
+    hint <- if (identical(cfg$cloud_cover, FALSE)) {
+      "Every window was skipped; the warnings say why. For no scenes or no \\
+       clear pixels, try more {.arg months}: {.val {source}} has no scene \\
+       cloud cover, and its mask band does the cloud screening."
+    } else {
+      "Every window was skipped; the warnings say why. For no scenes or no \\
+       clear pixels, try more {.arg months} or a higher {.arg cloud_cover_max}."
+    }
+    cli::cli_abort(c("No year produced a composite.", "i" = hint))
   }
   out
 }
