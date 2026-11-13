@@ -55,8 +55,49 @@ dft_index_expr <- function(cube,
   roles <- roles %||% cfg$roles
   scale <- scale %||% cfg$scale %||% 1
   offset <- offset %||% cfg$offset %||% 0
+  # Bands an expression cannot name (MODIS `250m_...`, #115) are renamed to
+  # their role first; a missing role is left for index_resolve_expr() to name.
+  needed <- intersect(index_roles(index), names(roles))
+  assets <- unlist(roles[needed])
+  cube <- cube_bands_rename(cube, assets)
+  roles[needed] <- as.list(band_expr_names(assets))
   expr <- index_resolve_expr(index, roles, scale, offset)
   gdalcubes::apply_pixel(cube, expr, names = index)
+}
+
+#' The name an expression uses for each band: the asset where it is a valid
+#' identifier, otherwise its role
+#'
+#' gdalcubes lower-cases a pixel expression and compiles it with tinyexpr, whose
+#' identifiers start with a letter, so an asset whose name starts with a digit
+#' (MODIS `250m_16_days_red_reflectance`, #115) reads as the number 250 and an
+#' unknown name, and the expression is refused after the whole STAC query. Such a
+#' band is renamed to its role ([cube_bands_rename()]); every other asset keeps
+#' its name, so a Sentinel-2 expression is unchanged.
+#'
+#' @param assets Named character: role -> asset.
+#' @return Named character: role -> the band name an expression uses.
+#' @noRd
+band_expr_names <- function(assets) {
+  ok <- grepl("^[A-Za-z][A-Za-z0-9_]*$", assets)
+  out <- assets
+  out[!ok] <- names(assets)[!ok]
+  out
+}
+
+#' Rename the bands of a cube that an expression cannot name to their roles
+#'
+#' The counterpart of [band_expr_names()], applied to the cube before
+#' `apply_pixel()` or `reduce_time()`. The mask band is never passed here: the
+#' mask is applied by name when the cube is built.
+#' @noRd
+cube_bands_rename <- function(cube, assets) {
+  new <- band_expr_names(assets)
+  renamed <- new != assets
+  if (!any(renamed)) return(cube)
+  args <- as.list(unname(new[renamed]))
+  names(args) <- unname(assets[renamed])
+  do.call(gdalcubes::rename_bands, c(list(cube), args))
 }
 
 #' Load the shipped spectral-index registry

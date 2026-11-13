@@ -236,9 +236,12 @@ dft_stac_composite <- function(aoi,
     function(cube, offset_use) composite_count_cube(cube, band_assets, bands)
   } else {
     function(cube, offset_use) {
-      exprs <- vapply(band_assets, scale_token, character(1),
+      assets <- band_assets
+      names(assets) <- bands
+      exprs <- vapply(band_expr_names(assets), scale_token, character(1),
                       scale = scale, offset = offset_use, USE.NAMES = FALSE)
-      gdalcubes::apply_pixel(cube, exprs, names = bands)
+      gdalcubes::apply_pixel(cube_bands_rename(cube, assets), exprs,
+                             names = bands)
     }
   }
 
@@ -356,7 +359,10 @@ dft_stac_composite <- function(aoi,
 #' single-step cube through unchanged.
 #' @noRd
 composite_count_cube <- function(cube, band_assets, bands) {
-  gdalcubes::reduce_time(cube, paste0("count(", band_assets, ")"),
+  assets <- band_assets
+  names(assets) <- bands
+  gdalcubes::reduce_time(cube_bands_rename(cube, assets),
+                         paste0("count(", band_expr_names(assets), ")"),
                          names = bands)
 }
 

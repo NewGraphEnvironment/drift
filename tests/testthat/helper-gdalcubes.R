@@ -157,3 +157,54 @@ skip_if_no_read_failure_status <- function() {
 # failures 0.7.5 already records (#99): a deleted SCL fails its band open and is
 # recorded; a corrupted SCL is not.
 production_pixel <- function(cube) gdalcubes::apply_pixel(cube, "B04 / 10000", names = "red")
+
+# A local MODIS-shaped gdalcubes collection for #115: one date, bands named as
+# Planetary Computer names the MOD13Q1 assets (leading digit, which tinyexpr
+# cannot read), the reflectance as INT2S with GDAL NoData -1000 and the
+# reliability as Byte with GDAL NoData 255, as the real COGs are (probed
+# 2026-11-13). No nodata is declared in the format, so gdalcubes takes it from
+# GDAL, as it does for a STAC collection (whose band nodata is ""). Rows, 40 x 40
+# cells of `res` over `ext`; red 500 DN, nir 3000 DN, reliability 0 unless:
+#   row 1: red and nir -1000 (fill), reliability 255 (fill)  -> NA
+#   row 2: reliability 3 (cloudy)                            -> NA
+#   row 3: reliability 1 (marginal)                          -> kept
+#   row 4: red -1000 only, reliability 0                     -> NA (band NoData)
+#   row 5: reliability 255 only                              -> NA (mask value)
+modis_fixture <- function(date = "2017-07-04", ext = c(0, 400, 0, 400), res = 10,
+                          envir = parent.frame()) {
+  d <- withr::local_tempdir(.local_envir = envir)
+  r <- terra::rast(xmin = ext[1], xmax = ext[2], ymin = ext[3], ymax = ext[4],
+                   resolution = res, crs = "EPSG:32609")
+  n <- terra::ncol(r)
+  row <- function(i) ((i - 1) * n + 1):(i * n)
+  red <- rep(500, terra::ncell(r)); nir <- rep(3000, terra::ncell(r))
+  rel <- rep(0, terra::ncell(r))
+  red[row(1)] <- NA; nir[row(1)] <- NA; rel[row(1)] <- NA
+  rel[row(2)] <- 3
+  rel[row(3)] <- 1
+  red[row(4)] <- NA
+  rel[row(5)] <- NA
+  stem <- file.path(d, paste0(format(as.Date(date), "%Y%m%d"), "_a"))
+  cog <- c("COMPRESS=DEFLATE", "OVERVIEWS=NONE")
+  w <- function(v, band, type, flag) {
+    f <- paste0(stem, "_", band, ".tif")
+    terra::writeRaster(terra::setValues(r, v), f, datatype = type, NAflag = flag,
+                       filetype = "COG", gdal = cog)
+    f
+  }
+  paths <- c(w(red, "250m_16_days_red_reflectance", "INT2S", -1000),
+             w(nir, "250m_16_days_NIR_reflectance", "INT2S", -1000),
+             w(rel, "250m_16_days_pixel_reliability", "INT1U", 255))
+  fmt_file <- file.path(d, "format.json")
+  writeLines(c(
+    '{"description": "drift #115 MODIS fixture", "tags": ["test"],',
+    ' "pattern": ".*\\\\.tif",',
+    ' "images": {"pattern": ".*/([0-9]{8}_[a-z]+)_.*"},',
+    ' "datetime": {"pattern": ".*/([0-9]{8})_.*", "format": "%Y%m%d"},',
+    ' "bands": {"250m_16_days_red_reflectance": {"pattern": ".*_red_reflectance\\\\.tif"},',
+    '           "250m_16_days_NIR_reflectance": {"pattern": ".*_NIR_reflectance\\\\.tif"},',
+    '           "250m_16_days_pixel_reliability": {"pattern": ".*_pixel_reliability\\\\.tif"}}}'
+  ), fmt_file)
+  gdalcubes::create_image_collection(paths, format = fmt_file,
+                                     out_file = file.path(d, "col.db"))
+}

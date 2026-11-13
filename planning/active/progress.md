@@ -9,3 +9,5 @@
 - Phase 1: 12 new tests across four files, all red on main (2 index, 1 config, 7 cube, 2 composite); the rest of each file stays green
 - Phase 2: modis-13Q1-061 config and evi row; config and index tests green
 - Phase 3: stac_items_datetime(), stac_cloud_cover_resolve(), stac_index_roles_check(); res and cloud_cover_max resolved with missing() in cube and composite; the four touched test files green (125 tests)
+- First live run (packaged AOI) failed `Cannot parse expression for kndvi ... error at token 39`: MODIS asset names start with a digit (review B1, which arrived minutes later with the same diagnosis from the gdalcubes source)
+- Review fold-in: band_expr_names()/cube_bands_rename() (index, composite, count); offline MODIS fixture (digit-led names, -1000 and 255/3 pixels) red on the parse error then green; out-of-window window-only items dropped (mutation: removing the drop turns its test red); refusal names NULL; midpoint test off-UTC

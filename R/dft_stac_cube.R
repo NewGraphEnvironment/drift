@@ -526,8 +526,15 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
     rstac::items_fetch() |>
     rstac::items_sign(sign_fn = sign_fn)
   # One datetime per item, read by the month filter, the offset split and
-  # gdalcubes alike (#115).
+  # gdalcubes alike (#115). The search matches a window-only item by overlap, so
+  # one whose midpoint lies outside the query is dropped here: gdalcubes would
+  # skip it, and a query of only such items would then read as an empty cube
+  # ("the AOI does not overlap") instead of "no items".
+  window_only <- vapply(items$features,
+                        function(f) is.null(f$properties$datetime), logical(1))
   items$features <- stac_items_datetime(items$features)
+  inside <- stac_items_within(items$features, datetime)
+  items$features <- items$features[!window_only | inside]
 
   # Restrict to growing-season (or any) calendar months. Fetching fewer, better
   # months both sharpens the vegetation signal (drops snow/low-sun winter noise)
@@ -608,6 +615,18 @@ stac_items_datetime <- function(features) {
 }
 
 
+#' Is each item's `datetime` date inside the query interval (inclusive)?
+#'
+#' Compared by date: the query may be written with or without times
+#' (`2017-06-01/2017-09-30` or `...T00:00:00Z/...T23:59:59Z`).
+#' @noRd
+stac_items_within <- function(features, datetime) {
+  dr <- as.Date(substr(strsplit(datetime, "/", fixed = TRUE)[[1]], 1, 10))
+  d <- as.Date(substr(vapply(features, function(f) f$properties$datetime, ""), 1, 10))
+  !is.na(d) & d >= dr[1] & d <= dr[2]
+}
+
+
 #' Resolve `cloud_cover_max` for a source, refusing one it cannot apply
 #'
 #' A source whose items carry no `eo:cloud_cover` (`cfg$cloud_cover` FALSE,
@@ -623,7 +642,8 @@ stac_cloud_cover_resolve <- function(cfg, source, cloud_cover_max, explicit) {
       "Source {.val {source}} has no scene cloud cover, so \\
        {.arg cloud_cover_max} cannot be applied.",
       "i" = "Its items carry no {.field eo:cloud_cover}; its mask band does \\
-             the cloud screening. Leave {.arg cloud_cover_max} unset."
+             the cloud screening. Leave {.arg cloud_cover_max} unset, or pass \\
+             {.code NULL}."
     ), class = "drift_no_cloud_cover")
   }
   NULL

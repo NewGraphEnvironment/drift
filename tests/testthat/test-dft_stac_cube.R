@@ -1336,6 +1336,8 @@ local_stac_query <- function(features, env = parent.frame()) {
 }
 
 test_that("a window-only item gets its window midpoint as datetime (#115)", {
+  # off-UTC, so a midpoint computed or formatted in local time would show
+  withr::local_timezone("America/Vancouver")
   feats <- list(
     modis_feature("MOD13Q1.A2017161", "2017-06-10T00:00:00.000000Z", "2017-06-25T23:59:59.000000Z"),
     modis_feature("MYD13Q1.A2017137", "2017-05-17T00:00:00.000000Z", "2017-06-01T23:59:59.000000Z")
@@ -1453,4 +1455,62 @@ test_that("dft_stac_cube defaults keep the Sentinel-2 key and use MODIS's own (#
                              datetime = "2010-06-01/2010-08-31",
                              cache_dir = cache), "captured")
   expect_equal(seen$res, 500)
+})
+
+test_that("a MODIS index computes over bands whose names start with a digit, and no fill reaches it (#115)", {
+  # tinyexpr reads `250m_...` as the number 250 and an unknown name, so on main
+  # this aborted "Invalid expression(s)" after the whole STAC query (review B1).
+  skip_if_not_installed("gdalcubes")
+  col <- modis_fixture()
+  cfg <- dft_stac_config("modis-13Q1-061")
+  out <- chunk_fixture_write(
+    col, t0 = "2017-07-01", t1 = "2017-07-31", dt = "P1M", aggregation = "median",
+    mask = gdalcubes::image_mask(cfg$roles$mask, values = cfg$mask_values),
+    pixel = function(cube) dft_index_expr(cube, index = "ndvi",
+                                          source = "modis-13Q1-061")
+  )
+  v <- terra::values(terra::rast(out))[, 1]
+  n <- 40L
+  rows <- split(v, rep(seq_len(n), each = n))
+  expect_true(all(is.na(rows[[1]])))   # reflectance and reliability fill
+  expect_true(all(is.na(rows[[2]])))   # cloudy
+  expect_true(all(is.na(rows[[4]])))   # red NoData -1000 alone
+  expect_true(all(is.na(rows[[5]])))   # reliability 255 alone
+  ndvi <- (0.3 - 0.05) / (0.3 + 0.05)
+  expect_equal(rows[[3]], rep(ndvi, n), tolerance = 1e-6)   # marginal is kept
+  expect_equal(unlist(rows[6:n], use.names = FALSE), rep(ndvi, n * (n - 5)),
+               tolerance = 1e-6)
+})
+
+test_that("the band rename leaves a Sentinel-2 expression untouched (#115)", {
+  roles <- dft_stac_config("sentinel-2-l2a")$roles
+  expect_equal(drift:::band_expr_names(unlist(roles[c("nir", "red")])),
+               c(nir = "B08", red = "B04"))
+  modis <- dft_stac_config("modis-13Q1-061")$roles
+  expect_equal(drift:::band_expr_names(unlist(modis[c("nir", "red")])),
+               c(nir = "nir", red = "red"))
+})
+
+test_that("a window-only item whose midpoint is outside the query is dropped (#115)", {
+  feats <- list(
+    modis_feature("MYD_may_into_jun", "2017-05-17T00:00:00Z", "2017-06-01T23:59:59Z"),
+    modis_feature("MOD_jun", "2017-06-10T00:00:00Z", "2017-06-25T23:59:59Z"),
+    modis_feature("MOD_sep_into_oct", "2017-09-30T00:00:00Z", "2017-10-15T23:59:59Z")
+  )
+  local_stac_query(feats)
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  got <- suppressMessages(drift:::stac_cube_items(
+    dft_stac_config("modis-13Q1-061"), sf::st_transform(aoi, 4326),
+    "2017-06-01T00:00:00Z/2017-09-30T23:59:59Z", cloud_cover_max = NULL,
+    months = NULL, sign_fn = identity
+  ))
+  expect_equal(vapply(got$features, `[[`, "", "id"), "MOD_jun")
+  # all outside: "no items", not an empty cube downstream
+  local_stac_query(feats[c(1, 3)])
+  expect_error(suppressMessages(drift:::stac_cube_items(
+    dft_stac_config("modis-13Q1-061"), sf::st_transform(aoi, 4326),
+    "2017-06-01/2017-09-30", cloud_cover_max = NULL, months = NULL,
+    sign_fn = identity
+  )), class = "drift_no_items")
 })
