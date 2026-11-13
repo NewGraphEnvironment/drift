@@ -13,8 +13,10 @@
 #   Rscript data-raw/benchmark_break_class_bulk.R fetch   # populate the cache only
 #   Rscript data-raw/benchmark_break_class_bulk.R run     # fetch (cached) + scan + patches
 #
-# Sample RSS from outside while it runs:
-#   ps -o rss= -p $PID >> data-raw/logs/benchmark_break_class/all_ff04/rss_run.txt  (every 2 s)
+# Measure memory by running it under /usr/bin/time -l and keeping its block (the
+# 2026-11-13 run's is all_ff04/time_l.txt); size from the peak memory footprint,
+# since the resident set misses what macOS compressed or swapped:
+#   /usr/bin/time -l Rscript data-raw/benchmark_break_class_bulk.R run
 #
 # Outputs (data-raw/logs/benchmark_break_class/all_ff04/; rasters/logs are
 # gitignored, the CSVs are the committed evidence record; the top level of

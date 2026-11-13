@@ -25,9 +25,9 @@ onto a 16000 x 14000 grid at 10 m (224M cells, EPSG:32609).
 
 31,844 change patches, 7,315.3 ha. Whole script 1,959 s (32.7 min) wall, peak memory
 footprint 48,027,107,264 bytes (44.7 GiB), maximum resident set size 14,495,481,856 bytes
-(13.5 GiB), no swap. Size a machine from the footprint: macOS compresses idle pages
+(13.5 GiB). Size a machine from the footprint: macOS compresses or swaps idle pages
 rather than keeping them resident, so the resident set reads far below what the process
-held.
+held. The block's `swaps` line is always 0 on macOS, so swap was not measured.
 
 Committed evidence (the `.log`, `.gpkg` and `summary_patches.csv` are gitignored):
 
