@@ -75,7 +75,7 @@ dft_index_expr <- function(cube,
 #' identifiers start with a letter, so an asset whose name starts with a digit
 #' (MODIS `250m_16_days_red_reflectance`, #115) reads as the number 250 and an
 #' unknown name, and the expression is refused after the whole STAC query. Such a
-#' band is renamed to its role ([cube_bands_rename()]); every other asset keeps
+#' band is renamed to its role (`cube_bands_rename()`); every other asset keeps
 #' its name, so a Sentinel-2 expression is unchanged.
 #'
 #' @param assets Named character: role -> asset.
@@ -90,7 +90,7 @@ band_expr_names <- function(assets) {
 
 #' Rename the bands of a cube that an expression cannot name to their roles
 #'
-#' The counterpart of [band_expr_names()], applied to the cube before
+#' The counterpart of `band_expr_names()`, applied to the cube before
 #' `apply_pixel()` or `reduce_time()`. The mask band is never passed here: the
 #' mask is applied by name when the cube is built.
 #' @noRd

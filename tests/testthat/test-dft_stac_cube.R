@@ -1514,3 +1514,48 @@ test_that("a window-only item whose midpoint is outside the query is dropped (#1
     sign_fn = identity
   )), class = "drift_no_items")
 })
+
+# Network, opt-in: MODIS end-to-end on the packaged AOI (#115).
+test_that("dft_stac_cube reads MODIS MOD13Q1, before 2017 too", {
+  skip_if(Sys.getenv("DRIFT_TEST_NETWORK") != "true",
+          "network test — set DRIFT_TEST_NETWORK=true to run")
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cache <- withr::local_tempdir()
+  cube <- suppressMessages(dft_stac_cube(
+    aoi, source = "modis-13Q1-061", index = "ndvi",
+    datetime = "2017-06-01/2017-09-30", months = 6:9, cache_dir = cache
+  ))
+  expect_equal(terra::res(cube), c(250, 250))
+  expect_equal(terra::nlyr(cube), 4)
+  aoi_t <- sf::st_transform(aoi, terra::crs(cube))
+  inpoly <- !is.na(terra::values(
+    terra::rasterize(terra::vect(aoi_t), terra::subset(cube, 1), touches = TRUE)
+  ))[, 1]
+  expect_gt(sum(inpoly), 0)
+  vals <- terra::values(cube)
+  # data on every layer inside the polygon (every month of the window is kept)
+  expect_true(all(colSums(!is.na(vals[inpoly, , drop = FALSE])) > 0))
+  expect_true(all(is.na(vals[!inpoly, , drop = FALSE])))
+  v <- vals[!is.na(vals)]
+  expect_true(all(v >= -1 & v <= 1))
+  # a fill in both bands would give exactly 0 (review G3)
+  expect_lt(mean(v == 0), 0.01)
+
+  # reflectance, the check a fill cannot pass: -1000 DN is -0.1
+  comp <- suppressMessages(dft_stac_composite(
+    aoi, years = 2017, months = 6:9, bands = c("red", "nir", "blue"),
+    source = "modis-13Q1-061", cache_dir = cache
+  ))[[1]]
+  r <- terra::values(comp)
+  expect_gt(sum(!is.na(r)), 0)
+  expect_true(all(r[!is.na(r)] >= 0 & r[!is.na(r)] <= 1))
+
+  # before Sentinel-2 exists
+  old <- suppressMessages(dft_stac_cube(
+    aoi, source = "modis-13Q1-061", index = "evi",
+    datetime = "2010-06-01/2010-08-31", cache_dir = cache
+  ))
+  expect_gt(sum(!is.na(terra::values(old))), 0)
+})
