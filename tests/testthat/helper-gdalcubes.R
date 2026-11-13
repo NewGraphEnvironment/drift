@@ -177,9 +177,12 @@ modis_fixture <- function(date = "2017-07-04", ext = c(0, 400, 0, 400), res = 10
                    resolution = res, crs = "EPSG:32609")
   n <- terra::ncol(r)
   row <- function(i) ((i - 1) * n + 1):(i * n)
-  red <- rep(500, terra::ncell(r)); nir <- rep(3000, terra::ncell(r))
+  red <- rep(500, terra::ncell(r))
+  nir <- rep(3000, terra::ncell(r))
   rel <- rep(0, terra::ncell(r))
-  red[row(1)] <- NA; nir[row(1)] <- NA; rel[row(1)] <- NA
+  red[row(1)] <- NA
+  nir[row(1)] <- NA
+  rel[row(1)] <- NA
   rel[row(2)] <- 3
   rel[row(3)] <- 1
   red[row(4)] <- NA

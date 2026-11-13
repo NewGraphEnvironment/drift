@@ -844,9 +844,12 @@ test_that("dft_stac_composite defaults keep the Sentinel-2 key and use MODIS's o
                "captured")
   expect_equal(seen$res, 10)
   expect_equal(seen$cc, 20)
-  expect_error(suppressWarnings(dft_stac_composite(
-    aoi_pkg(), years = 2010, source = "modis-13Q1-061",
-    bands = c("red", "nir"), cache_dir = cache)), "captured")
+  expect_error(
+    suppressWarnings(dft_stac_composite(aoi_pkg(), years = 2010,
+                                        source = "modis-13Q1-061",
+                                        bands = c("red", "nir"), cache_dir = cache)),
+    "captured"
+  )
   expect_equal(seen$res, 250)
   expect_null(seen$cc)
 })

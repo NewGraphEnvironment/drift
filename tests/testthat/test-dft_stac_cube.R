@@ -1327,8 +1327,9 @@ local_stac_query <- function(features, env = parent.frame()) {
       q
     },
     post_request = function(q, ...) q,
-    items_fetch = function(q, ...) structure(list(features = features),
-                                             class = c("doc_items", "list")),
+    items_fetch = function(q, ...) {
+      structure(list(features = features), class = c("doc_items", "list"))
+    },
     items_sign = function(items, ...) items,
     .package = "rstac", .env = env
   )
@@ -1350,9 +1351,11 @@ test_that("a window-only item gets its window midpoint as datetime (#115)", {
 })
 
 test_that("an item that has a datetime is left exactly as it was (#115)", {
-  s2 <- list(id = "S2A_x", properties = list(
-    datetime = "2021-07-04T19:21:11.024000Z", `eo:cloud_cover` = 12),
-    assets = list(SCL = list(href = "x")))
+  s2 <- list(
+    id = "S2A_x",
+    properties = list(datetime = "2021-07-04T19:21:11.024000Z", `eo:cloud_cover` = 12),
+    assets = list(SCL = list(href = "x"))
+  )
   expect_identical(drift:::stac_items_datetime(list(s2)), list(s2))
 })
 
@@ -1383,9 +1386,11 @@ test_that("stac_cube_items keeps MODIS items by month and skips the cloud filter
 })
 
 test_that("stac_cube_items still filters Sentinel-2 by eo:cloud_cover (#115)", {
-  s2 <- list(id = "S2A_x", properties = list(
-    datetime = "2021-07-04T19:21:11.024000Z", `eo:cloud_cover` = 12),
-    assets = list(SCL = list(href = "x")))
+  s2 <- list(
+    id = "S2A_x",
+    properties = list(datetime = "2021-07-04T19:21:11.024000Z", `eo:cloud_cover` = 12),
+    assets = list(SCL = list(href = "x"))
+  )
   calls <- local_stac_query(list(s2))
   aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
                      quiet = TRUE)
@@ -1466,8 +1471,9 @@ test_that("a MODIS index computes over bands whose names start with a digit, and
   out <- chunk_fixture_write(
     col, t0 = "2017-07-01", t1 = "2017-07-31", dt = "P1M", aggregation = "median",
     mask = gdalcubes::image_mask(cfg$roles$mask, values = cfg$mask_values),
-    pixel = function(cube) dft_index_expr(cube, index = "ndvi",
-                                          source = "modis-13Q1-061")
+    pixel = function(cube) {
+      dft_index_expr(cube, index = "ndvi", source = "modis-13Q1-061")
+    }
   )
   v <- terra::values(terra::rast(out))[, 1]
   n <- 40L
