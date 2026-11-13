@@ -13,9 +13,9 @@
 #   Rscript data-raw/benchmark_break_class_bulk.R fetch   # populate the cache only
 #   Rscript data-raw/benchmark_break_class_bulk.R run     # fetch (cached) + scan + patches
 #
-# Measure memory by running it under /usr/bin/time -l and keeping its block (the
-# 2026-11-13 run's is all_ff04/time_l.txt); size from the peak memory footprint,
-# since the resident set misses what macOS compressed or swapped:
+# Measure memory by running it under /usr/bin/time -l (macOS; -v with GNU time) and
+# keeping its block (the 2026-11-13 run's is all_ff04/time_l.txt). On macOS record the
+# peak memory footprint beside the resident set, which misses what was compressed or swapped:
 #   /usr/bin/time -l Rscript data-raw/benchmark_break_class_bulk.R run
 #
 # Outputs (data-raw/logs/benchmark_break_class/all_ff04/; rasters/logs are
