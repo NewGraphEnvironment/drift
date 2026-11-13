@@ -809,3 +809,44 @@ test_that("a failed year is an abort, not a skipped year (#87)", {
   # year 1 was built before year 2 failed, and stays cached; year 2 does not
   expect_length(list.files(cache, pattern = "\\.tif$", recursive = TRUE), 1L)
 })
+
+test_that("dft_stac_composite refuses an explicit cloud filter on MODIS (#115)", {
+  skip_if_not_installed("gdalcubes")
+  testthat::local_mocked_bindings(
+    stac_cube_items = function(...) stop("reached the network")
+  )
+  cache <- withr::local_tempdir()
+  expect_error(
+    dft_stac_composite(aoi_pkg(), years = 2010, source = "modis-13Q1-061",
+                       bands = c("red", "nir"), cloud_cover_max = 20,
+                       cache_dir = cache),
+    class = "drift_no_cloud_cover"
+  )
+  expect_length(list.files(cache, recursive = TRUE), 0L)
+})
+
+test_that("dft_stac_composite defaults keep the Sentinel-2 key and use MODIS's own (#115)", {
+  skip_if_not_installed("gdalcubes")
+  seen <- new.env()
+  testthat::local_mocked_bindings(
+    stac_composite_cache_key = function(aoi_target, res, target_crs, datetime, dt,
+                                        aggregation, resampling, stac_url,
+                                        collection, band_assets, bands,
+                                        cloud_cover_max, ...) {
+      seen$res <- res
+      seen$cc <- cloud_cover_max
+      stop("captured")
+    }
+  )
+  cache <- withr::local_tempdir()
+  expect_error(suppressWarnings(dft_stac_composite(aoi_pkg(), years = 2021,
+                                                   cache_dir = cache)),
+               "captured")
+  expect_equal(seen$res, 10)
+  expect_equal(seen$cc, 20)
+  expect_error(suppressWarnings(dft_stac_composite(
+    aoi_pkg(), years = 2010, source = "modis-13Q1-061",
+    bands = c("red", "nir"), cache_dir = cache)), "captured")
+  expect_equal(seen$res, 250)
+  expect_null(seen$cc)
+})

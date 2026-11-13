@@ -100,3 +100,25 @@ test_that("ndwi applies the S2 offset per band, so DN input gives reflectance ou
   raw <- drift:::index_resolve_expr("ndwi", s2_roles, scale = 1, offset = 0)
   expect_false(isTRUE(all.equal(eval_expr(raw, dn), -0.5)))
 })
+
+test_that("dft_index_table ships evi over nir, red and blue (#115)", {
+  tbl <- dft_index_table()
+  expect_true("evi" %in% tbl$index)
+  expect_setequal(drift:::index_roles("evi"), c("nir", "red", "blue"))
+  expect_equal(drift:::index_resolve_expr("evi", s2_roles, scale = 1, offset = 0),
+               "2.5 * (B08 - B04) / (B08 + 6 * B04 - 7.5 * B02 + 1)")
+})
+
+test_that("evi gives the hand-computed value, and needs the reflectance scale (#115)", {
+  # Dense canopy: nir 0.40, red 0.04, blue 0.02.
+  # EVI = 2.5 * 0.36 / (0.40 + 0.24 - 0.15 + 1) = 0.9 / 1.49
+  refl <- c(B08 = 0.40, B04 = 0.04, B02 = 0.02)
+  expr <- drift:::index_resolve_expr("evi", s2_roles, scale = 1, offset = 0)
+  expect_equal(eval_expr(expr, refl), 0.9 / 1.49)
+  # MODIS DN = reflectance * 1e4, no offset. The `+ 1` does not scale, so EVI on
+  # raw DN is wrong unless the scale is folded in, unlike a ratio such as NDVI.
+  dn <- refl * 1e4
+  folded <- drift:::index_resolve_expr("evi", s2_roles, scale = 1e-4, offset = 0)
+  expect_equal(eval_expr(folded, dn), 0.9 / 1.49)
+  expect_false(isTRUE(all.equal(eval_expr(expr, dn), 0.9 / 1.49)))
+})

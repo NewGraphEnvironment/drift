@@ -21,11 +21,11 @@
 
 ## Phase 1: Tests first (red)
 
-- [ ] `test-dft_stac_config.R`: `modis-13Q1-061` is a cube source; roles red/nir/blue/mask map to `250m_16_days_red_reflectance` / `_NIR_` / `_blue_` / `_pixel_reliability`; no `swir16`/`green`; scale 1e-4, offset 0; `available_datetime` starts `2000-02-18`; `res` 250; and it is marked as having no cloud-cover property.
-- [ ] Fixture item test (no network): a MODIS-shaped feature list (null `datetime`, start/end window, no `eo:cloud_cover`, `proj:wkt2` only) goes through `stac_cube_items()`, with `rstac` mocked to stop by default (`code-check-r.md`, "A fetcher's test helper must make the network fail"). Asserts: the midpoint is set, `months` keeps the right items, `is_pre` is all FALSE, and an S2-shaped item is unchanged.
-- [ ] Refusals before any network call: explicit `cloud_cover_max` on MODIS (cube and composite); `index = "ndmi"` on MODIS; the S2 path still accepts both.
-- [ ] Cache-key invariance: the S2 key for a fixed call is identical before and after the change (golden value taken from main).
-- [ ] `test-dft_index_expr.R`: `evi` is in the registry over nir/red/blue; its resolved expression on S2 roles; and the hand-computed value on known reflectance, including the scale fold (EVI's `+ 1` makes it scale-sensitive).
+- [x] `test-dft_stac_config.R`: `modis-13Q1-061` is a cube source; roles red/nir/blue/mask map to `250m_16_days_red_reflectance` / `_NIR_` / `_blue_` / `_pixel_reliability`; no `swir16`/`green`; scale 1e-4, offset 0; `available_datetime` starts `2000-02-18`; `res` 250; and it is marked as having no cloud-cover property.
+- [x] Fixture item test (no network): a MODIS-shaped feature list (null `datetime`, start/end window, no `eo:cloud_cover`, `proj:wkt2` only) goes through `stac_cube_items()`, with `rstac` mocked to stop by default (`code-check-r.md`, "A fetcher's test helper must make the network fail"). Asserts: the midpoint is set, `months` keeps the right items, `is_pre` is all FALSE, and an S2-shaped item is unchanged.
+- [x] Refusals before any network call: explicit `cloud_cover_max` on MODIS (cube and composite); `index = "ndmi"` on MODIS; the S2 path still accepts both.
+- [x] Cache-key invariance: the S2 key for a fixed call is identical before and after the change. Pinned at the caller instead of a golden value: a mocked key builder captures the `res` and `cloud_cover_max` that `dft_stac_cube()` and `dft_stac_composite()` hand it (10/60 and 10/20 for S2, 250/NULL for MODIS); the frozen-key guardian already pins the builder.
+- [x] `test-dft_index_expr.R`: `evi` is in the registry over nir/red/blue; its resolved expression on S2 roles; and the hand-computed value on known reflectance, including the scale fold (EVI's `+ 1` makes it scale-sensitive).
 
 ## Phase 2: Source config and index registry
 

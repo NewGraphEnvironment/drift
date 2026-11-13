@@ -6,3 +6,4 @@
 - Created branch `115-modis-vegetation-indices-mod13q1-as-a-cu` off origin/main
 - Scaffolded PWF baseline from issue #115 with approved phases
 - Next: start Phase 1
+- Phase 1: 12 new tests across four files, all red on main (2 index, 1 config, 7 cube, 2 composite); the rest of each file stays green
