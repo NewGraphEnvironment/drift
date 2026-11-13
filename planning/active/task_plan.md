@@ -39,9 +39,19 @@
 - [x] `dft_stac_cube()`: `res` from `cfg$res` when missing. Refuse an index whose roles the source lacks, before the query (`index_roles()` against `cfg$roles`).
 - [x] roxygen for `source`, `res` and `cloud_cover_max` in both functions; `devtools::document()`.
 
+## Review fold-in (Plan review, 2026-11-13; `review-plan.md`)
+
+- [ ] B1/O2: one helper renames bands whose asset is not an identifier to their role name (`gdalcubes::rename_bands()`) before `apply_pixel`/`reduce_time`, used by `dft_index_expr()` and the composite's pixel functions (reflectance and count); S2 untouched. Offline fixture test with MODIS-named bands.
+- [ ] G3/G4: the offline fixture also carries -1000 reflectance NoData and reliability 255/3 pixels, and asserts NA there and the hand value elsewhere.
+- [ ] G6: drop window-only items whose midpoint falls outside the query window, in `stac_cube_items()`; tested.
+- [ ] A2: the cloud refusal names `NULL` as accepted; A3: midpoint test under an off-UTC timezone.
+- [ ] G2/G5: docs — composite bands for MODIS and what `count` counts on it; the cube/composite/items/package/index docs and the trajectory vignette stop calling Sentinel-2 the only cube source.
+- [ ] A4: config comment says 250 m is the product's nominal size (grid 231.656 m); A6: collection is open-ended (STAC extent `2000-02-18/null`, read 2026-11-13), so the end date is the default window, said so.
+- [ ] A5 (pre-existing: monthly layer labels whatever `dt`) filed as its own issue.
+
 ## Phase 4: Live verification
 
-- [ ] An opt-in network test (`DRIFT_TEST_NETWORK=true`): the packaged AOI, MODIS, `kndvi` and `evi`, 2017-06-01/2017-09-30, `months = 6:9`. It asserts data inside the polygon on every layer, NA outside, kndvi in [0, 1), and evi within a plausible range, so a -1000 fill reaching the index fails. A pre-2017 window (2010) returns data.
+- [ ] An opt-in network test (`DRIFT_TEST_NETWORK=true`): the packaged AOI, MODIS, `kndvi` and `evi`, 2017-06-01/2017-09-30, `months = 6:9`. It asserts data inside the polygon on every layer, NA outside, kndvi in [0, 1), ndvi in [-1, 1], and a MODIS composite's red/nir/blue reflectance in [0, 1] (a -1000 fill is -0.1; kndvi/evi ranges cannot catch it, review G3). A pre-2017 window (2010) returns data.
 - [ ] Fill check: confirm that gdalcubes honours red/NIR NoData -1000 and the reliability NoData 255 (no fill value reaches the index), and record the result in `inst/notes/gdalcubes-pc-gotchas.md`.
 - [ ] BULK scale run: the `co_ff04` floodplain, MODIS kndvi for one decade (2008-2017, `months = 6:9`), with `/usr/bin/time -l` peak RSS and wall time recorded in the PR body (CLAUDE.md, "Scale-test raster functions").
 
