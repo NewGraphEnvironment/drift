@@ -22,7 +22,7 @@ The plan review and the first live run independently found the digit-name failur
   - The 40 summer layers carry data (median 16,336 cells); the other 80 are NA by design.
   - 21.7 min wall, peak RSS 1.74 GiB (`/usr/bin/time -l`). At 250 m, memory is not the constraint; the network read is.
   - The run's 160 warnings looked like a defect at first. They were the probe's own `range()` over the empty months, confirmed on the cached cube.
-- **Tests:** full suite `[ FAIL 0 | WARN 0 | SKIP 20 | PASS 1774 ]`. 18 new offline tests and one opt-in live test.
+- **Tests:** full suite `[ FAIL 0 | WARN 0 | SKIP 20 | PASS 1774 ]`. 19 new offline tests and one opt-in live test.
 - **`/code-check branch`:** four rounds.
   - Rounds 1 and 2 were clean. Round 1 noted two points below the bar, both fixed: the role plural, and a non-UTC window offset.
   - Round 3 found one real defect, now fixed: the composite's all-skipped abort advised a cloud filter that MODIS refuses.
