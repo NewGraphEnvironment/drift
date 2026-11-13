@@ -8,7 +8,7 @@ message: If you use drift, please cite it by its DOI, 10.5281/zenodo.23372090.
 type: software
 license: MIT
 title: 'drift: Detecting Riparian and Inland Floodplain Transitions'
-version: 0.24.3
+version: 0.25.0
 doi: 10.5281/zenodo.23372090
 abstract: Fetch free global land-cover maps (Esri IO LULC, ESA WorldCover) or your
   own classified rasters for any area, such as a floodplain, compare them between
@@ -31,8 +31,8 @@ preferred-citation:
     email: al@newgraphenvironment.com
     orcid: https://orcid.org/0000-0002-3495-2128
     affiliation: New Graph Environment Ltd.
-  version: 0.24.3
-  date-released: '2026-10-18'
+  version: 0.25.0
+  date-released: '2026-11-13'
   url: https://www.newgraphenvironment.com/drift/
   repository-code: https://github.com/NewGraphEnvironment/drift
   license: MIT
@@ -42,7 +42,7 @@ preferred-citation:
     name: New Graph Environment Ltd.
 repository-code: https://github.com/NewGraphEnvironment/drift
 url: https://www.newgraphenvironment.com/drift/
-date-released: '2026-10-18'
+date-released: '2026-11-13'
 contact:
 - family-names: Irvine
   given-names: Allan
