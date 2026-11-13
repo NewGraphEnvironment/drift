@@ -14,7 +14,7 @@
 #   Rscript data-raw/benchmark_break_class_bulk.R run     # fetch (cached) + scan + patches
 #
 # Sample RSS from outside while it runs:
-#   ps -o rss= -p $PID >> data-raw/logs/benchmark_break_class/rss_run.txt  (every 2 s)
+#   ps -o rss= -p $PID >> data-raw/logs/benchmark_break_class/all_ff04/rss_run.txt  (every 2 s)
 #
 # Outputs (data-raw/logs/benchmark_break_class/all_ff04/; rasters/logs are
 # gitignored, the CSVs are the committed evidence record; the top level of
@@ -70,7 +70,7 @@ if (!file.exists(gpkg)) {
   stopifnot(file.rename(tmp, gpkg))
 }
 # name the layer: the file also carries all_ff02, all_ff06 and the per-stream
-# all_ff04_by_blue_line_key, and st_read() without `layer =` silently takes all_ff02
+# all_ff04_by_blue_line_key, and st_read() without `layer =` takes all_ff02 with only a warning
 aoi <- sf::st_read(gpkg, layer = "all_ff04", quiet = TRUE)
 aoi <- sf::st_as_sf(sf::st_union(sf::st_geometry(aoi)))
 message("AOI: ", round(as.numeric(sum(sf::st_area(aoi))) / 1e6, 1), " km2, CRS ",
