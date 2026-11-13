@@ -29,8 +29,8 @@
 
 ## Phase 2: Source config and index registry
 
-- [ ] `dft_stac_config()`: add `"modis-13Q1-061"` to the choices and its list (roles, `mask_values = c(2L, 3L, 255L)`, scale 1e-4, offset 0, `res = 250`, `cloud_cover = FALSE`, `available_datetime = "2000-02-18/<end>"`, a cost comment), plus roxygen.
-- [ ] `inst/indices/indices.csv`: add `evi`.
+- [x] `dft_stac_config()`: add `"modis-13Q1-061"` to the choices and its list (roles, `mask_values = c(2L, 3L, 255L)`, scale 1e-4, offset 0, `res = 250`, `cloud_cover = FALSE`, `available_datetime = "2000-02-18/2025-12-31"`, a cost comment), plus roxygen.
+- [x] `inst/indices/indices.csv`: add `evi`.
 
 ## Phase 3: Read path
 

@@ -4,3 +4,4 @@ kndvi,"tanh(pow((nir - red) / (nir + red), 2))","nir,red",Kernel NDVI (tanh of N
 ndmi,"(nir - swir16) / (nir + swir16)","nir,swir16",Normalized Difference Moisture Index
 ndwi,"(green - nir) / (green + nir)","green,nir",Normalized Difference Water Index (McFeeters 1996)
 mndwi,"(green - swir16) / (green + swir16)","green,swir16",Modified NDWI (Xu 2006)
+evi,"2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1)","nir,red,blue",Enhanced Vegetation Index (Huete et al. 2002); saturates less than NDVI under dense canopy
