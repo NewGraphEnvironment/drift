@@ -1,0 +1,276 @@
+"from_class","to_class","status","break_year","n_cells","area","pct"
+"Trees","Trees","stable",NA,4374344,43743.44,61.71
+"Water","Water","stable",NA,749046,7490.46,10.57
+"Rangeland","Rangeland","stable",NA,624170,6241.7,8.81
+"Trees","Trees","flicker",NA,221475,2214.75,3.12
+"Rangeland","Rangeland","flicker",NA,209226,2092.26,2.95
+"Trees","Rangeland","flicker",NA,91875,918.75,1.3
+"Built Area","Built Area","stable",NA,70918,709.18,1
+"Trees","Rangeland","break",2023,57731,577.31,0.81
+"Rangeland","Trees","flicker",NA,57018,570.18,0.8
+"Rangeland","Trees","break",2018,41284,412.84,0.58
+"Trees","Rangeland","break",2019,33609,336.09,0.47
+"Trees","Rangeland","break",2018,31947,319.47,0.45
+"Water","Water","flicker",NA,27358,273.58,0.39
+"Flooded Vegetation","Flooded Vegetation","stable",NA,25099,250.99,0.35
+"Rangeland","Crops","flicker",NA,23720,237.2,0.33
+"Trees","Rangeland","break",2021,23621,236.21,0.33
+"Trees","Built Area","flicker",NA,23576,235.76,0.33
+"Bare Ground","Trees","break",2018,21459,214.59,0.3
+"Trees","Rangeland","break",2022,20845,208.45,0.29
+"Crops","Crops","flicker",NA,19514,195.14,0.28
+"Trees","Water","flicker",NA,14817,148.17,0.21
+"Rangeland","Trees","break",2023,14406,144.06,0.2
+"Crops","Crops","stable",NA,14384,143.84,0.2
+"Crops","Rangeland","flicker",NA,12688,126.88,0.18
+"Trees","Built Area","break",2018,12178,121.78,0.17
+"Trees","Rangeland","break",2020,11389,113.89,0.16
+"Crops","Rangeland","break",2019,10419,104.19,0.15
+"Built Area","Built Area","flicker",NA,10277,102.77,0.14
+"Trees","Water","break",2023,9672,96.72,0.14
+"Water","Trees","break",2023,8590,85.9,0.12
+"Rangeland","Trees","break",2021,8372,83.72,0.12
+"Trees","Crops","flicker",NA,7849,78.49,0.11
+"Crops","Rangeland","break",2020,7536,75.36,0.11
+"Crops","Rangeland","break",2018,7432,74.32,0.1
+"Flooded Vegetation","Flooded Vegetation","flicker",NA,7328,73.28,0.1
+"Rangeland","Crops","break",2023,7130,71.3,0.1
+"Rangeland","Trees","break",2022,6981,69.81,0.1
+"Rangeland","Trees","break",2020,6961,69.61,0.1
+"Rangeland","Trees","break",2019,6764,67.64,0.1
+"Bare Ground","Trees","flicker",NA,6423,64.23,0.09
+"Bare Ground","Water","break",2018,6263,62.63,0.09
+"Rangeland","Water","flicker",NA,5942,59.42,0.08
+"Water","Trees","flicker",NA,5780,57.8,0.08
+"Bare Ground","Rangeland","flicker",NA,5442,54.42,0.08
+"Rangeland","Crops","break",2018,4951,49.51,0.07
+"Bare Ground","Built Area","break",2018,4719,47.19,0.07
+"Rangeland","Built Area","flicker",NA,4672,46.72,0.07
+"Trees","Water","break",2018,4451,44.51,0.06
+"Crops","Rangeland","break",2023,4414,44.14,0.06
+"Bare Ground","Water","flicker",NA,3771,37.71,0.05
+"Water","Rangeland","flicker",NA,3524,35.24,0.05
+"Crops","Rangeland","break",2022,3402,34.02,0.05
+"Trees","Built Area","break",2023,3273,32.73,0.05
+"Rangeland","Flooded Vegetation","flicker",NA,3211,32.11,0.05
+"Rangeland","Water","break",2018,3161,31.61,0.04
+"Flooded Vegetation","Trees","flicker",NA,2976,29.76,0.04
+"Snow/Ice","Trees","flicker",NA,2831,28.31,0.04
+"Flooded Vegetation","Rangeland","flicker",NA,2759,27.59,0.04
+"Rangeland","Crops","break",2019,2662,26.62,0.04
+"Snow/Ice","Rangeland","flicker",NA,2654,26.54,0.04
+"Trees","Water","break",2022,2565,25.65,0.04
+"Water","Trees","break",2022,2559,25.59,0.04
+"Rangeland","Built Area","break",2018,2432,24.32,0.03
+"Bare Ground","Built Area","flicker",NA,2148,21.48,0.03
+"Rangeland","Crops","break",2022,2132,21.32,0.03
+"Rangeland","Crops","break",2020,2118,21.18,0.03
+"Built Area","Rangeland","flicker",NA,2070,20.7,0.03
+"Trees","Built Area","break",2022,1893,18.93,0.03
+"Snow/Ice","Water","flicker",NA,1829,18.29,0.03
+"Crops","Built Area","flicker",NA,1814,18.14,0.03
+"Trees","Crops","break",2021,1652,16.52,0.02
+"Snow/Ice","Snow/Ice","stable",NA,1590,15.9,0.02
+"Crops","Trees","flicker",NA,1585,15.85,0.02
+"Bare Ground","Rangeland","break",2018,1545,15.45,0.02
+"Water","Rangeland","break",2023,1516,15.16,0.02
+"Rangeland","Crops","break",2021,1454,14.54,0.02
+"Trees","Crops","break",2022,1431,14.31,0.02
+"Trees","Water","break",2019,1387,13.87,0.02
+"Trees","Crops","break",2023,1374,13.74,0.02
+"Trees","Water","break",2021,1185,11.85,0.02
+"Bare Ground","Bare Ground","flicker",NA,1101,11.01,0.02
+"Trees","Flooded Vegetation","flicker",NA,1069,10.69,0.02
+"Bare Ground","Flooded Vegetation","flicker",NA,1034,10.34,0.01
+"Trees","Built Area","break",2021,978,9.78,0.01
+"Built Area","Crops","flicker",NA,978,9.78,0.01
+"Snow/Ice","Built Area","flicker",NA,978,9.78,0.01
+"Snow/Ice","Flooded Vegetation","flicker",NA,879,8.79,0.01
+"Rangeland","Water","break",2023,846,8.46,0.01
+"Bare Ground","Crops","flicker",NA,810,8.1,0.01
+"Built Area","Trees","flicker",NA,750,7.5,0.01
+"Trees","Crops","break",2018,726,7.26,0.01
+"Water","Built Area","flicker",NA,709,7.09,0.01
+"Water","Bare Ground","flicker",NA,621,6.21,0.01
+"Water","Trees","break",2018,603,6.03,0.01
+"Crops","Rangeland","break",2021,600,6,0.01
+"Crops","Water","flicker",NA,547,5.47,0.01
+"Trees","Bare Ground","flicker",NA,533,5.33,0.01
+"Snow/Ice","Snow/Ice","flicker",NA,522,5.22,0.01
+"Bare Ground","Bare Ground","stable",NA,509,5.09,0.01
+"Water","Built Area","break",2023,506,5.06,0.01
+"Water","Trees","break",2021,450,4.5,0.01
+"Trees","Water","break",2020,450,4.5,0.01
+"Water","Rangeland","break",2018,441,4.41,0.01
+"Rangeland","Built Area","break",2023,435,4.35,0.01
+"Rangeland","Bare Ground","flicker",NA,401,4.01,0.01
+"Water","Rangeland","break",2022,390,3.9,0.01
+"Built Area","Rangeland","break",2023,385,3.85,0.01
+"Snow/Ice","Rangeland","break",2018,349,3.49,0
+"Rangeland","Built Area","break",2021,349,3.49,0
+"Flooded Vegetation","Rangeland","break",2018,340,3.4,0
+"Rangeland","Water","break",2019,335,3.35,0
+"Trees","Built Area","break",2019,328,3.28,0
+"Built Area","Trees","break",2023,324,3.24,0
+"Built Area","Rangeland","break",2021,317,3.17,0
+"Snow/Ice","Crops","flicker",NA,310,3.1,0
+"Snow/Ice","Trees","break",2018,309,3.09,0
+"Rangeland","Built Area","break",2022,304,3.04,0
+"Built Area","Rangeland","break",2019,281,2.81,0
+"Water","Bare Ground","break",2023,275,2.75,0
+"Crops","Built Area","break",2023,250,2.5,0
+"Water","Crops","flicker",NA,242,2.42,0
+"Crops","Built Area","break",2018,242,2.42,0
+"Trees","Built Area","break",2020,236,2.36,0
+"Water","Flooded Vegetation","flicker",NA,235,2.35,0
+"Bare Ground","Crops","break",2018,233,2.33,0
+"Rangeland","Bare Ground","break",2022,231,2.31,0
+"Built Area","Crops","break",2023,230,2.3,0
+"Built Area","Water","flicker",NA,220,2.2,0
+"Rangeland","Snow/Ice","flicker",NA,207,2.07,0
+"Water","Snow/Ice","flicker",NA,185,1.85,0
+"Snow/Ice","Water","break",2018,185,1.85,0
+"Water","Built Area","break",2022,184,1.84,0
+"Rangeland","Built Area","break",2020,181,1.81,0
+"Water","Rangeland","break",2019,180,1.8,0
+"Water","Bare Ground","break",2022,179,1.79,0
+"Rangeland","Flooded Vegetation","break",2023,167,1.67,0
+"Water","Bare Ground","break",2018,166,1.66,0
+"Rangeland","Water","break",2022,165,1.65,0
+"Water","Rangeland","break",2020,162,1.62,0
+"Trees","Snow/Ice","flicker",NA,162,1.62,0
+"Water","Crops","break",2023,160,1.6,0
+"Flooded Vegetation","Trees","break",2018,158,1.58,0
+"Trees","Crops","break",2019,156,1.56,0
+"Flooded Vegetation","Water","flicker",NA,152,1.52,0
+"Bare Ground","Flooded Vegetation","break",2018,152,1.52,0
+"Rangeland","Water","break",2021,150,1.5,0
+"Water","Rangeland","break",2021,146,1.46,0
+"Rangeland","Built Area","break",2019,133,1.33,0
+"Crops","Built Area","break",2019,129,1.29,0
+"Crops","Trees","break",2023,126,1.26,0
+"Built Area","Rangeland","break",2018,122,1.22,0
+"Rangeland","Flooded Vegetation","break",2018,119,1.19,0
+"Snow/Ice","Bare Ground","flicker",NA,117,1.17,0
+"Crops","Trees","break",2018,111,1.11,0
+"Built Area","Water","break",2023,104,1.04,0
+"Snow/Ice","Built Area","break",2018,104,1.04,0
+"Crops","Built Area","break",2022,101,1.01,0
+"Rangeland","Flooded Vegetation","break",2019,101,1.01,0
+"Water","Trees","break",2020,99,0.99,0
+"Built Area","Bare Ground","break",2023,97,0.97,0
+"Water","Built Area","break",2018,93,0.93,0
+"Crops","Trees","break",2022,93,0.93,0
+"Water","Trees","break",2019,92,0.92,0
+"Flooded Vegetation","Rangeland","break",2019,90,0.9,0
+"Trees","Flooded Vegetation","break",2019,86,0.86,0
+"Crops","Built Area","break",2021,86,0.86,0
+"Bare Ground","Water","break",2019,79,0.79,0
+"Flooded Vegetation","Snow/Ice","flicker",NA,77,0.77,0
+"Bare Ground","Rangeland","break",2020,74,0.74,0
+"Clouds","Water","flicker",NA,70,0.7,0
+"Clouds","Built Area","break",2018,63,0.63,0
+"Crops","Trees","break",2021,62,0.62,0
+"Crops","Water","break",2023,61,0.61,0
+"Trees","Flooded Vegetation","break",2023,60,0.6,0
+"Clouds","Trees","flicker",NA,60,0.6,0
+"Crops","Trees","break",2020,59,0.59,0
+"Bare Ground","Snow/Ice","flicker",NA,55,0.55,0
+"Bare Ground","Rangeland","break",2019,55,0.55,0
+"Built Area","Bare Ground","flicker",NA,54,0.54,0
+"Built Area","Rangeland","break",2022,52,0.52,0
+"Flooded Vegetation","Trees","break",2023,51,0.51,0
+"Built Area","Trees","break",2019,51,0.51,0
+"Rangeland","Water","break",2020,51,0.51,0
+"Built Area","Water","break",2018,45,0.45,0
+"Built Area","Trees","break",2022,45,0.45,0
+"Trees","Flooded Vegetation","break",2018,44,0.44,0
+"Trees","Crops","break",2020,43,0.43,0
+"Water","Built Area","break",2021,42,0.42,0
+"Built Area","Crops","break",2019,41,0.41,0
+"Built Area","Crops","break",2018,40,0.4,0
+"Flooded Vegetation","Crops","flicker",NA,39,0.39,0
+"Crops","Built Area","break",2020,39,0.39,0
+"Clouds","Built Area","flicker",NA,39,0.39,0
+"Water","Flooded Vegetation","break",2023,37,0.37,0
+"Flooded Vegetation","Water","break",2018,37,0.37,0
+"Bare Ground","Rangeland","break",2023,37,0.37,0
+"Built Area","Water","break",2022,35,0.35,0
+"Built Area","Rangeland","break",2020,34,0.34,0
+"Built Area","Trees","break",2021,32,0.32,0
+"Trees","Flooded Vegetation","break",2020,31,0.31,0
+"Flooded Vegetation","Rangeland","break",2023,31,0.31,0
+"Clouds","Water","break",2018,31,0.31,0
+"Built Area","Trees","break",2020,29,0.29,0
+"Water","Bare Ground","break",2021,28,0.28,0
+"Built Area","Crops","break",2022,28,0.28,0
+"Bare Ground","Snow/Ice","break",2018,27,0.27,0
+"Bare Ground","Water","break",2020,26,0.26,0
+"Rangeland","Bare Ground","break",2018,25,0.25,0
+"Flooded Vegetation","Built Area","flicker",NA,23,0.23,0
+"Rangeland","Snow/Ice","break",2018,22,0.22,0
+"Crops","Water","break",2019,21,0.21,0
+"Crops","Trees","break",2019,21,0.21,0
+"Snow/Ice","Trees","break",2022,21,0.21,0
+"Bare Ground","Water","break",2023,20,0.2,0
+"Flooded Vegetation","Rangeland","break",2022,19,0.19,0
+"Snow/Ice","Crops","break",2018,19,0.19,0
+"Crops","Water","break",2018,18,0.18,0
+"Snow/Ice","Bare Ground","break",2023,16,0.16,0
+"Rangeland","Bare Ground","break",2019,16,0.16,0
+"Water","Bare Ground","break",2019,15,0.15,0
+"Snow/Ice","Rangeland","break",2022,15,0.15,0
+"Rangeland","Flooded Vegetation","break",2022,15,0.15,0
+"Water","Snow/Ice","break",2019,12,0.12,0
+"Crops","Water","break",2022,12,0.12,0
+"Built Area","Trees","break",2018,12,0.12,0
+"Bare Ground","Water","break",2022,12,0.12,0
+"Snow/Ice","Bare Ground","break",2018,12,0.12,0
+"Trees","Bare Ground","break",2022,10,0.1,0
+"Flooded Vegetation","Trees","break",2022,10,0.1,0
+"Snow/Ice","Bare Ground","break",2022,10,0.1,0
+"Water","Crops","break",2022,9,0.09,0
+"Snow/Ice","Water","break",2022,9,0.09,0
+"Snow/Ice","Water","break",2023,9,0.09,0
+"Bare Ground","Trees","break",2019,8,0.08,0
+"Crops","Water","break",2021,7,0.07,0
+"Rangeland","Bare Ground","break",2021,7,0.07,0
+"Snow/Ice","Rangeland","break",2023,6,0.06,0
+"Rangeland","Bare Ground","break",2020,6,0.06,0
+"Built Area","Water","break",2019,5,0.05,0
+"Snow/Ice","Trees","break",2021,5,0.05,0
+"Clouds","Trees","break",2018,5,0.05,0
+"Water","Flooded Vegetation","break",2022,4,0.04,0
+"Water","Snow/Ice","break",2023,4,0.04,0
+"Trees","Flooded Vegetation","break",2021,4,0.04,0
+"Trees","Snow/Ice","break",2023,4,0.04,0
+"Built Area","Water","break",2021,4,0.04,0
+"Built Area","Crops","break",2020,4,0.04,0
+"Snow/Ice","Trees","break",2023,4,0.04,0
+"Rangeland","Flooded Vegetation","break",2021,4,0.04,0
+"Water","Flooded Vegetation","break",2019,3,0.03,0
+"Water","Flooded Vegetation","break",2020,3,0.03,0
+"Water","Crops","break",2021,3,0.03,0
+"Water","Snow/Ice","break",2018,3,0.03,0
+"Trees","Snow/Ice","break",2018,3,0.03,0
+"Trees","Snow/Ice","break",2019,3,0.03,0
+"Bare Ground","Rangeland","break",2021,3,0.03,0
+"Clouds","Bare Ground","flicker",NA,3,0.03,0
+"Rangeland","Snow/Ice","break",2019,3,0.03,0
+"Water","Crops","break",2018,2,0.02,0
+"Trees","Flooded Vegetation","break",2022,2,0.02,0
+"Trees","Bare Ground","break",2021,2,0.02,0
+"Flooded Vegetation","Bare Ground","flicker",NA,2,0.02,0
+"Built Area","Crops","break",2021,2,0.02,0
+"Bare Ground","Trees","break",2020,2,0.02,0
+"Bare Ground","Built Area","break",2021,2,0.02,0
+"Rangeland","Snow/Ice","break",2023,2,0.02,0
+"Water","Flooded Vegetation","break",2018,1,0.01,0
+"Water","Built Area","break",2019,1,0.01,0
+"Water","Bare Ground","break",2020,1,0.01,0
+"Water","Snow/Ice","break",2020,1,0.01,0
+"Flooded Vegetation","Built Area","break",2018,1,0.01,0
+"Crops","Water","break",2020,1,0.01,0
+"Bare Ground","Snow/Ice","break",2019,1,0.01,0
+"Bare Ground","Snow/Ice","break",2020,1,0.01,0
+"Clouds","Rangeland","flicker",NA,1,0.01,0
