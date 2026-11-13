@@ -18,9 +18,9 @@ composites at 250 m from 2000-02-18, a cube source).}
 \value{
 A list. Categorical sources have elements \code{stac_url}, \code{collection},
 \code{asset}, \code{available_years}. Cube sources have \code{stac_url}, \code{collection},
-\code{cube = TRUE}, \code{roles} (a named list mapping
-\code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}/\code{mask}
-to asset names), \code{mask_values} (integer mask classes to exclude),
+\code{cube = TRUE}, \code{roles} (a named list mapping the roles the source has,
+from \code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}, and \code{mask}, to asset names; MODIS
+has no \code{green} or \code{swir16}), \code{mask_values} (integer mask classes to exclude),
 \code{scale}/\code{offset} (DN → reflectance affine transform), and
 \code{available_datetime} (an ISO 8601 interval string). A cube source may also
 carry \code{res} (its native resolution in metres, used when the caller passes
@@ -40,7 +40,7 @@ Sources are of two kinds. \strong{Categorical} sources (\code{"io-lulc"},
 \code{asset} name for \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}. \strong{Cube} sources (\code{"sentinel-2-l2a"},
 \code{"modis-13Q1-061"})
 host multi-band reflectance imagery and instead carry a role-based band map
-(\code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}/\code{mask}), mask values, and reflectance scale/offset for
+(some of \code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}, plus \code{mask}), mask values, and reflectance scale/offset for
 \code{\link[=dft_stac_cube]{dft_stac_cube()}}; they are marked with \code{cube = TRUE}. The role-based schema
 means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 change — only the role→asset map and scale/offset differ.

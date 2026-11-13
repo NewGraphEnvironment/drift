@@ -138,9 +138,10 @@ between years is a real one.
 needs to choose composite windows. It is read one day per time step, so
 where adjacent MGRS tiles overlap, their two items of one acquisition count
 once, and a masked tile does not hide a clear one from the same day. "Clear"
-means not in \code{mask_values} (by default cloud, cloud shadow, cirrus \strong{and
-snow}, so a spring or autumn count excludes snow cover as well as cloud), and
-only scenes passing \code{cloud_cover_max} are counted. The counts are whole
+means not in \code{mask_values} (for Sentinel-2 by default cloud, cloud shadow,
+cirrus \strong{and snow}, so a spring or autumn count excludes snow cover as well
+as cloud; for MODIS snow/ice, cloudy and fill, keeping "marginal"), and only
+scenes passing \code{cloud_cover_max} are counted where the source has one. The counts are whole
 numbers with no scale or offset applied, stored as integers, one layer per
 band. The mask is shared, so bands count alike and \code{bands = "red"} is enough.
 A pixel with no clear day is \code{NA}, never 0, because gdalcubes cannot tell a

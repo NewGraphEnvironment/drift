@@ -17,3 +17,4 @@
 - Full suite: [ FAIL 0 | WARN 0 | SKIP 20 | PASS 1774 ]; pkgdown::check_pkgdown() clean; no new lints in touched files
 - /code-check branch round 1: Clean; two below-the-bar points fixed (role plural via cli::qty; a non-UTC window offset is refused rather than read as UTC), with tests
 - /code-check round 2: Clean (fixes verified by mutation). Round 3: one fragile finding, the composite's all-skipped abort advised a higher cloud_cover_max, which MODIS refuses; advice now source-aware, tested. Not inside an earlier fix
+- /code-check round 4: Clean (sweep of 229 condition calls and docs for Sentinel-2-only assumptions). Three below-the-bar doc points fixed (MODIS count masks, roles a source may lack, NULL accepted in the notes). Loop ended on a clean round 4; no round found a defect inside a fix

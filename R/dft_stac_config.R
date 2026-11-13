@@ -10,7 +10,7 @@
 #' `asset` name for [dft_stac_fetch()]. **Cube** sources (`"sentinel-2-l2a"`,
 #' `"modis-13Q1-061"`)
 #' host multi-band reflectance imagery and instead carry a role-based band map
-#' (`red`/`green`/`blue`/`nir`/`swir16`/`mask`), mask values, and reflectance scale/offset for
+#' (some of `red`/`green`/`blue`/`nir`/`swir16`, plus `mask`), mask values, and reflectance scale/offset for
 #' [dft_stac_cube()]; they are marked with `cube = TRUE`. The role-based schema
 #' means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 #' change — only the role→asset map and scale/offset differ.
@@ -23,9 +23,9 @@
 #'
 #' @return A list. Categorical sources have elements `stac_url`, `collection`,
 #'   `asset`, `available_years`. Cube sources have `stac_url`, `collection`,
-#'   `cube = TRUE`, `roles` (a named list mapping
-#'   `red`/`green`/`blue`/`nir`/`swir16`/`mask`
-#'   to asset names), `mask_values` (integer mask classes to exclude),
+#'   `cube = TRUE`, `roles` (a named list mapping the roles the source has,
+#'   from `red`/`green`/`blue`/`nir`/`swir16`, and `mask`, to asset names; MODIS
+#'   has no `green` or `swir16`), `mask_values` (integer mask classes to exclude),
 #'   `scale`/`offset` (DN → reflectance affine transform), and
 #'   `available_datetime` (an ISO 8601 interval string). A cube source may also
 #'   carry `res` (its native resolution in metres, used when the caller passes
