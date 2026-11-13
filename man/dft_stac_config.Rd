@@ -4,21 +4,28 @@
 \alias{dft_stac_config}
 \title{Get STAC configuration for a known source}
 \usage{
-dft_stac_config(source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a"))
+dft_stac_config(
+  source = c("io-lulc", "esa-worldcover", "sentinel-2-l2a", "modis-13Q1-061")
+)
 }
 \arguments{
 \item{source}{Character. One of \code{"io-lulc"} (Esri IO LULC annual v02),
-\code{"esa-worldcover"} (ESA WorldCover), or \code{"sentinel-2-l2a"} (Sentinel-2
-L2A surface reflectance, a cube source).}
+\code{"esa-worldcover"} (ESA WorldCover), \code{"sentinel-2-l2a"} (Sentinel-2
+L2A surface reflectance at 10 m from 2017, a cube source), or
+\code{"modis-13Q1-061"} (MODIS Terra/Aqua MOD13Q1 v6.1 reflectance, 16-day
+composites at 250 m from 2000-02-18, a cube source).}
 }
 \value{
 A list. Categorical sources have elements \code{stac_url}, \code{collection},
 \code{asset}, \code{available_years}. Cube sources have \code{stac_url}, \code{collection},
-\code{cube = TRUE}, \code{roles} (a named list mapping
-\code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}/\code{mask}
-to asset names), \code{mask_values} (integer mask classes to exclude),
+\code{cube = TRUE}, \code{roles} (a named list mapping the roles the source has,
+from \code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}, and \code{mask}, to asset names; MODIS
+has no \code{green} or \code{swir16}), \code{mask_values} (integer mask classes to exclude),
 \code{scale}/\code{offset} (DN → reflectance affine transform), and
-\code{available_datetime} (an ISO 8601 interval string). The \code{cube} field is
+\code{available_datetime} (an ISO 8601 interval string). A cube source may also
+carry \code{res} (its native resolution in metres, used when the caller passes
+none) and \code{cloud_cover = FALSE} (its items have no \code{eo:cloud_cover}, so no
+scene-level cloud filter applies). The \code{cube} field is
 absent (not \code{FALSE}) for categorical sources; test with \code{isTRUE(cfg$cube)}.
 }
 \description{
@@ -30,9 +37,10 @@ users don't need to remember STAC URLs, collection IDs, and band names.
 \details{
 Sources are of two kinds. \strong{Categorical} sources (\code{"io-lulc"},
 \code{"esa-worldcover"}) host single-band classified rasters and carry a flat
-\code{asset} name for \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}. \strong{Cube} sources (\code{"sentinel-2-l2a"})
+\code{asset} name for \code{\link[=dft_stac_fetch]{dft_stac_fetch()}}. \strong{Cube} sources (\code{"sentinel-2-l2a"},
+\code{"modis-13Q1-061"})
 host multi-band reflectance imagery and instead carry a role-based band map
-(\code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}/\code{mask}), mask values, and reflectance scale/offset for
+(some of \code{red}/\code{green}/\code{blue}/\code{nir}/\code{swir16}, plus \code{mask}), mask values, and reflectance scale/offset for
 \code{\link[=dft_stac_cube]{dft_stac_cube()}}; they are marked with \code{cube = TRUE}. The role-based schema
 means a new reflectance source (e.g. Landsat C2 L2) drops in with no API
 change — only the role→asset map and scale/offset differ.
@@ -41,5 +49,6 @@ change — only the role→asset map and scale/offset differ.
 dft_stac_config("io-lulc")
 dft_stac_config("esa-worldcover")
 dft_stac_config("sentinel-2-l2a")
+dft_stac_config("modis-13Q1-061")$roles
 
 }

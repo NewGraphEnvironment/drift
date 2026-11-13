@@ -41,9 +41,12 @@ number of them; \code{c("nir", "red", "green")} is the standard vegetation false
 colour. Layers are named by role, in the order given.}
 
 \item{source}{Character. A cube source name for \code{\link[=dft_stac_config]{dft_stac_config()}} (default
-\code{"sentinel-2-l2a"}).}
+\code{"sentinel-2-l2a"}). \code{"modis-13Q1-061"} has no green band, so give it
+\code{bands} from \code{"red"}, \code{"nir"} and \code{"blue"}.}
 
-\item{res}{Numeric. Output pixel size in CRS units (default 10).}
+\item{res}{Numeric. Output pixel size in CRS units. When not given, the
+source's native resolution where it has one (250 for \code{"modis-13Q1-061"}),
+otherwise 10.}
 
 \item{crs}{Character. Target CRS as an EPSG string. When \code{NULL},
 auto-detected from the AOI centroid's UTM zone.}
@@ -70,7 +73,9 @@ default keeps the whole AOI bounding box. \code{TRUE} uses the same rule as
 
 \item{cloud_cover_max}{Numeric. Scene-level \code{eo:cloud_cover} maximum percent
 (default 20, stricter than the cube's 60 because a composite of few clear
-scenes looks better than one of many cloudy ones).}
+scenes looks better than one of many cloudy ones), or \code{NULL} for none. A
+source with no \code{eo:cloud_cover} (\code{"modis-13Q1-061"}) gets no pre-filter,
+and passing a value for one is an error; see \code{\link[=dft_stac_cube]{dft_stac_cube()}}.}
 
 \item{mask_values}{Integer vector of mask-band classes to exclude. When
 \code{NULL}, taken from \code{\link[=dft_stac_config]{dft_stac_config()}}; for Sentinel-2 that is the SCL
@@ -113,7 +118,8 @@ year, says \strong{when} a place changed. The Esri and Google basemaps in
 \details{
 This is the multi-band sibling of \code{\link[=dft_stac_cube]{dft_stac_cube()}} and shares its read path:
 the same STAC query (paginated, \code{intersects} the AOI, scene-level
-\code{eo:cloud_cover} pre-filter), the same per-pixel mask, the same Sentinel-2
+\code{eo:cloud_cover} pre-filter where the source has one), the same per-pixel
+mask, the same Sentinel-2
 offset correction at the 2022-01-25 processing-baseline boundary, the same
 tiling and the same AOI clip. Where the cube returns one index per month, this
 returns the bands themselves, one time step per window.
@@ -132,9 +138,10 @@ between years is a real one.
 needs to choose composite windows. It is read one day per time step, so
 where adjacent MGRS tiles overlap, their two items of one acquisition count
 once, and a masked tile does not hide a clear one from the same day. "Clear"
-means not in \code{mask_values} (by default cloud, cloud shadow, cirrus \strong{and
-snow}, so a spring or autumn count excludes snow cover as well as cloud), and
-only scenes passing \code{cloud_cover_max} are counted. The counts are whole
+means not in \code{mask_values} (for Sentinel-2 by default cloud, cloud shadow,
+cirrus \strong{and snow}, so a spring or autumn count excludes snow cover as well
+as cloud; for MODIS snow/ice, cloudy and fill, keeping "marginal"), and only
+scenes passing \code{cloud_cover_max} are counted where the source has one. The counts are whole
 numbers with no scale or offset applied, stored as integers, one layer per
 band. The mask is shared, so bands count alike and \code{bands = "red"} is enough.
 A pixel with no clear day is \code{NA}, never 0, because gdalcubes cannot tell a
@@ -143,6 +150,8 @@ day whose read failed for part of a chunk goes uncounted there, so where
 reads fail a count is a lower bound; gdalcubes reports such failures only on
 the console, as a composite's are. A count is not refused
 across the Sentinel-2 2022-01-25 offset change, which does not affect it.
+On \code{"modis-13Q1-061"} each item is a 16-day composite placed at its window
+midpoint, so the count is of clear \strong{composites}, not clear days.
 }
 
 \section{Caching}{

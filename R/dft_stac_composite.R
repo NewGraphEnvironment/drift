@@ -9,7 +9,8 @@
 #'
 #' This is the multi-band sibling of [dft_stac_cube()] and shares its read path:
 #' the same STAC query (paginated, `intersects` the AOI, scene-level
-#' `eo:cloud_cover` pre-filter), the same per-pixel mask, the same Sentinel-2
+#' `eo:cloud_cover` pre-filter where the source has one), the same per-pixel
+#' mask, the same Sentinel-2
 #' offset correction at the 2022-01-25 processing-baseline boundary, the same
 #' tiling and the same AOI clip. Where the cube returns one index per month, this
 #' returns the bands themselves, one time step per window.
@@ -27,9 +28,10 @@
 #' needs to choose composite windows. It is read one day per time step, so
 #' where adjacent MGRS tiles overlap, their two items of one acquisition count
 #' once, and a masked tile does not hide a clear one from the same day. "Clear"
-#' means not in `mask_values` (by default cloud, cloud shadow, cirrus **and
-#' snow**, so a spring or autumn count excludes snow cover as well as cloud), and
-#' only scenes passing `cloud_cover_max` are counted. The counts are whole
+#' means not in `mask_values` (for Sentinel-2 by default cloud, cloud shadow,
+#' cirrus **and snow**, so a spring or autumn count excludes snow cover as well
+#' as cloud; for MODIS snow/ice, cloudy and fill, keeping "marginal"), and only
+#' scenes passing `cloud_cover_max` are counted where the source has one. The counts are whole
 #' numbers with no scale or offset applied, stored as integers, one layer per
 #' band. The mask is shared, so bands count alike and `bands = "red"` is enough.
 #' A pixel with no clear day is `NA`, never 0, because gdalcubes cannot tell a
@@ -38,6 +40,8 @@
 #' reads fail a count is a lower bound; gdalcubes reports such failures only on
 #' the console, as a composite's are. A count is not refused
 #' across the Sentinel-2 2022-01-25 offset change, which does not affect it.
+#' On `"modis-13Q1-061"` each item is a 16-day composite placed at its window
+#' midpoint, so the count is of clear **composites**, not clear days.
 #'
 #' @section Caching:
 #' Each year's composite is written once under [dft_cache_path()] as
@@ -82,8 +86,11 @@
 #'   number of them; `c("nir", "red", "green")` is the standard vegetation false
 #'   colour. Layers are named by role, in the order given.
 #' @param source Character. A cube source name for [dft_stac_config()] (default
-#'   `"sentinel-2-l2a"`).
-#' @param res Numeric. Output pixel size in CRS units (default 10).
+#'   `"sentinel-2-l2a"`). `"modis-13Q1-061"` has no green band, so give it
+#'   `bands` from `"red"`, `"nir"` and `"blue"`.
+#' @param res Numeric. Output pixel size in CRS units. When not given, the
+#'   source's native resolution where it has one (250 for `"modis-13Q1-061"`),
+#'   otherwise 10.
 #' @param crs Character. Target CRS as an EPSG string. When `NULL`,
 #'   auto-detected from the AOI centroid's UTM zone.
 #' @param aggregation Character. How scenes within a window are reduced
@@ -105,7 +112,9 @@
 #'   [dft_stac_cube()]: every cell the polygon touches is kept.
 #' @param cloud_cover_max Numeric. Scene-level `eo:cloud_cover` maximum percent
 #'   (default 20, stricter than the cube's 60 because a composite of few clear
-#'   scenes looks better than one of many cloudy ones).
+#'   scenes looks better than one of many cloudy ones), or `NULL` for none. A
+#'   source with no `eo:cloud_cover` (`"modis-13Q1-061"`) gets no pre-filter,
+#'   and passing a value for one is an error; see [dft_stac_cube()].
 #' @param mask_values Integer vector of mask-band classes to exclude. When
 #'   `NULL`, taken from [dft_stac_config()]; for Sentinel-2 that is the SCL
 #'   cloud, cloud-shadow, cirrus and **snow** classes, so snow cover is masked
@@ -188,6 +197,10 @@ dft_stac_composite <- function(aoi,
       "i" = "Use {.fn dft_stac_fetch} for categorical rasters."
     ))
   }
+  # Before anything reads them: missing() tells a default from a choice (#115).
+  cloud_cover_max <- stac_cloud_cover_resolve(cfg, source, cloud_cover_max,
+                                              explicit = !missing(cloud_cover_max))
+  if (missing(res)) res <- cfg$res %||% res
   aggregation <- aggregation_check(aggregation,
                                    c(.cube_view_aggregations, "count"))
   resampling <- resampling_check(resampling)
@@ -227,9 +240,12 @@ dft_stac_composite <- function(aoi,
     function(cube, offset_use) composite_count_cube(cube, band_assets, bands)
   } else {
     function(cube, offset_use) {
-      exprs <- vapply(band_assets, scale_token, character(1),
+      assets <- band_assets
+      names(assets) <- bands
+      exprs <- vapply(band_expr_names(assets), scale_token, character(1),
                       scale = scale, offset = offset_use, USE.NAMES = FALSE)
-      gdalcubes::apply_pixel(cube, exprs, names = bands)
+      gdalcubes::apply_pixel(cube_bands_rename(cube, assets), exprs,
+                             names = bands)
     }
   }
 
@@ -324,12 +340,17 @@ dft_stac_composite <- function(aoi,
   names(out) <- vapply(years, composite_label, character(1), months = months)
   out <- out[!vapply(out, is.null, logical(1))]
   if (!length(out)) {
-    cli::cli_abort(c(
-      "No year produced a composite.",
-      "i" = "Every window was skipped; the warnings say why. For no scenes or \\
-             no clear pixels, try more {.arg months} or a higher \\
-             {.arg cloud_cover_max}."
-    ))
+    # A source with no scene cloud cover refuses cloud_cover_max (#115), so the
+    # advice names it only where it can be followed.
+    hint <- if (identical(cfg$cloud_cover, FALSE)) {
+      "Every window was skipped; the warnings say why. For no scenes or no \\
+       clear pixels, try more {.arg months}: {.val {source}} has no scene \\
+       cloud cover, and its mask band does the cloud screening."
+    } else {
+      "Every window was skipped; the warnings say why. For no scenes or no \\
+       clear pixels, try more {.arg months} or a higher {.arg cloud_cover_max}."
+    }
+    cli::cli_abort(c("No year produced a composite.", "i" = hint))
   }
   out
 }
@@ -347,7 +368,10 @@ dft_stac_composite <- function(aoi,
 #' single-step cube through unchanged.
 #' @noRd
 composite_count_cube <- function(cube, band_assets, bands) {
-  gdalcubes::reduce_time(cube, paste0("count(", band_assets, ")"),
+  assets <- band_assets
+  names(assets) <- bands
+  gdalcubes::reduce_time(cube_bands_rename(cube, assets),
+                         paste0("count(", band_expr_names(assets), ")"),
                          names = bands)
 }
 

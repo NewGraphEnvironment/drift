@@ -1289,3 +1289,300 @@ test_that("a clean masked read in drift's read shape passes the chunk check (#99
     expect_silent(drift:::cube_check_chunks(nc))
   }
 })
+
+# ---- MODIS MOD13Q1 (#115) -------------------------------------------------
+
+# A MODIS-shaped STAC feature: no `datetime`, a 16-day start/end window, no
+# eo:cloud_cover, and a WKT-only CRS (no proj:epsg), as Planetary Computer
+# serves modis-13Q1-061 (probed 2026-11-13).
+modis_feature <- function(id, start, end) {
+  list(
+    id = id,
+    properties = list(
+      datetime = NULL,
+      start_datetime = start,
+      end_datetime = end,
+      `proj:wkt2` = "PROJCS[\"unnamed\",GEOGCS[\"Unknown datum based upon the custom spheroid\"]]",
+      platform = "terra"
+    ),
+    assets = list(
+      `250m_16_days_red_reflectance` = list(href = "https://example.invalid/red.tif"),
+      `250m_16_days_NIR_reflectance` = list(href = "https://example.invalid/nir.tif"),
+      `250m_16_days_pixel_reliability` = list(href = "https://example.invalid/rel.tif")
+    )
+  )
+}
+
+# Stub the rstac query chain so stac_cube_items() runs with no network. Every
+# stub but items_fetch() passes the query through; items_fetch() returns the
+# fixture, and ext_filter() records that it was called.
+local_stac_query <- function(features, env = parent.frame()) {
+  calls <- new.env()
+  calls$filter <- 0L
+  testthat::local_mocked_bindings(
+    stac = function(...) list(),
+    stac_search = function(q, ...) q,
+    ext_filter = function(q, ...) {
+      calls$filter <- calls$filter + 1L
+      q
+    },
+    post_request = function(q, ...) q,
+    items_fetch = function(q, ...) {
+      structure(list(features = features), class = c("doc_items", "list"))
+    },
+    items_sign = function(items, ...) items,
+    .package = "rstac", .env = env
+  )
+  calls
+}
+
+test_that("a window-only item gets its window midpoint as datetime (#115)", {
+  # off-UTC, so a midpoint computed or formatted in local time would show
+  withr::local_timezone("America/Vancouver")
+  feats <- list(
+    modis_feature("MOD13Q1.A2017161", "2017-06-10T00:00:00.000000Z", "2017-06-25T23:59:59.000000Z"),
+    modis_feature("MYD13Q1.A2017137", "2017-05-17T00:00:00.000000Z", "2017-06-01T23:59:59.000000Z")
+  )
+  out <- drift:::stac_items_datetime(feats)
+  dt <- vapply(out, function(f) f$properties$datetime, "")
+  expect_equal(dt, c("2017-06-17T23:59:59Z", "2017-05-24T23:59:59Z"))
+  # the window itself is kept
+  expect_equal(out[[1]]$properties$start_datetime, feats[[1]]$properties$start_datetime)
+})
+
+test_that("an item that has a datetime is left exactly as it was (#115)", {
+  s2 <- list(
+    id = "S2A_x",
+    properties = list(datetime = "2021-07-04T19:21:11.024000Z", `eo:cloud_cover` = 12),
+    assets = list(SCL = list(href = "x"))
+  )
+  expect_identical(drift:::stac_items_datetime(list(s2)), list(s2))
+})
+
+test_that("an item with neither datetime nor a window is refused, naming it (#115)", {
+  bad <- list(id = "no_time", properties = list(start_datetime = "2017-06-10T00:00:00Z"))
+  expect_error(drift:::stac_items_datetime(list(bad)), "no_time")
+})
+
+test_that("a window in UTC reads, and one at another offset is refused (#115)", {
+  # strptime ignores trailing characters, so a -07:00 window would otherwise be
+  # read as UTC and the midpoint placed seven hours early.
+  ok <- modis_feature("utc", "2017-06-10T00:00:00+00:00", "2017-06-25T23:59:59+00:00")
+  expect_equal(drift:::stac_items_datetime(list(ok))[[1]]$properties$datetime,
+               "2017-06-17T23:59:59Z")
+  off <- modis_feature("pdt", "2017-06-10T00:00:00-07:00", "2017-06-25T23:59:59-07:00")
+  expect_error(drift:::stac_items_datetime(list(off)), class = "drift_item_no_datetime")
+})
+
+test_that("the role refusal counts the missing roles, not the index (#115)", {
+  skip_if_not_installed("gdalcubes")
+  cfg <- dft_stac_config("modis-13Q1-061")
+  one <- tryCatch(drift:::stac_index_roles_check("ndmi", c("nir", "swir16"), cfg, "m"),
+                  error = conditionMessage)
+  two <- tryCatch(drift:::stac_index_roles_check("mndwi", c("green", "swir16"), cfg, "m"),
+                  error = conditionMessage)
+  expect_match(one, "band role \"swir16\"")
+  expect_match(two, "band roles \"green\" and \"swir16\"")
+})
+
+test_that("stac_cube_items keeps MODIS items by month and skips the cloud filter (#115)", {
+  feats <- list(
+    modis_feature("MOD_jun", "2017-06-10T00:00:00Z", "2017-06-25T23:59:59Z"),
+    modis_feature("MYD_may_into_jun", "2017-05-17T00:00:00Z", "2017-06-01T23:59:59Z"),
+    modis_feature("MOD_aug", "2017-08-13T00:00:00Z", "2017-08-28T23:59:59Z")
+  )
+  calls <- local_stac_query(feats)
+  cfg <- dft_stac_config("modis-13Q1-061")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  got <- suppressMessages(drift:::stac_cube_items(
+    cfg, sf::st_transform(aoi, 4326), "2017-05-01/2017-09-30",
+    cloud_cover_max = NULL, months = 6:7, sign_fn = identity
+  ))
+  # On main every MODIS item read as month NA and was dropped. The window
+  # midpoint puts MYD_may_into_jun in May (05-24), so only MOD_jun survives.
+  expect_equal(vapply(got$features, `[[`, "", "id"), "MOD_jun")
+  expect_equal(got$is_pre, FALSE)
+  expect_equal(calls$filter, 0L)
+})
+
+test_that("stac_cube_items still filters Sentinel-2 by eo:cloud_cover (#115)", {
+  s2 <- list(
+    id = "S2A_x",
+    properties = list(datetime = "2021-07-04T19:21:11.024000Z", `eo:cloud_cover` = 12),
+    assets = list(SCL = list(href = "x"))
+  )
+  calls <- local_stac_query(list(s2))
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  got <- suppressMessages(drift:::stac_cube_items(
+    dft_stac_config("sentinel-2-l2a"), sf::st_transform(aoi, 4326),
+    "2021-06-01/2021-08-31", cloud_cover_max = 60, months = NULL,
+    sign_fn = identity
+  ))
+  expect_equal(calls$filter, 1L)
+  expect_identical(got$features, list(s2))
+})
+
+test_that("dft_stac_cube refuses what MODIS cannot do, before any query (#115)", {
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  testthat::local_mocked_bindings(
+    stac = function(...) stop("reached the network"), .package = "rstac"
+  )
+  cache <- withr::local_tempdir()
+  # an explicit cloud filter on a source with no eo:cloud_cover
+  expect_error(
+    dft_stac_cube(aoi, source = "modis-13Q1-061", cloud_cover_max = 60,
+                  datetime = "2010-06-01/2010-08-31", cache_dir = cache),
+    class = "drift_no_cloud_cover"
+  )
+  # an index needing a role the source has no band for
+  for (ix in c("ndmi", "mndwi", "ndwi")) {
+    expect_error(
+      dft_stac_cube(aoi, source = "modis-13Q1-061", index = ix,
+                    datetime = "2010-06-01/2010-08-31", cache_dir = cache),
+      class = "drift_index_role_missing"
+    )
+  }
+  expect_length(list.files(cache, recursive = TRUE), 0L)
+})
+
+test_that("dft_stac_cube defaults keep the Sentinel-2 key and use MODIS's own (#115)", {
+  # Capture what the caller hands the key builder, then stop. The frozen-key
+  # guardian above pins the builder; this pins the caller's defaults, which is
+  # where a missing() resolution could move a Sentinel-2 key.
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  seen <- new.env()
+  testthat::local_mocked_bindings(
+    stac_cube_cache_key = function(aoi_target, res, target_crs, dt, aggregation,
+                                   resampling, stac_url, collection, band_assets,
+                                   datetime, index, cloud_cover_max, ...) {
+      seen$res <- res
+      seen$cc <- cloud_cover_max
+      stop("captured")
+    }
+  )
+  cache <- withr::local_tempdir()
+  expect_error(dft_stac_cube(aoi, datetime = "2021-06-01/2021-08-31",
+                             cache_dir = cache), "captured")
+  expect_equal(seen$res, 10)
+  expect_equal(seen$cc, 60)
+  expect_error(dft_stac_cube(aoi, source = "modis-13Q1-061",
+                             datetime = "2010-06-01/2010-08-31",
+                             cache_dir = cache), "captured")
+  expect_equal(seen$res, 250)
+  expect_null(seen$cc)
+  # an explicit res still wins
+  expect_error(dft_stac_cube(aoi, source = "modis-13Q1-061", res = 500,
+                             datetime = "2010-06-01/2010-08-31",
+                             cache_dir = cache), "captured")
+  expect_equal(seen$res, 500)
+})
+
+test_that("a MODIS index computes over bands whose names start with a digit, and no fill reaches it (#115)", {
+  # tinyexpr reads `250m_...` as the number 250 and an unknown name, so on main
+  # this aborted "Invalid expression(s)" after the whole STAC query (review B1).
+  skip_if_not_installed("gdalcubes")
+  col <- modis_fixture()
+  cfg <- dft_stac_config("modis-13Q1-061")
+  out <- chunk_fixture_write(
+    col, t0 = "2017-07-01", t1 = "2017-07-31", dt = "P1M", aggregation = "median",
+    mask = gdalcubes::image_mask(cfg$roles$mask, values = cfg$mask_values),
+    pixel = function(cube) {
+      dft_index_expr(cube, index = "ndvi", source = "modis-13Q1-061")
+    }
+  )
+  v <- terra::values(terra::rast(out))[, 1]
+  n <- 40L
+  rows <- split(v, rep(seq_len(n), each = n))
+  expect_true(all(is.na(rows[[1]])))   # reflectance and reliability fill
+  expect_true(all(is.na(rows[[2]])))   # cloudy
+  expect_true(all(is.na(rows[[4]])))   # red NoData -1000 alone
+  expect_true(all(is.na(rows[[5]])))   # reliability 255 alone
+  ndvi <- (0.3 - 0.05) / (0.3 + 0.05)
+  expect_equal(rows[[3]], rep(ndvi, n), tolerance = 1e-6)   # marginal is kept
+  expect_equal(unlist(rows[6:n], use.names = FALSE), rep(ndvi, n * (n - 5)),
+               tolerance = 1e-6)
+})
+
+test_that("the band rename leaves a Sentinel-2 expression untouched (#115)", {
+  roles <- dft_stac_config("sentinel-2-l2a")$roles
+  expect_equal(drift:::band_expr_names(unlist(roles[c("nir", "red")])),
+               c(nir = "B08", red = "B04"))
+  modis <- dft_stac_config("modis-13Q1-061")$roles
+  expect_equal(drift:::band_expr_names(unlist(modis[c("nir", "red")])),
+               c(nir = "nir", red = "red"))
+})
+
+test_that("a window-only item whose midpoint is outside the query is dropped (#115)", {
+  feats <- list(
+    modis_feature("MYD_may_into_jun", "2017-05-17T00:00:00Z", "2017-06-01T23:59:59Z"),
+    modis_feature("MOD_jun", "2017-06-10T00:00:00Z", "2017-06-25T23:59:59Z"),
+    modis_feature("MOD_sep_into_oct", "2017-09-30T00:00:00Z", "2017-10-15T23:59:59Z")
+  )
+  local_stac_query(feats)
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  got <- suppressMessages(drift:::stac_cube_items(
+    dft_stac_config("modis-13Q1-061"), sf::st_transform(aoi, 4326),
+    "2017-06-01T00:00:00Z/2017-09-30T23:59:59Z", cloud_cover_max = NULL,
+    months = NULL, sign_fn = identity
+  ))
+  expect_equal(vapply(got$features, `[[`, "", "id"), "MOD_jun")
+  # all outside: "no items", not an empty cube downstream
+  local_stac_query(feats[c(1, 3)])
+  expect_error(suppressMessages(drift:::stac_cube_items(
+    dft_stac_config("modis-13Q1-061"), sf::st_transform(aoi, 4326),
+    "2017-06-01/2017-09-30", cloud_cover_max = NULL, months = NULL,
+    sign_fn = identity
+  )), class = "drift_no_items")
+})
+
+# Network, opt-in: MODIS end-to-end on the packaged AOI (#115).
+test_that("dft_stac_cube reads MODIS MOD13Q1, before 2017 too", {
+  skip_if(Sys.getenv("DRIFT_TEST_NETWORK") != "true",
+          "network test — set DRIFT_TEST_NETWORK=true to run")
+  skip_if_not_installed("gdalcubes")
+  aoi <- sf::st_read(system.file("extdata", "example_aoi.gpkg", package = "drift"),
+                     quiet = TRUE)
+  cache <- withr::local_tempdir()
+  cube <- suppressMessages(dft_stac_cube(
+    aoi, source = "modis-13Q1-061", index = "ndvi",
+    datetime = "2017-06-01/2017-09-30", months = 6:9, cache_dir = cache
+  ))
+  expect_equal(terra::res(cube), c(250, 250))
+  expect_equal(terra::nlyr(cube), 4)
+  aoi_t <- sf::st_transform(aoi, terra::crs(cube))
+  inpoly <- !is.na(terra::values(
+    terra::rasterize(terra::vect(aoi_t), terra::subset(cube, 1), touches = TRUE)
+  ))[, 1]
+  expect_gt(sum(inpoly), 0)
+  vals <- terra::values(cube)
+  # data on every layer inside the polygon (every month of the window is kept)
+  expect_true(all(colSums(!is.na(vals[inpoly, , drop = FALSE])) > 0))
+  expect_true(all(is.na(vals[!inpoly, , drop = FALSE])))
+  v <- vals[!is.na(vals)]
+  expect_true(all(v >= -1 & v <= 1))
+  # a fill in both bands would give exactly 0 (review G3)
+  expect_lt(mean(v == 0), 0.01)
+
+  # reflectance, the check a fill cannot pass: -1000 DN is -0.1
+  comp <- suppressMessages(dft_stac_composite(
+    aoi, years = 2017, months = 6:9, bands = c("red", "nir", "blue"),
+    source = "modis-13Q1-061", cache_dir = cache
+  ))[[1]]
+  r <- terra::values(comp)
+  expect_gt(sum(!is.na(r)), 0)
+  expect_true(all(r[!is.na(r)] >= 0 & r[!is.na(r)] <= 1))
+
+  # before Sentinel-2 exists
+  old <- suppressMessages(dft_stac_cube(
+    aoi, source = "modis-13Q1-061", index = "evi",
+    datetime = "2010-06-01/2010-08-31", cache_dir = cache
+  ))
+  expect_gt(sum(!is.na(terra::values(old))), 0)
+})

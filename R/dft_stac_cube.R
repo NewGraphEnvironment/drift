@@ -20,16 +20,35 @@
 #' `intersects` with the AOI geometry, not a bounding box (floodplain polygons
 #' are highly non-rectangular); and a scene-level `eo:cloud_cover` pre-filter
 #' shrinks the collection before any pixel is read, complementing per-pixel mask
-#' filtering.
+#' filtering. A source whose items carry no `eo:cloud_cover` gets no pre-filter.
+#'
+#' @section Sources:
+#' Two cube sources, both on Microsoft Planetary Computer and free with no
+#' account:
+#' * `"sentinel-2-l2a"`: 10 m, from 2017, cloud-masked with the Scene
+#'   Classification Layer. Every index in [dft_index_table()].
+#' * `"modis-13Q1-061"`: MODIS Terra and Aqua MOD13Q1 v6.1 16-day composites at a
+#'   nominal 250 m, from 2000-02-18, so an index for any year before Sentinel-2.
+#'   Masked with the product's pixel reliability (snow/ice and cloudy). It has
+#'   red, NIR and blue but no green or SWIR band, so it serves `ndvi`, `kndvi`
+#'   and `evi`. Each item is a 16-day window rather than one date; it is placed
+#'   at the window's midpoint, which decides its month for `months` and for the
+#'   monthly layer, so a month holds about four composites (two per satellite).
 #'
 #' @param aoi An `sf` polygon defining the area of interest.
 #' @param source Character. A cube source name for [dft_stac_config()] (default
-#'   `"sentinel-2-l2a"`). Must be a source with `cube = TRUE`.
+#'   `"sentinel-2-l2a"`). Must be a source with `cube = TRUE`:
+#'   `"sentinel-2-l2a"` (10 m, from 2017) or `"modis-13Q1-061"` (MODIS 16-day
+#'   composites at 250 m, from 2000-02-18). MODIS has red, NIR and blue but no
+#'   green or SWIR band, so it serves `ndvi`, `kndvi` and `evi`; an index needing
+#'   another band is refused before any query.
 #' @param index Character. Spectral index from [dft_index_table()] (default
 #'   `"kndvi"`). Determines which band roles (and thus assets) are fetched.
 #' @param datetime Character. ISO 8601 interval `"start/end"`. When `NULL`, uses
 #'   `available_datetime` from [dft_stac_config()].
-#' @param res Numeric. Output pixel size in CRS units (default 10).
+#' @param res Numeric. Output pixel size in CRS units. When not given, the
+#'   source's native resolution where it has one (250 for `"modis-13Q1-061"`),
+#'   otherwise 10.
 #' @param crs Character. Target CRS as an EPSG string. When `NULL`, auto-detected
 #'   from the AOI centroid's UTM zone.
 #' @param dt Character. ISO 8601 duration for the temporal aggregation window
@@ -63,7 +82,10 @@
 #'   stair-stepped superset of the polygon with `NA` where empty tiles were
 #'   skipped), not a gap-free bounding box.
 #' @param cloud_cover_max Numeric. Scene-level `eo:cloud_cover` maximum percent
-#'   for the STAC pre-filter (default 60).
+#'   for the STAC pre-filter (default 60), or `NULL` for no pre-filter. A source
+#'   whose items carry no `eo:cloud_cover` (`"modis-13Q1-061"`) gets no
+#'   pre-filter, since the filter would drop every item; passing a value for one
+#'   is an error. Its mask band does the cloud screening.
 #' @param months Integer vector of calendar months (1-12) to keep, or `NULL`
 #'   (default) for all. Restricting to the growing season (e.g. `6:9`) both
 #'   sharpens the vegetation signal — snow and low-sun winter scenes carry no
@@ -186,6 +208,11 @@ dft_stac_cube <- function(aoi,
       "i" = "Use {.fn dft_stac_fetch} for categorical rasters."
     ))
   }
+  # Before anything reads them: missing() is what tells a default from a value
+  # the caller chose (#115).
+  cloud_cover_max <- stac_cloud_cover_resolve(cfg, source, cloud_cover_max,
+                                              explicit = !missing(cloud_cover_max))
+  if (missing(res)) res <- cfg$res %||% res
   datetime <- datetime %||% cfg$available_datetime
   mask_values <- mask_values %||% cfg$mask_values
   scale <- cfg$scale %||% 1
@@ -215,6 +242,7 @@ dft_stac_cube <- function(aoi,
   # Assets: the index's required roles + the mask role (index_roles errors on
   # an unknown index before any network call)
   roles_needed <- index_roles(index)
+  stac_index_roles_check(index, roles_needed, cfg, source)
   band_assets <- unlist(cfg$roles[roles_needed], use.names = FALSE)
 
   # datetime interval -> cube_view time bounds
@@ -481,7 +509,9 @@ stac_cube_cache_read <- function(cache_file, collection, datetime,
 #' multi-year query returns hundreds of items; a single page silently
 #' truncates); the query uses `intersects` with the AOI geometry, not a bounding
 #' box; and a scene-level `eo:cloud_cover` pre-filter shrinks the collection
-#' before any pixel is read.
+#' before any pixel is read, unless `cloud_cover_max` is `NULL` (a source whose
+#' items carry no `eo:cloud_cover`). A window-only item is placed at its window
+#' midpoint (stac_items_datetime()) and dropped when that falls outside the query.
 #'
 #' @return A list with `features` (the signed, month-filtered STAC features),
 #'   `is_pre` (logical, one per feature: acquired before `cfg$offset_boundary`),
@@ -491,7 +521,7 @@ stac_cube_cache_read <- function(cache_file, collection, datetime,
 stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
                             sign_fn) {
   message("Querying STAC: ", cfg$collection, " (", datetime, ")...")
-  items <- rstac::stac(cfg$stac_url) |>
+  query <- rstac::stac(cfg$stac_url) |>
     rstac::stac_search(
       collections = cfg$collection,
       # union so a multi-feature AOI queries its whole footprint, matching the
@@ -500,11 +530,26 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
       intersects = stac_query_geometry(aoi_wgs84),
       datetime = datetime,
       limit = 500
-    ) |>
-    rstac::ext_filter(`eo:cloud_cover` <= {{cloud_cover_max}}) |>
+    )
+  # NULL for a source whose items have no eo:cloud_cover (#115): a filter on a
+  # property the items lack returns none of them.
+  if (!is.null(cloud_cover_max)) {
+    query <- rstac::ext_filter(query, `eo:cloud_cover` <= {{cloud_cover_max}})
+  }
+  items <- query |>
     rstac::post_request() |>
     rstac::items_fetch() |>
     rstac::items_sign(sign_fn = sign_fn)
+  # One datetime per item, read by the month filter, the offset split and
+  # gdalcubes alike (#115). The search matches a window-only item by overlap, so
+  # one whose midpoint lies outside the query is dropped here: gdalcubes would
+  # skip it, and a query of only such items would then read as an empty cube
+  # ("the AOI does not overlap") instead of "no items".
+  window_only <- vapply(items$features,
+                        function(f) is.null(f$properties$datetime), logical(1))
+  items$features <- stac_items_datetime(items$features)
+  inside <- stac_items_within(items$features, datetime)
+  items$features <- items$features[!window_only | inside]
 
   # Restrict to growing-season (or any) calendar months. Fetching fewer, better
   # months both sharpens the vegetation signal (drops snow/low-sun winter noise)
@@ -550,6 +595,95 @@ stac_cube_items <- function(cfg, aoi_wgs84, datetime, cloud_cover_max, months,
   }
   list(features = items$features, is_pre = is_pre, items = items,
        sign_fn = sign_fn)
+}
+
+
+#' Give a window-only STAC item its window midpoint as `datetime`
+#'
+#' A composite product (MODIS MOD13Q1, #115) carries `datetime: null` and the
+#' window as `start_datetime`/`end_datetime`. Every reader in drift takes
+#' `properties$datetime`, so on such an item the `months` filter read NA and
+#' dropped everything. The midpoint is the rule gdalcubes itself applies to a
+#' window-only item (`stac_image_collection(duration = "center")`), so drift's
+#' month filter and gdalcubes' placement of the image in time agree; and as the
+#' item reaches gdalcubes with a `datetime`, gdalcubes' window branch, which
+#' needs lubridate and skips the item with a warning without it, is never taken.
+#' An item that has a `datetime` is returned unchanged.
+#' @noRd
+stac_items_datetime <- function(features) {
+  lapply(features, function(f) {
+    if (!is.null(f$properties$datetime)) return(f)
+    w <- c(f$properties$start_datetime %||% NA_character_,
+           f$properties$end_datetime %||% NA_character_)
+    # UTC only: strptime ignores trailing characters, so any other offset would be
+    # parsed and silently dropped. Such a time is refused below as unreadable.
+    utc <- grepl(paste0("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}",
+                        "([.][0-9]+)?(Z|[+]00:00)?$"), w)
+    t <- as.POSIXct(sub("(Z|[+]00:00)$", "", w), format = "%Y-%m-%dT%H:%M:%OS",
+                    tz = "UTC")
+    t[!utc] <- NA
+    if (anyNA(t)) {
+      id <- f$id %||% NA_character_ # nolint: object_usage_linter. cli template
+      cli::cli_abort(c(
+        "STAC item {.val {id}} has no {.field datetime} and no readable \\
+         {.field start_datetime}/{.field end_datetime} window."
+      ), class = "drift_item_no_datetime")
+    }
+    mid <- t[1] + (as.numeric(t[2]) - as.numeric(t[1])) / 2
+    f$properties$datetime <- format(mid, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+    f
+  })
+}
+
+
+#' Is each item's `datetime` date inside the query interval (inclusive)?
+#'
+#' Compared by date: the query may be written with or without times
+#' (`2017-06-01/2017-09-30` or `...T00:00:00Z/...T23:59:59Z`).
+#' @noRd
+stac_items_within <- function(features, datetime) {
+  dr <- as.Date(substr(strsplit(datetime, "/", fixed = TRUE)[[1]], 1, 10))
+  d <- as.Date(substr(vapply(features, function(f) f$properties$datetime, ""), 1, 10))
+  !is.na(d) & d >= dr[1] & d <= dr[2]
+}
+
+
+#' Resolve `cloud_cover_max` for a source, refusing one it cannot apply
+#'
+#' A source whose items carry no `eo:cloud_cover` (`cfg$cloud_cover` FALSE,
+#' MODIS, #115) gets `NULL`, meaning no pre-filter: the filter would return no
+#' items. A value the caller passed for such a source is refused rather than
+#' dropped, so nobody believes a cloud threshold was applied. Every other source
+#' gets the value unchanged, which keeps its cache keys where they were.
+#' @noRd
+stac_cloud_cover_resolve <- function(cfg, source, cloud_cover_max, explicit) {
+  if (!identical(cfg$cloud_cover, FALSE)) return(cloud_cover_max)
+  if (explicit && !is.null(cloud_cover_max)) {
+    cli::cli_abort(c(
+      "Source {.val {source}} has no scene cloud cover, so \\
+       {.arg cloud_cover_max} cannot be applied.",
+      "i" = "Its items carry no {.field eo:cloud_cover}; its mask band does \\
+             the cloud screening. Leave {.arg cloud_cover_max} unset, or pass \\
+             {.code NULL}."
+    ), class = "drift_no_cloud_cover")
+  }
+  NULL
+}
+
+
+#' Refuse an index whose band roles the source does not have, before any query
+#'
+#' Without this the missing role was dropped from the asset list and the call
+#' went through the whole STAC query before the expression failed (#115).
+#' @noRd
+stac_index_roles_check <- function(index, roles_needed, cfg, source) {
+  absent <- setdiff(roles_needed, setdiff(names(cfg$roles), "mask"))
+  if (!length(absent)) return(invisible(TRUE))
+  cli::cli_abort(c(
+    "Index {.val {index}} needs band {cli::qty(length(absent))}role{?s} \\
+     {.val {absent}}, which {.val {source}} does not have.",
+    "i" = "Roles it has: {.val {setdiff(names(cfg$roles), 'mask')}}."
+  ), class = "drift_index_role_missing")
 }
 
 

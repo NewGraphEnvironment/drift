@@ -16,7 +16,7 @@ Detecting Riparian and Inland Floodplain Transitions — track land cover change
 - `R/` — package functions, `tests/testthat/` — testthat 3e tests, `vignettes/` — worked examples;
   `vignettes/articles/` — pkgdown-only articles, excluded from the tarball by `.Rbuildignore`
 - `inst/lulc_classes/` — shipped CSV class tables (code, class_name, color, description)
-- `inst/indices/` — spectral-index registry CSV (ndvi, kndvi, ndmi) read by `dft_index_table()`
+- `inst/indices/` — spectral-index registry CSV (ndvi, kndvi, ndmi, ndwi, mndwi, evi) read by `dft_index_table()`
 - `inst/extdata/` — small test rasters (Neexdzii Kwa reach; IO LULC for every year 2017–2023 on one grid, 237KB total)
 - `inst/notes/` — durable technical reference (see Reference docs below)
 - `inst/cartography/` — `gq_reg_custom()` layer CSVs, so figures carry no hardcoded colour. Note
@@ -72,6 +72,15 @@ cube   <- dft_stac_cube(aoi, source = "sentinel-2-l2a", index = "kndvi",
                         datetime = "2017-01-01/2023-12-31", months = 6:9)  # returns a terra stack
 breaks <- dft_rast_break(cube, start = c(2022, 1))   # abrupt change, dated (BFAST bfastmonitor)
 trend  <- dft_rast_trend(cube)                        # gradual change (Theil-Sen slope + Mann-Kendall)
+```
+
+Before 2017 (#115): MODIS MOD13Q1 16-day composites at 250 m from 2000, same catalogue, no account.
+`ndvi`/`kndvi`/`evi` only (no green or SWIR). Items are 16-day windows placed at their midpoint;
+no `eo:cloud_cover`, so a `cloud_cover_max` value is refused (`NULL` is fine); `res` defaults to 250:
+
+```r
+cube <- dft_stac_cube(aoi, source = "modis-13Q1-061", index = "kndvi",
+                      datetime = "2008-01-01/2017-12-31", months = 6:9)
 ```
 
 Dated reference imagery (#79): per-year median reflectance composites on the same read path as
@@ -151,8 +160,10 @@ devtools::install()    # needed before rendering vignettes
 
 The bundled Neexdzii Kwa tile is 314 x 326 cells and cannot reach memory or runtime failure modes. A real floodplain-scale pair is two downloads away — the BULK watershed group item on stac-floodplains-bc, already clipped to the floodplain, ~1.2 MB each:
 
-- `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2017.tif`
-- `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_co_ff04/classified_2023.tif`
+- `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_all_ff04/classified_2017.tif`
+- `https://stac-floodplains-bc.s3.us-west-2.amazonaws.com/bulk_all_ff04/classified_2023.tif`
+
+**The item moved (read 2026-11-13).** `bulk_co_ff04` now answers 403 for every asset. Its successor, `bulk_all_ff04`, carries all seven classified years (2017-2023), so no IO LULC fetch is needed for an annual series. Its `floodplain.gpkg` holds `all_ff02`/`all_ff04`/`all_ff06` (two features each), with no `co_ff04` layer. The shape and reference timings below were measured on `co_ff04`, and `data-raw/benchmark_break_class_bulk.R` still names the old URL.
 
 Shape: 14651 x 11552 at 10 m (EPSG:32609), 169M cells, 97.7% `NA` outside the floodplain threads. The item carries **three** classified years (2017/2020/2023); for an annual series, fetch IO LULC 2017-2023 for its `floodplain.gpkg` (`layer = "co_ff04"` — the file also holds ff02/ff06 and `st_read()` silently takes ff02) with `dft_stac_fetch(tile_size = 20000)`: 30 tiles/year, 23.6 min for seven, a 16000 x 12000 grid (192M cells) — `data-raw/benchmark_break_class_bulk.R` (#9). The seven come back in memory (~1.5 GB each), an 8.5-20 GB RSS floor before any function runs. Reference timings (2026-09-05, 64 GB machine): `dft_rast_transition()` 4 s, `dft_transition_vectors(changes_only = TRUE)` 12 s → 21,701 change patches / 4,625 ha, `dft_transition_artifact()` 143 s, pipeline peak 10.7 GB RSS. Item listing at `https://images.a11s.one/collections/stac-floodplains-bc/items` — paginate with `limit=10`; `limit=50` returned an empty body.
 

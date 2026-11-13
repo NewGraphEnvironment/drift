@@ -174,3 +174,20 @@ are both green, so kNDVI cannot cleanly separate them — the continuous tools a
 strongest on clear canopy removal and gradual trends, and weakest at telling
 riparian tree from rangeland. Used with the categorical map, they say whether a
 mapped change is *real*, which *way* it is going, and *when* it happened.
+
+## What about years before 2017?
+
+Sentinel-2 starts in 2017. For an index in earlier years, use MODIS: the same
+call with `source = "modis-13Q1-061"` reads the MOD13Q1 16-day composites from
+2000 on, from the same catalogue and with no account.
+
+```{r modis, eval = FALSE}
+cube_2008 <- dft_stac_cube(aoi, source = "modis-13Q1-061", index = "kndvi",
+                           datetime = "2008-01-01/2017-12-31", months = 6:9)
+```
+
+The cells are 250 m rather than 10 m, which suits a site-level or reach-level
+series better than the patch-level questions above. A whole harvest block is a
+few MODIS cells, and a riparian strip narrower than one cell is mixed with what
+lies beside it. MODIS has no SWIR16 or green band, so it serves `ndvi`, `kndvi`
+and `evi` only.
