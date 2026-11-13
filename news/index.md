@@ -1,5 +1,38 @@
 # Changelog
 
+## drift 0.25.0
+
+- **MODIS vegetation indices from 2000
+  ([\#115](https://github.com/NewGraphEnvironment/drift/issues/115)).**
+  `dft_stac_cube(source = "modis-13Q1-061")` reads the MOD13Q1 v6.1
+  16-day composites (Terra and Aqua, 250 m) from Microsoft Planetary
+  Computer, the same catalogue and signing as Sentinel-2, with no
+  account. A survey run before 2017 now gets an index from drift.
+  [`dft_stac_composite()`](https://www.newgraphenvironment.com/drift/reference/dft_stac_composite.md)
+  reads it too.
+  - The source has red, NIR and blue but no green or SWIR band, so it
+    serves `ndvi`, `kndvi` and the new `evi`. An index that needs
+    another band is refused before any query.
+  - Each item is a 16-day window rather than a date. drift places it at
+    the window midpoint, the rule gdalcubes applies. Before this, the
+    `months` filter dropped every such item. An item whose midpoint
+    falls outside the query is dropped.
+  - The items carry no `eo:cloud_cover`, and a filter on it returns
+    nothing, so none is applied: the pixel-reliability mask (snow/ice,
+    cloudy, fill) does the screening. Passing a `cloud_cover_max` value
+    for this source is an error (`NULL` is fine). `res` defaults to the
+    source’s 250 m.
+  - The MODIS asset names start with a digit, which gdalcubes cannot
+    read inside a pixel expression. Such bands are renamed to their role
+    first. Sentinel-2 calls, their defaults and their cache keys are
+    unchanged.
+- **`evi` in the index registry**, from NIR, red and blue, for
+  Sentinel-2 and MODIS alike. It saturates less than NDVI under dense
+  canopy.
+- **`citation("drift")` and `CITATION.cff` cite the package by its
+  Zenodo concept DOI**, which resolves to every archived release. It is
+  held once, in `DESCRIPTION`’s `Config/DOI`.
+
 ## drift 0.24.3
 
 - **The README describes what drift does today

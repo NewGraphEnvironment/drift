@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">drift</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.24.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.25.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,9 +35,23 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.png" class="logo" alt=""><h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/NewGraphEnvironment/drift/blob/v0.25.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.25.0" id="drift-0250">drift 0.25.0<a class="anchor" aria-label="anchor" href="#drift-0250"></a></h2>
+<ul><li>
+<strong>MODIS vegetation indices from 2000 (<a href="https://github.com/NewGraphEnvironment/drift/issues/115" class="external-link">#115</a>).</strong> <code>dft_stac_cube(source = "modis-13Q1-061")</code> reads the MOD13Q1 v6.1 16-day composites (Terra and Aqua, 250 m) from Microsoft Planetary Computer, the same catalogue and signing as Sentinel-2, with no account. A survey run before 2017 now gets an index from drift. <code><a href="../reference/dft_stac_composite.html">dft_stac_composite()</a></code> reads it too.
+<ul><li>The source has red, NIR and blue but no green or SWIR band, so it serves <code>ndvi</code>, <code>kndvi</code> and the new <code>evi</code>. An index that needs another band is refused before any query.</li>
+<li>Each item is a 16-day window rather than a date. drift places it at the window midpoint, the rule gdalcubes applies. Before this, the <code>months</code> filter dropped every such item. An item whose midpoint falls outside the query is dropped.</li>
+<li>The items carry no <code>eo:cloud_cover</code>, and a filter on it returns nothing, so none is applied: the pixel-reliability mask (snow/ice, cloudy, fill) does the screening. Passing a <code>cloud_cover_max</code> value for this source is an error (<code>NULL</code> is fine). <code>res</code> defaults to the source’s 250 m.</li>
+<li>The MODIS asset names start with a digit, which gdalcubes cannot read inside a pixel expression. Such bands are renamed to their role first. Sentinel-2 calls, their defaults and their cache keys are unchanged.</li>
+</ul></li>
+<li>
+<strong><code>evi</code> in the index registry</strong>, from NIR, red and blue, for Sentinel-2 and MODIS alike. It saturates less than NDVI under dense canopy.</li>
+<li>
+<strong><code>citation("drift")</code> and <code>CITATION.cff</code> cite the package by its Zenodo concept DOI</strong>, which resolves to every archived release. It is held once, in <code>DESCRIPTION</code>’s <code>Config/DOI</code>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.24.3" id="drift-0243">drift 0.24.3<a class="anchor" aria-label="anchor" href="#drift-0243"></a></h2>
 <ul><li>
