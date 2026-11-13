@@ -14,3 +14,4 @@
 - Live (packaged AOI, 2017-06/09): 16 items (18 before the window drop), 4 monthly layers at 250 m, 82 cells each; kndvi 0.33-0.60, evi 0.23-0.58; 2010 ndvi 0.48-0.80; composite min reflectance red 0.018-0.035, nir 0.094-0.26. Opt-in network test green (10 expectations), with the file's Sentinel-2 network tests
 - BULK scale run (co_ff04 from the local floodplains copy; `bulk_co_ff04` now 403s, its successor `bulk_all_ff04` has no co_ff04 layer): MODIS kNDVI 2008-2017 months 6:9, 314 items, 587 x 463 x 120 layers (40 summer layers with data, median 16,336 cells), 21.7 min wall, peak RSS 1.74 GiB (`/usr/bin/time -l`). The run's 160 warnings were the probe's own range() over the 80 empty months, confirmed on the cached cube
 - Owner, mid-run: finish #115 to an open PR, then merge it with /gh-pr-merge
+- Full suite: [ FAIL 0 | WARN 0 | SKIP 20 | PASS 1774 ]; pkgdown::check_pkgdown() clean; no new lints in touched files

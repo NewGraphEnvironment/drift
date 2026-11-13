@@ -58,7 +58,7 @@
 ## Phase 5: Docs and release prep
 
 - [x] CLAUDE.md Core Pipeline gains a MODIS line (above the marker); the moved BULK item noted there. NEWS is written by `/gh-pr-merge` at the release (repo practice, `69371d8`); the draft entry goes in the PR body.
-- [ ] `lintr::lint_package()`, the full `devtools::test()`, `pkgdown::check_pkgdown()`.
+- [x] `lintr::lint_package()`, the full `devtools::test()`, `pkgdown::check_pkgdown()`.
 - [x] Version bump: done by `/gh-pr-merge` in its release commit, as for v0.24.3 (`69371d8`), not on the branch.
 
 ## Owed at the end (reported, done after merge)
@@ -67,7 +67,7 @@
 
 ## Validation
 
-- [ ] Tests pass
+- [x] Tests pass
 - [ ] `/code-check` clean (once over the branch with `/code-check branch`)
 - [ ] PWF checkboxes match landed work
 - [ ] `/planning-archive` on completion
