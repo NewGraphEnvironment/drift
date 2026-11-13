@@ -5,10 +5,13 @@
 #' cube, returning a single-band cube named after the index.
 #'
 #' Index formulas are stored in a shipped registry ([dft_index_table()]) written
-#' over band **roles** (`red`, `nir`, `swir16`), not literal asset names. The
-#' roles are resolved to per-source asset names via [dft_stac_config()], so the
-#' same `"kndvi"` works against Sentinel-2 (`B04`/`B08`) or any future
-#' reflectance source without changing the formula.
+#' over band **roles** (`red`, `green`, `blue`, `nir`, `swir16`), not literal
+#' asset names. The roles are resolved to per-source asset names via
+#' [dft_stac_config()], so the same `"kndvi"` works against Sentinel-2
+#' (`B04`/`B08`) and MODIS (`250m_16_days_red_reflectance`/`..._NIR_...`)
+#' without changing the formula. A band whose asset name is not a valid
+#' expression identifier (the MODIS names start with a digit) is renamed to its
+#' role in the cube before the expression is applied.
 #'
 #' Reflectance `scale`/`offset` are folded **into** the expression as a per-band
 #' affine transform `(asset * scale + offset)`. This matters for ratio indices:

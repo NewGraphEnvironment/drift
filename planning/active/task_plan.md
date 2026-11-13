@@ -45,8 +45,8 @@
 - [x] G3/G4: the offline fixture also carries -1000 reflectance NoData and reliability 255/3 pixels, and asserts NA there and the hand value elsewhere.
 - [x] G6: drop window-only items whose midpoint falls outside the query window, in `stac_cube_items()`; tested.
 - [x] A2: the cloud refusal names `NULL` as accepted; A3: midpoint test under an off-UTC timezone.
-- [ ] G2/G5: docs — composite bands for MODIS and what `count` counts on it; the cube/composite/items/package/index docs and the trajectory vignette stop calling Sentinel-2 the only cube source.
-- [ ] A4: config comment says 250 m is the product's nominal size (grid 231.656 m); A6: collection is open-ended (STAC extent `2000-02-18/null`, read 2026-11-13), so the end date is the default window, said so.
+- [x] G2/G5: docs — composite bands for MODIS and what `count` counts on it; the cube/composite/items/package/index docs and the trajectory vignette stop calling Sentinel-2 the only cube source.
+- [x] A4: config comment says 250 m is the product's nominal size (grid 231.656 m); A6: collection is open-ended (STAC extent `2000-02-18/null`, read 2026-11-13), so the end date is the default window, said so.
 - [ ] A5 (pre-existing: monthly layer labels whatever `dt`) filed as its own issue.
 
 ## Phase 4: Live verification

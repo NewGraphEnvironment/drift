@@ -40,10 +40,13 @@ cube, returning a single-band cube named after the index.
 }
 \details{
 Index formulas are stored in a shipped registry (\code{\link[=dft_index_table]{dft_index_table()}}) written
-over band \strong{roles} (\code{red}, \code{nir}, \code{swir16}), not literal asset names. The
-roles are resolved to per-source asset names via \code{\link[=dft_stac_config]{dft_stac_config()}}, so the
-same \code{"kndvi"} works against Sentinel-2 (\code{B04}/\code{B08}) or any future
-reflectance source without changing the formula.
+over band \strong{roles} (\code{red}, \code{green}, \code{blue}, \code{nir}, \code{swir16}), not literal
+asset names. The roles are resolved to per-source asset names via
+\code{\link[=dft_stac_config]{dft_stac_config()}}, so the same \code{"kndvi"} works against Sentinel-2
+(\code{B04}/\code{B08}) and MODIS (\verb{250m_16_days_red_reflectance}/\code{..._NIR_...})
+without changing the formula. A band whose asset name is not a valid
+expression identifier (the MODIS names start with a digit) is renamed to its
+role in the cube before the expression is applied.
 
 Reflectance \code{scale}/\code{offset} are folded \strong{into} the expression as a per-band
 affine transform \code{(asset * scale + offset)}. This matters for ratio indices:

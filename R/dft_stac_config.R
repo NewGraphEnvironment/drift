@@ -108,12 +108,15 @@ dft_stac_config <- function(source = c("io-lulc", "esa-worldcover",
       mask_values = c(2L, 3L, 255L),
       scale = 1e-4,
       offset = 0,
-      # Native resolution, used by dft_stac_cube()/dft_stac_composite() when
-      # `res` is not passed (their 10 m default would be 625x the cells).
+      # The product's nominal resolution (its sinusoidal grid is 231.656 m),
+      # used by dft_stac_cube()/dft_stac_composite() when `res` is not passed
+      # (their 10 m default would be 625x the cells).
       res = 250,
       # Items carry no eo:cloud_cover; a filter on it returns no items at all.
       # The pixel_reliability mask does the cloud screening instead.
       cloud_cover = FALSE,
+      # The collection is open-ended (STAC extent 2000-02-18/null, read
+      # 2026-11-13); the end here is only the default window when none is given.
       available_datetime = "2000-02-18/2025-12-31"
     )
     # "landsat-c2-l2" drops in with the same cube shape, no API change:

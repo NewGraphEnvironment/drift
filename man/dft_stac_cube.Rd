@@ -186,8 +186,25 @@ returns hundreds of items; a single page silently truncates); the query uses
 \code{intersects} with the AOI geometry, not a bounding box (floodplain polygons
 are highly non-rectangular); and a scene-level \code{eo:cloud_cover} pre-filter
 shrinks the collection before any pixel is read, complementing per-pixel mask
-filtering.
+filtering. A source whose items carry no \code{eo:cloud_cover} gets no pre-filter.
 }
+\section{Sources}{
+
+Two cube sources, both on Microsoft Planetary Computer and free with no
+account:
+\itemize{
+\item \code{"sentinel-2-l2a"}: 10 m, from 2017, cloud-masked with the Scene
+Classification Layer. Every index in \code{\link[=dft_index_table]{dft_index_table()}}.
+\item \code{"modis-13Q1-061"}: MODIS Terra and Aqua MOD13Q1 v6.1 16-day composites at a
+nominal 250 m, from 2000-02-18, so an index for any year before Sentinel-2.
+Masked with the product's pixel reliability (snow/ice and cloudy). It has
+red, NIR and blue but no green or SWIR band, so it serves \code{ndvi}, \code{kndvi}
+and \code{evi}. Each item is a 16-day window rather than one date; it is placed
+at the window's midpoint, which decides its month for \code{months} and for the
+monthly layer, so a month holds about four composites (two per satellite).
+}
+}
+
 \examples{
 \dontrun{
 # Monthly kNDVI cube for a floodplain reach (requires network + gdalcubes)

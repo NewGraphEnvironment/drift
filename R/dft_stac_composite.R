@@ -9,7 +9,8 @@
 #'
 #' This is the multi-band sibling of [dft_stac_cube()] and shares its read path:
 #' the same STAC query (paginated, `intersects` the AOI, scene-level
-#' `eo:cloud_cover` pre-filter), the same per-pixel mask, the same Sentinel-2
+#' `eo:cloud_cover` pre-filter where the source has one), the same per-pixel
+#' mask, the same Sentinel-2
 #' offset correction at the 2022-01-25 processing-baseline boundary, the same
 #' tiling and the same AOI clip. Where the cube returns one index per month, this
 #' returns the bands themselves, one time step per window.
@@ -38,6 +39,8 @@
 #' reads fail a count is a lower bound; gdalcubes reports such failures only on
 #' the console, as a composite's are. A count is not refused
 #' across the Sentinel-2 2022-01-25 offset change, which does not affect it.
+#' On `"modis-13Q1-061"` each item is a 16-day composite placed at its window
+#' midpoint, so the count is of clear **composites**, not clear days.
 #'
 #' @section Caching:
 #' Each year's composite is written once under [dft_cache_path()] as

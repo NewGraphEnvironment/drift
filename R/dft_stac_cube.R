@@ -20,7 +20,20 @@
 #' `intersects` with the AOI geometry, not a bounding box (floodplain polygons
 #' are highly non-rectangular); and a scene-level `eo:cloud_cover` pre-filter
 #' shrinks the collection before any pixel is read, complementing per-pixel mask
-#' filtering.
+#' filtering. A source whose items carry no `eo:cloud_cover` gets no pre-filter.
+#'
+#' @section Sources:
+#' Two cube sources, both on Microsoft Planetary Computer and free with no
+#' account:
+#' * `"sentinel-2-l2a"`: 10 m, from 2017, cloud-masked with the Scene
+#'   Classification Layer. Every index in [dft_index_table()].
+#' * `"modis-13Q1-061"`: MODIS Terra and Aqua MOD13Q1 v6.1 16-day composites at a
+#'   nominal 250 m, from 2000-02-18, so an index for any year before Sentinel-2.
+#'   Masked with the product's pixel reliability (snow/ice and cloudy). It has
+#'   red, NIR and blue but no green or SWIR band, so it serves `ndvi`, `kndvi`
+#'   and `evi`. Each item is a 16-day window rather than one date; it is placed
+#'   at the window's midpoint, which decides its month for `months` and for the
+#'   monthly layer, so a month holds about four composites (two per satellite).
 #'
 #' @param aoi An `sf` polygon defining the area of interest.
 #' @param source Character. A cube source name for [dft_stac_config()] (default
@@ -496,7 +509,9 @@ stac_cube_cache_read <- function(cache_file, collection, datetime,
 #' multi-year query returns hundreds of items; a single page silently
 #' truncates); the query uses `intersects` with the AOI geometry, not a bounding
 #' box; and a scene-level `eo:cloud_cover` pre-filter shrinks the collection
-#' before any pixel is read.
+#' before any pixel is read, unless `cloud_cover_max` is `NULL` (a source whose
+#' items carry no `eo:cloud_cover`). A window-only item is placed at its window
+#' midpoint (stac_items_datetime()) and dropped when that falls outside the query.
 #'
 #' @return A list with `features` (the signed, month-filtered STAC features),
 #'   `is_pre` (logical, one per feature: acquired before `cfg$offset_boundary`),
